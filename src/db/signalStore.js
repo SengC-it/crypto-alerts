@@ -17,7 +17,15 @@ class SignalStore {
   async _initSupabase() {
     try {
       const { createClient } = await import('@supabase/supabase-js');
-      this.supabase = createClient(CONFIG.SUPABASE.URL, CONFIG.SUPABASE.KEY);
+      // Node.js < 22 doesn't have native WebSocket, needs ws as transport
+      let options = {};
+      try {
+        const wsModule = await import('ws');
+        options = { realtime: { transport: wsModule.default || wsModule.WebSocket || wsModule } };
+      } catch {
+        // ws not available, skip realtime config
+      }
+      this.supabase = createClient(CONFIG.SUPABASE.URL, CONFIG.SUPABASE.KEY, options);
       await this._ensureTable();
       console.log('[DB] Supabase connected');
     } catch (err) {
