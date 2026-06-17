@@ -61,14 +61,14 @@ export const CONFIG = {
     },
     tier2: {
       name: '热门',
-      symbols: (process.env.TIER2_PAIRS || 'XRPUSDT,ADAUSDT,DOGEUSDT,AVAXUSDT,MATICUSDT,LINKUSDT,DOTUSDT,ARBUSDT,NEARUSDT,LTCUSDT,ATOMUSDT,UNIUSDT,FILUSDT')
+      symbols: (process.env.TIER2_PAIRS || 'XRPUSDT,ADAUSDT,AVAXUSDT,LINKUSDT,DOTUSDT,ARBUSDT,NEARUSDT,LTCUSDT,ATOMUSDT,UNIUSDT')
         .split(',').map(s => s.toUpperCase().trim()),
       intervalMinutes: 60,    // 1小时检查一次
       cooldownMinutes: 240,   // 4小时冷却
     },
     tier3: {
       name: '新锐',
-      symbols: (process.env.TIER3_PAIRS || 'APTUSDT,SUIUSDT,RNDRUSDT,STXUSDT,IMXUSDT,AAVEUSDT')
+      symbols: (process.env.TIER3_PAIRS || 'APTUSDT,STXUSDT,IMXUSDT,AAVEUSDT')
         .split(',').map(s => s.toUpperCase().trim()),
       intervalMinutes: 240,   // 4小时检查一次
       cooldownMinutes: 480,   // 8小时冷却
@@ -143,7 +143,7 @@ export const CONFIG = {
 
   // 信号质量过滤配置（v2 优化）
   SIGNAL_FILTER: {
-    minConfidence: 40,              // 从30提到40，过滤低质量信号
+    minConfidence: 60,              // 中频方案：60% 只通知高确定性信号
     filterConflicts: true,
     boostResonance: true,
     buyRequiresTrendConfirm: true,  // 做多需要趋势确认（价格>SMA50）

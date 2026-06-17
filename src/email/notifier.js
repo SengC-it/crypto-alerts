@@ -134,12 +134,17 @@ function buildHtml(signal) {
     </div>
 
     <!-- Footer -->
-    <div style="padding:16px;border-top:1px solid #2a2a4a;text-align:center;">
-      <p style="margin:0;color:#666;font-size:11px;">
-        本工具仅提供信号提醒，不自动执行交易。过往表现不代表未来收益，交易需自行承担风险。
-      </p>
-      <p style="margin:4px 0 0;color:#444;font-size:10px;">
-        Crypto Alerts | ${new Date().toISOString()}
+    <div style="padding:16px;border-top:1px solid #2a2a4a;">
+      <div style="background:#1a0a0a;border:1px solid #ea394355;border-radius:8px;padding:12px;margin-bottom:12px;">
+        <div style="color:#ea3943;font-size:12px;font-weight:bold;margin-bottom:4px;">⚠️ 风险提示</div>
+        <div style="color:#ccc;font-size:11px;line-height:1.5;">
+          本信号仅供参考，不构成投资建议。历史回测胜率约40%，扣除手续费/滑点后净收益有限。
+          加密货币波动极大，任何交易均有亏损风险，请根据自身情况谨慎决策。
+          切勿全仓操作，建议单笔风险不超过总资金2%。
+        </div>
+      </div>
+      <p style="margin:0;color:#666;font-size:11px;text-align:center;">
+        Crypto Alerts 信号提醒系统 | 仅供研究参考 | ${new Date().toISOString()}
       </p>
     </div>
   </div>
