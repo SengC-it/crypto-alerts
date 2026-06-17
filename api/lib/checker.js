@@ -1,12 +1,12 @@
 // Serverless-friendly signal checker
 // 拉取 Binance REST 数据 → 计算指标 → 运行策略 → 去重 → 存储 + 发邮件
 
-import { CONFIG } from '../src/config.js';
-import { getCandles } from '../src/websocket/rest.js';
-import { computeAllIndicators } from '../src/indicators/index.js';
-import { runStrategies } from '../src/strategies/manager.js';
-import { signalStore } from '../src/db/signalStore.js';
-import { sendSignalEmail } from '../src/email/notifier.js';
+import { CONFIG } from '../../src/config.js';
+import { getCandles } from '../../src/websocket/rest.js';
+import { computeAllIndicators } from '../../src/indicators/index.js';
+import { runStrategies } from '../../src/strategies/manager.js';
+import { signalStore } from '../../src/db/signalStore.js';
+import { sendSignalEmail } from '../../src/email/notifier.js';
 
 /**
  * 对单个交易对执行信号检测
@@ -70,16 +70,31 @@ async function checkSymbol(symbol) {
  * 检测所有交易对
  */
 export async function checkAllSignals() {
+  // 并行请求所有交易对（大幅提速）
+  const tasks = CONFIG.BINANCE.SYMBOLS.map(async (symbol) => {
+    try {
+      const result = await checkSymbol(symbol);
+      return { ok: true, result };
+    } catch (err) {
+      return { ok: false, symbol, error: err.message };
+    }
+  });
+
+  const settled = await Promise.allSettled(tasks);
   const results = [];
   const errors = [];
 
-  for (const symbol of CONFIG.BINANCE.SYMBOLS) {
-    try {
-      const result = await checkSymbol(symbol);
-      results.push(result);
-      if (result.error) errors.push(result);
-    } catch (err) {
-      errors.push({ symbol, error: err.message });
+  for (const item of settled) {
+    if (item.status === 'fulfilled') {
+      const val = item.value;
+      if (val.ok) {
+        results.push(val.result);
+        if (val.result.error) errors.push(val.result);
+      } else {
+        errors.push({ symbol: val.symbol, error: val.error });
+      }
+    } else {
+      errors.push({ error: item.reason?.message || 'Unknown error' });
     }
   }
 
