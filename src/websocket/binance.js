@@ -1,82 +1,164 @@
 // Binance Futures WebSocket Client
+// 使用组合流 (Combined Stream) 稳定订阅多个币种
 
 import WebSocket from 'ws';
+import http from 'node:http';
+import https from 'node:https';
 import { CONFIG } from '../config.js';
 import { getCandles } from './rest.js';
 
 const { BINANCE } = CONFIG;
 
+/**
+ * 解析代理地址
+ */
+function getProxyUrl() {
+  return process.env.HTTPS_PROXY || process.env.https_proxy
+    || process.env.HTTP_PROXY || process.env.http_proxy
+    || process.env.ALL_PROXY || process.env.all_proxy
+    || null;
+}
+
+/**
+ * 通过 HTTP CONNECT 隧道建立 WebSocket 连接
+ */
+function connectViaProxy(targetUrl, proxyUrl) {
+  const proxyParsed = new URL(proxyUrl);
+  const targetParsed = new URL(targetUrl);
+
+  const proxyPort = parseInt(proxyParsed.port) || (proxyParsed.protocol === 'https:' ? 443 : 80);
+  const proxyHost = proxyParsed.hostname;
+  const targetHost = targetParsed.hostname;
+  const targetPort = targetParsed.port || (targetParsed.protocol === 'wss:' ? 443 : 80);
+
+  return new Promise((resolve, reject) => {
+    const connectOpts = {
+      host: proxyHost,
+      port: proxyPort,
+      method: 'CONNECT',
+      path: `${targetHost}:${targetPort}`,
+    };
+
+    if (proxyParsed.username || proxyParsed.password) {
+      const auth = Buffer.from(`${proxyParsed.username}:${proxyParsed.password}`).toString('base64');
+      connectOpts.headers = { 'Proxy-Authorization': `Basic ${auth}` };
+    }
+
+    const connectReq = http.request(connectOpts);
+
+    connectReq.on('connect', (res, socket) => {
+      if (res.statusCode !== 200) {
+        reject(new Error(`Proxy CONNECT failed: ${res.statusCode}`));
+        return;
+      }
+      resolve(socket);
+    });
+
+    connectReq.on('error', reject);
+    connectReq.setTimeout(10000, () => { connectReq.destroy(); reject(new Error('Proxy connect timeout')); });
+    connectReq.end();
+  });
+}
+
+/**
+ * 构建组合流 URL
+ * 格式: wss://fstream.binance.com/stream?streams=stream1/stream2/...
+ */
+function buildCombinedStreamUrl() {
+  const streams = [];
+  for (const symbol of CONFIG.BINANCE_SYMBOLS) {
+    streams.push(`${symbol.toLowerCase()}@kline_1h`);
+  }
+  // 不订阅 ticker，减少连接负载；价格从 kline 获取
+  const streamPath = streams.join('/');
+  return `wss://fstream.binance.com/stream?streams=${streamPath}`;
+}
+
 class BinanceFuturesWS {
   constructor() {
     this.ws = null;
-    this.reconnectInterval = 10000;
+    this.reconnectInterval = 15000;
+    this.maxReconnectInterval = 60000;
     this.reconnectTimer = null;
     this.klineListeners = new Map();
     this.tickerListeners = new Map();
     this.isReady = false;
     this.cachedCandles = new Map();  // symbol -> last known candles
+    this._intentionalClose = false;
   }
 
   /**
-   * Connect to Binance Futures WebSocket
+   * Connect to Binance Futures WebSocket (Combined Stream)
    */
-  connect() {
+  async connect() {
+    this._intentionalClose = false;
+    const combinedUrl = buildCombinedStreamUrl();
+    const proxyUrl = getProxyUrl();
+
+    let wsOptions = {};
+    if (proxyUrl) {
+      console.log('[WS] Using proxy:', proxyUrl);
+      try {
+        const socket = await connectViaProxy(combinedUrl, proxyUrl);
+        wsOptions = { agent: new https.Agent({ socket, rejectUnauthorized: false }) };
+      } catch (err) {
+        console.warn('[WS] Proxy tunnel failed, trying direct:', err.message);
+      }
+    }
+
     return new Promise((resolve, reject) => {
-      this.ws = new WebSocket(BINANCE.WS_URL);
+      this.ws = new WebSocket(combinedUrl, wsOptions);
+
+      const connectTimeout = setTimeout(() => {
+        this.ws.terminate();
+        reject(new Error('WebSocket connect timeout'));
+      }, 30000);
 
       this.ws.on('open', () => {
-        console.log('[WS] Connected to Binance Futures WebSocket');
-        this.subscribeAll();
+        clearTimeout(connectTimeout);
+        console.log('[WS] Connected to Binance Futures Combined Stream');
+        console.log('[WS] Monitoring', CONFIG.BINANCE_SYMBOLS.length, 'symbols');
         this.isReady = true;
+        this.reconnectInterval = 15000;  // reset backoff on success
         resolve();
       });
 
       this.ws.on('message', (data) => {
         try {
-          const msg = JSON.parse(data.toString());
-          this.handleMessage(msg);
+          const wrapped = JSON.parse(data.toString());
+          // Combined stream format: { stream: "btcusdt@kline_1h", data: {...} }
+          if (wrapped.data) {
+            this.handleMessage(wrapped.data);
+          }
         } catch (e) {
-          // ignore
+          // ignore non-JSON
         }
       });
 
       this.ws.on('close', () => {
-        console.log('[WS] Disconnected. Reconnecting...');
+        clearTimeout(connectTimeout);
         this.isReady = false;
-        this.reconnectTimer = setTimeout(() => this.connect(), this.reconnectInterval);
+        if (!this._intentionalClose) {
+          console.log('[WS] Disconnected. Reconnecting in', this.reconnectInterval / 1000, 's...');
+          this.reconnectTimer = setTimeout(() => this.connect(), this.reconnectInterval);
+          // Exponential backoff
+          this.reconnectInterval = Math.min(this.reconnectInterval * 1.5, this.maxReconnectInterval);
+        }
       });
 
       this.ws.on('error', (err) => {
+        clearTimeout(connectTimeout);
         console.error('[WS] Error:', err.message);
         reject(err);
       });
+
+      // Ping/Pong keep-alive
+      this.ws.on('ping', () => {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+          this.ws.pong();
+        }
+      });
     });
-  }
-
-  subscribeAll() {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-
-    // Subscribe to kline streams for all monitored symbols
-    for (const symbol of BINANCE.SYMBOLS) {
-      const stream = symbol.toLowerCase() + '@kline_1h';
-      this.ws.send(JSON.stringify({
-        method: 'SUBSCRIBE',
-        params: [stream],
-        id: Date.now() + Math.random(),
-      }));
-      console.log('[WS] Subscribed to', stream);
-    }
-
-    // Also subscribe to tickers for quick price
-    for (const symbol of BINANCE.SYMBOLS) {
-      const stream = symbol.toLowerCase() + '@ticker';
-      this.ws.send(JSON.stringify({
-        method: 'SUBSCRIBE',
-        params: [stream],
-        id: Date.now() + Math.random(),
-      }));
-      console.log('[WS] Subscribed to', stream);
-    }
   }
 
   handleMessage(msg) {
@@ -85,7 +167,7 @@ class BinanceFuturesWS {
       const symbol = msg.s;
       const kline = msg.k;
 
-      if (kline.x) {  // Closed candle - this is where we trigger analysis
+      if (kline.x) {  // Closed candle - trigger analysis
         const candle = {
           open: parseFloat(kline.o),
           high: parseFloat(kline.h),
@@ -109,18 +191,6 @@ class BinanceFuturesWS {
           for (const fn of listeners) {
             fn(candle, candles);
           }
-        }
-      }
-    }
-
-    // Ticker message (quick price update)
-    if (msg.e === '24hrTicker') {
-      const symbol = msg.s;
-      const price = parseFloat(msg.c);
-      const listeners = this.tickerListeners.get(symbol);
-      if (listeners) {
-        for (const fn of listeners) {
-          fn({ symbol, price, volume: parseFloat(msg.v), change: parseFloat(msg.P) });
         }
       }
     }
@@ -151,26 +221,38 @@ class BinanceFuturesWS {
    */
   async warmUpCache() {
     console.log('[WS] Warming up candle cache...');
-    for (const symbol of BINANCE.SYMBOLS) {
-      try {
-        const candles = await getCandles(symbol, '1h', 100);
-        const parsed = candles.map((c) => ({
-          open: parseFloat(c[1]),
-          high: parseFloat(c[2]),
-          low: parseFloat(c[3]),
-          close: parseFloat(c[4]),
-          volume: parseFloat(c[5]),
-          timestamp: c[6],
-        }));
-        this.cachedCandles.set(symbol, parsed);
-        console.log('[WS] Cached', parsed.length, 'candles for', symbol);
-      } catch (err) {
-        console.warn('[WS] Failed to warm up', symbol, ':', err.message);
+    const symbols = CONFIG.BINANCE_SYMBOLS;
+
+    // Parallel fetch in batches of 5 to avoid rate limits
+    const batchSize = 5;
+    for (let i = 0; i < symbols.length; i += batchSize) {
+      const batch = symbols.slice(i, i + batchSize);
+      const results = await Promise.allSettled(
+        batch.map(async (symbol) => {
+          const candles = await getCandles(symbol, '1h', 100);
+          const parsed = candles.map((c) => ({
+            open: parseFloat(c[1]),
+            high: parseFloat(c[2]),
+            low: parseFloat(c[3]),
+            close: parseFloat(c[4]),
+            volume: parseFloat(c[5]),
+            timestamp: c[6],
+          }));
+          this.cachedCandles.set(symbol, parsed);
+          console.log('[WS] Cached', parsed.length, 'candles for', symbol);
+        })
+      );
+
+      for (let j = 0; j < results.length; j++) {
+        if (results[j].status === 'rejected') {
+          console.warn('[WS] Failed to warm up', batch[j], ':', results[j].reason?.message);
+        }
       }
     }
   }
 
   close() {
+    this._intentionalClose = true;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     if (this.ws) this.ws.close();
     console.log('[WS] Closed');
