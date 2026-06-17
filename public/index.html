@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crypto Alerts - 交易信号提醒</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0f0f1a; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-height: 100vh; }
+    .header { background: linear-gradient(135deg, #1a1a2e, #16213e); padding: 32px; text-align: center; border-bottom: 1px solid #2a2a4a; }
+    .header h1 { font-size: 28px; color: #16c784; margin-bottom: 8px; }
+    .header p { color: #999; font-size: 14px; }
+    .status-bar { display: flex; justify-content: center; gap: 24px; padding: 16px; background: #1a1a2e; }
+    .status-item { text-align: center; }
+    .status-item .value { font-size: 24px; font-weight: bold; color: #16c784; }
+    .status-item .label { font-size: 12px; color: #999; margin-top: 4px; }
+    .container { max-width: 900px; margin: 24px auto; padding: 0 16px; }
+    .card { background: #1a1a2e; border-radius: 12px; padding: 20px; margin-bottom: 16px; border: 1px solid #2a2a4a; }
+    .card h2 { font-size: 18px; color: #fff; margin-bottom: 12px; }
+    .card p { color: #999; font-size: 14px; line-height: 1.6; }
+    .signals-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+    .signal-card { background: #16213e; border-radius: 8px; padding: 16px; border-left: 4px solid #444; }
+    .signal-card.buy { border-left-color: #16c784; }
+    .signal-card.sell { border-left-color: #ea3943; }
+    .signal-card .symbol { font-size: 18px; font-weight: bold; color: #fff; }
+    .signal-card .strategy { font-size: 12px; color: #999; margin-top: 2px; }
+    .signal-card .direction { font-size: 14px; font-weight: bold; margin-top: 8px; }
+    .signal-card .direction.buy { color: #16c784; }
+    .signal-card .direction.sell { color: #ea3943; }
+    .signal-card .confidence { font-size: 12px; color: #ffd700; margin-top: 4px; }
+    .signal-card .time { font-size: 11px; color: #666; margin-top: 8px; }
+    .btn { display: inline-block; padding: 10px 24px; background: #16c784; color: #0f0f1a; border: none; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; margin-top: 12px; }
+    .btn:hover { background: #12a76d; }
+    .btn:disabled { background: #444; cursor: not-allowed; }
+    .loading { color: #999; text-align: center; padding: 40px; }
+    .empty { color: #666; text-align: center; padding: 40px; }
+    .footer { text-align: center; padding: 32px; color: #444; font-size: 12px; }
+    pre { background: #0f0f1a; padding: 12px; border-radius: 6px; overflow-x: auto; font-size: 12px; max-height: 300px; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Crypto Alerts</h1>
+    <p>Binance 合约交易信号提醒系统 | 8 策略实时监控</p>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-item">
+      <div class="value" id="status">--</div>
+      <div class="label">服务状态</div>
+    </div>
+    <div class="status-item">
+      <div class="value" id="lastCheck">--</div>
+      <div class="label">上次检测</div>
+    </div>
+    <div class="status-item">
+      <div class="value" id="pairCount">8</div>
+      <div class="label">监控交易对</div>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <h2>手动触发检测</h2>
+      <p>点击按钮立即执行一次全量信号检测（每小时 Cron 会自动执行）</p>
+      <button class="btn" id="checkBtn" onclick="runCheck()">立即检测</button>
+      <pre id="checkResult" style="display:none;"></pre>
+    </div>
+
+    <div class="card">
+      <h2>最近信号</h2>
+      <div id="signalsContainer" class="loading">加载中...</div>
+    </div>
+
+    <div class="card">
+      <h2>当前策略</h2>
+      <div class="signals-grid">
+        <div class="signal-card"><div class="strategy">RSI 反转策略</div><div style="color:#999;font-size:12px;margin-top:4px;">RSI超卖/超买区间反转</div></div>
+        <div class="signal-card"><div class="strategy">MACD 交叉策略</div><div style="color:#999;font-size:12px;margin-top:4px;">MACD金叉/死叉信号</div></div>
+        <div class="signal-card"><div class="strategy">布林带均值回归</div><div style="color:#999;font-size:12px;margin-top:4px;">价格触及布林带上下轨</div></div>
+        <div class="signal-card"><div class="strategy">EMA 双均线交叉</div><div style="color:#999;font-size:12px;margin-top:4px;">9/21 EMA金叉死叉</div></div>
+        <div class="signal-card"><div class="strategy">多指标共振</div><div style="color:#999;font-size:12px;margin-top:4px;">RSI+MACD+布林带三重确认</div></div>
+        <div class="signal-card"><div class="strategy">唐奇安通道突破</div><div style="color:#999;font-size:12px;margin-top:4px;">N日高低点突破</div></div>
+        <div class="signal-card"><div class="strategy">ATR 波动率策略</div><div style="color:#999;font-size:12px;margin-top:4px;">波动率放大+放量确认</div></div>
+        <div class="signal-card"><div class="strategy">成交量确认策略</div><div style="color:#999;font-size:12px;margin-top:4px;">放量+趋势方向确认</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>API 文档</h2>
+      <p>
+        <code style="color:#16c784;">GET /api/health</code> - 健康检查<br>
+        <code style="color:#16c784;">GET /api/check</code> - 执行信号检测<br>
+        <code style="color:#16c784;">GET /api/signals?symbol=BTCUSDT&limit=10</code> - 获取信号记录
+      </p>
+    </div>
+  </div>
+
+  <div class="footer">
+    Crypto Alerts v1.0 | 本工具仅提供信号提醒，不自动执行交易 | 过往表现不代表未来收益
+  </div>
+
+  <script>
+    async function checkHealth() {
+      try {
+        const res = await fetch('/api/health');
+        const data = await res.json();
+        document.getElementById('status').textContent = data.status === 'ok' ? '✓ 运行中' : '✗ 异常';
+        document.getElementById('status').style.color = data.status === 'ok' ? '#16c784' : '#ea3943';
+      } catch {
+        document.getElementById('status').textContent = '✗ 离线';
+        document.getElementById('status').style.color = '#ea3943';
+      }
+    }
+
+    async function loadSignals() {
+      try {
+        const res = await fetch('/api/signals?limit=10');
+        const data = await res.json();
+        const container = document.getElementById('signalsContainer');
+
+        let allSignals = [];
+        if (data.signals) {
+          for (const [sym, sigs] of Object.entries(data.signals)) {
+            if (Array.isArray(sigs)) allSignals = allSignals.concat(sigs);
+          }
+        } else if (Array.isArray(data)) {
+          allSignals = data;
+        }
+
+        if (allSignals.length === 0) {
+          container.innerHTML = '<div class="empty">暂无信号记录</div>';
+          return;
+        }
+
+        const html = '<div class="signals-grid">' + allSignals.map(s => {
+          const dir = (s.signal_direction || s.signal || '').toUpperCase();
+          const cls = dir === 'BUY' ? 'buy' : dir === 'SELL' ? 'sell' : '';
+          const dirLabel = dir === 'BUY' ? '🟢 买入' : dir === 'SELL' ? '🔴 卖出' : dir;
+          const sym = s.symbol || '--';
+          const strategy = s.name || s.strategy || '--';
+          const conf = s.confidence || '--';
+          const time = s.created_at || s.timestamp || '--';
+          return `<div class="signal-card ${cls}">
+            <div class="symbol">${sym.replace('USDT','/USDT')}</div>
+            <div class="strategy">${strategy}</div>
+            <div class="direction ${cls}">${dirLabel}</div>
+            <div class="confidence">置信度: ${conf}%</div>
+            <div class="time">${time}</div>
+          </div>`;
+        }).join('') + '</div>';
+
+        container.innerHTML = html;
+      } catch (err) {
+        document.getElementById('signalsContainer').innerHTML = '<div class="empty">加载失败: ' + err.message + '</div>';
+      }
+    }
+
+    async function runCheck() {
+      const btn = document.getElementById('checkBtn');
+      const result = document.getElementById('checkResult');
+      btn.disabled = true;
+      btn.textContent = '检测中...';
+      result.style.display = 'none';
+
+      try {
+        const res = await fetch('/api/check');
+        const data = await res.json();
+        result.textContent = JSON.stringify(data, null, 2);
+        result.style.display = 'block';
+        document.getElementById('lastCheck').textContent = new Date().toLocaleTimeString();
+        // 刷新信号列表
+        await loadSignals();
+      } catch (err) {
+        result.textContent = 'Error: ' + err.message;
+        result.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '立即检测';
+      }
+    }
+
+    checkHealth();
+  </script>
+</body>
+</html>

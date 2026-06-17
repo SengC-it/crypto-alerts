@@ -1,0 +1,21 @@
+{
+  "name": "crypto-alerts",
+  "version": "1.0.0",
+  "description": "Crypto trading signal notifier with email alerts",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test tests/"
+  },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "nodemailer": "^6.9.0",
+    "@supabase/supabase-js": "^2.39.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
+
