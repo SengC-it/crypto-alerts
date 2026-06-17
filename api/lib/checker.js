@@ -1,5 +1,6 @@
 // Serverless-friendly signal checker
 // 拉取 Binance REST 数据 → 计算指标 → 运行策略 → 去重 → 存储 + 发邮件
+// 支持按档位 (tier) 检测不同币种
 
 import { CONFIG } from '../../src/config.js';
 import { getCandles } from '../../src/websocket/rest.js';
@@ -74,11 +75,28 @@ async function checkSymbol(symbol) {
 }
 
 /**
- * 检测所有交易对
+ * 检测指定档位的所有交易对
+ * @param {string} tierKey - 'tier1' | 'tier2' | 'tier3' | 'all'
  */
-export async function checkAllSignals() {
-  // 并行请求所有交易对（大幅提速）
-  const tasks = CONFIG.BINANCE.SYMBOLS.map(async (symbol) => {
+export async function checkTierSignals(tierKey = 'all') {
+  let symbols = [];
+
+  if (tierKey === 'all') {
+    // 所有档位
+    for (const tier of Object.values(CONFIG.MONITOR_TIERS)) {
+      symbols.push(...tier.symbols);
+    }
+    symbols = [...new Set(symbols)];
+  } else {
+    const tier = CONFIG.MONITOR_TIERS[tierKey];
+    if (!tier) {
+      return { error: `Unknown tier: ${tierKey}`, availableTiers: Object.keys(CONFIG.MONITOR_TIERS) };
+    }
+    symbols = tier.symbols;
+  }
+
+  // 并行请求所有交易对
+  const tasks = symbols.map(async (symbol) => {
     try {
       const result = await checkSymbol(symbol);
       return { ok: true, result };
@@ -107,10 +125,18 @@ export async function checkAllSignals() {
 
   return {
     timestamp: new Date().toISOString(),
+    tier: tierKey,
     totalChecked: results.length,
     totalErrors: errors.length,
     results,
   };
+}
+
+/**
+ * 兼容旧接口 - 检测所有交易对
+ */
+export async function checkAllSignals() {
+  return checkTierSignals('all');
 }
 
 export { checkSymbol };

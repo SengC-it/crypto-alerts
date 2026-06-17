@@ -282,7 +282,7 @@ export async function backtestAll(days = 30, options = {}) {
   const results = [];
   const errors = [];
 
-  const tasks = CONFIG.BINANCE.SYMBOLS.map(async (symbol) => {
+  const tasks = CONFIG.BINANCE_SYMBOLS.map(async (symbol) => {
     try {
       const result = await backtestSymbol(symbol, days, options);
       return { ok: true, result };

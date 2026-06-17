@@ -46,15 +46,43 @@ export const CONFIG = {
 
   // Binance WebSocket (public, no key needed)
   BINANCE: {
-    WS_URL: 'wss://fstream.binance.com/ws',       // Futures (鍚堢害)
+    WS_URL: 'wss://fstream.binance.com/ws',       // Futures
     REST_URL: 'https://fapi.binance.com',           // Futures REST API
-    SYMBOLS: (process.env.MONITOR_PAIRS || 'BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT,XRPUSDT,ADAUSDT,DOTUSDT,LINKUSDT')
-      .split(',')
-      .map(s => s.toUpperCase()),
   },
 
-  // Signal Cooldown (minutes)
-  SIGNAL_COOLDOWN_MINUTES: parseInt(process.env.SIGNAL_COOLDOWN_MINUTES) || 240,
+  // 三档监控体系 - 不同币种不同频率
+  MONITOR_TIERS: {
+    tier1: {
+      name: '主流',
+      symbols: (process.env.TIER1_PAIRS || 'BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT')
+        .split(',').map(s => s.toUpperCase().trim()),
+      intervalMinutes: 15,    // 15分钟检查一次
+      cooldownMinutes: 120,   // 2小时冷却
+    },
+    tier2: {
+      name: '热门',
+      symbols: (process.env.TIER2_PAIRS || 'XRPUSDT,ADAUSDT,DOGEUSDT,AVAXUSDT,MATICUSDT,LINKUSDT,DOTUSDT,ARBUSDT,OPUSDT,NEARUSDT,LTCUSDT,ATOMUSDT,UNIUSDT,FILUSDT')
+        .split(',').map(s => s.toUpperCase().trim()),
+      intervalMinutes: 60,    // 1小时检查一次
+      cooldownMinutes: 240,   // 4小时冷却
+    },
+    tier3: {
+      name: '新锐',
+      symbols: (process.env.TIER3_PAIRS || 'SHIBUSDT,PEPEUSDT,APTUSDT,SUIUSDT,SEIUSDT,INJUSDT,RNDRUSDT,FETUSDT,STXUSDT,IMXUSDT,WLDUSDT,AAVEUSDT')
+        .split(',').map(s => s.toUpperCase().trim()),
+      intervalMinutes: 240,   // 4小时检查一次
+      cooldownMinutes: 480,   // 8小时冷却
+    },
+  },
+
+  // 兼容旧配置：SYMBOLS 汇总所有档位
+  get BINANCE_SYMBOLS() {
+    const all = [];
+    for (const tier of Object.values(this.MONITOR_TIERS)) {
+      all.push(...tier.symbols);
+    }
+    return [...new Set(all)];
+  },
 
   // Log Level
   LOG_LEVEL: (process.env.LOG_LEVEL || 'info').toLowerCase(),

@@ -4,7 +4,7 @@
 import { CONFIG } from './config.js';
 import { wsClient } from './websocket/binance.js';
 import { computeAllIndicators } from './indicators/index.js';
-import { runStrategies } from './strategies/manager.js';
+import { runStrategies, filterSignals } from './strategies/manager.js';
 import { signalStore } from './db/signalStore.js';
 import { sendSignalEmail, sendStartupEmail, verifyEmailConfig } from './email/notifier.js';
 
@@ -42,10 +42,22 @@ async function onCandleClosed(symbol, candle, allCandles) {
   }
 
   // 3. 运行所有启用的策略
-  const signals = runStrategies(symbol, indicators, strategyConfigs);
+  const rawSignals = runStrategies(symbol, indicators, strategyConfigs);
+
+  if (rawSignals.length === 0) {
+    log('debug', `[${symbol}] No signals generated`);
+    return;
+  }
+
+  // 3b. 信号质量过滤
+  const signals = filterSignals(rawSignals, {
+    minConfidence: CONFIG.SIGNAL_FILTER?.minConfidence || 30,
+    filterConflicts: CONFIG.SIGNAL_FILTER?.filterConflicts !== false,
+    boostResonance: CONFIG.SIGNAL_FILTER?.boostResonance !== false,
+  });
 
   if (signals.length === 0) {
-    log('debug', `[${symbol}] No signals generated`);
+    log('debug', `[${symbol}] All signals filtered out`);
     return;
   }
 
@@ -83,8 +95,10 @@ async function main() {
   console.log('╚══════════════════════════════════════════╝');
   console.log('');
 
-  log('info', 'Monitoring pairs:', CONFIG.BINANCE.SYMBOLS.join(', '));
-  log('info', 'Signal cooldown:', CONFIG.SIGNAL_COOLDOWN_MINUTES, 'minutes');
+  log('info', 'Monitoring tiers:');
+  for (const [key, tier] of Object.entries(CONFIG.MONITOR_TIERS)) {
+    log('info', `  ${key} (${tier.name}): ${tier.symbols.join(', ')} - every ${tier.intervalMinutes}min, cooldown ${tier.cooldownMinutes}min`);
+  }
   log('info', 'Supabase:', CONFIG.SUPABASE.ENABLED ? 'ENABLED' : 'DISABLED (memory only)');
   log('info', 'Strategies enabled:', Object.entries(CONFIG.DEFAULT_STRATEGIES)
     .filter(([, v]) => v.enabled)
@@ -119,7 +133,7 @@ async function main() {
   await wsClient.warmUpCache();
 
   // 4. 注册 K线收盘监听器
-  for (const symbol of CONFIG.BINANCE.SYMBOLS) {
+  for (const symbol of CONFIG.BINANCE_SYMBOLS) {
     wsClient.onKline(symbol, (candle, allCandles) => {
       onCandleClosed(symbol, candle, allCandles).catch(err => {
         log('error', `[${symbol}] Error processing candle:`, err.message);
@@ -129,7 +143,7 @@ async function main() {
 
   // 5. 发送启动通知邮件
   if (emailOk) {
-    await sendStartupEmail(CONFIG.BINANCE.SYMBOLS);
+    await sendStartupEmail(CONFIG.BINANCE_SYMBOLS);
   }
 
   log('info', '🚀 Crypto Alerts is running! Press Ctrl+C to stop.');

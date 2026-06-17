@@ -46,12 +46,25 @@ class SignalStore {
   }
 
   /**
+   * 获取某个币种所属档位的冷却时间（分钟）
+   */
+  _getCooldownMinutes(symbol) {
+    for (const tier of Object.values(CONFIG.MONITOR_TIERS)) {
+      if (tier.symbols.includes(symbol)) {
+        return tier.cooldownMinutes;
+      }
+    }
+    // 默认 240 分钟
+    return 240;
+  }
+
+  /**
    * 检查信号是否在冷却期内（去重）
    * @returns {boolean} true = 信号已被去重（应跳过），false = 新信号
    */
   async isDuplicate(signal) {
     const key = this._dedupeKey(signal);
-    const cooldownMs = CONFIG.SIGNAL_COOLDOWN_MINUTES * 60 * 1000;
+    const cooldownMs = this._getCooldownMinutes(signal.symbol) * 60 * 1000;
     const now = Date.now();
 
     // 检查内存缓存
@@ -94,9 +107,12 @@ class SignalStore {
     // 内存存储
     this.memoryStore.set(key, { signal, timestamp: now });
 
-    // 清理过期缓存（每次写入时简单清理）
+    // 清理过期缓存（取最长冷却期 * 2 作为清理阈值）
+    const maxCooldown = Math.max(
+      ...Object.values(CONFIG.MONITOR_TIERS).map(t => t.cooldownMinutes)
+    ) * 60 * 1000 * 2;
     for (const [k, v] of this.memoryStore) {
-      if (Date.now() - v.timestamp > CONFIG.SIGNAL_COOLDOWN_MINUTES * 60 * 1000 * 2) {
+      if (Date.now() - v.timestamp > maxCooldown) {
         this.memoryStore.delete(k);
       }
     }
