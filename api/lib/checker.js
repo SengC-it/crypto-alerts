@@ -44,11 +44,13 @@ async function checkSymbol(symbol) {
   // 4. 运行策略
   const rawSignals = runStrategies(symbol, indicators, strategyConfigs);
 
-  // 5. 信号质量过滤（置信度+矛盾+共振）
+  // 5. 信号质量过滤（置信度+矛盾+共振+趋势确认）
   const signals = filterSignals(rawSignals, {
-    minConfidence: CONFIG.SIGNAL_FILTER?.minConfidence || 30,
+    minConfidence: CONFIG.SIGNAL_FILTER?.minConfidence || 40,
     filterConflicts: CONFIG.SIGNAL_FILTER?.filterConflicts !== false,
     boostResonance: CONFIG.SIGNAL_FILTER?.boostResonance !== false,
+    buyRequiresTrendConfirm: CONFIG.SIGNAL_FILTER?.buyRequiresTrendConfirm !== false,
+    trendIndicators: { sma_50: indicators.sma_50, currentPrice: indicators.currentPrice },
   });
 
   // 6. 去重 + 存储 + 邮件

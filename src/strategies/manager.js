@@ -51,16 +51,18 @@ export function runStrategies(symbol, indicators, strategyConfigs) {
 
 /**
  * 信号质量过滤
- * 1. 去除低置信度信号（默认 < 30%）
- * 2. 同币种矛盾信号过滤（同时 BUY+SELL → 取消双向）
- * 3. 多策略共振加权（同方向信号合并，置信度叠加）
- * 4. 如果有共振信号，优先返回共振信号
+ * 1. 去除低置信度信号
+ * 2. 做多趋势确认（价格>SMA50 才允许做多，避免逆势抄底）
+ * 3. 同币种矛盾信号过滤
+ * 4. 多策略共振加权
  */
 export function filterSignals(signals, options = {}) {
   const {
-    minConfidence = 30,         // 最低置信度
-    filterConflicts = true,     // 过滤矛盾信号
-    boostResonance = true,      // 共振加权
+    minConfidence = 40,         // 最低置信度
+    filterConflicts = true,
+    boostResonance = true,
+    buyRequiresTrendConfirm = true,  // 做多需要趋势确认
+    trendIndicators = null,     // 传入 { sma_50, currentPrice } 做趋势判断
   } = options;
 
   if (!signals || signals.length === 0) return [];
@@ -69,38 +71,42 @@ export function filterSignals(signals, options = {}) {
   let filtered = signals.filter(s => s.confidence >= minConfidence);
   if (filtered.length === 0) return [];
 
-  // Step 2: 矛盾信号过滤
+  // Step 2: 做多趋势确认 — BUY 信号只在价格 > SMA50 时通过
+  if (buyRequiresTrendConfirm && trendIndicators) {
+    const { sma_50, currentPrice } = trendIndicators;
+    if (sma_50 && currentPrice) {
+      // 价格在 SMA50 下方 → 过滤低置信度 BUY（高置信度 < 70 的一律拒绝）
+      if (currentPrice < sma_50) {
+        filtered = filtered.filter(s => {
+          if (s.signal === 'BUY' && s.confidence < 70) return false;
+          return true;
+        });
+      }
+    }
+  }
+
+  // Step 3: 矛盾信号过滤
   if (filterConflicts) {
-    const buyStrategies = new Set(filtered.filter(s => s.signal === 'BUY').map(s => s.strategy));
-    const sellStrategies = new Set(filtered.filter(s => s.signal === 'SELL').map(s => s.strategy));
+    const buyCount = filtered.filter(s => s.signal === 'BUY').length;
+    const sellCount = filtered.filter(s => s.signal === 'SELL').length;
 
-    if (buyStrategies.size > 0 && sellStrategies.size > 0) {
-      // 检查是否是同一个策略既出BUY又出SELL（不可能，但防御性检查）
-      // 如果不同策略给出相反方向 → 保留多数方向
-      const buyCount = filtered.filter(s => s.signal === 'BUY').length;
-      const sellCount = filtered.filter(s => s.signal === 'SELL').length;
-
+    if (buyCount > 0 && sellCount > 0) {
       if (Math.abs(buyCount - sellCount) <= 1) {
-        // 信号势均力敌，跳过所有信号
         return [];
       }
-      // 否则保留多数方向
       const majorityDirection = buyCount > sellCount ? 'BUY' : 'SELL';
       filtered = filtered.filter(s => s.signal === majorityDirection);
     }
   }
 
-  // Step 3: 多策略共振加权
+  // Step 4: 多策略共振加权
   if (boostResonance && filtered.length > 1) {
     const buySignals = filtered.filter(s => s.signal === 'BUY');
     const sellSignals = filtered.filter(s => s.signal === 'SELL');
-
-    // 同方向的信号合并为一个共振信号
     const resonanceSignals = [];
 
     if (buySignals.length >= 2) {
-      const totalConf = buySignals.reduce((s, sig) => s + sig.confidence, 0);
-      const avgConf = Math.round(totalConf / buySignals.length);
+      const avgConf = Math.round(buySignals.reduce((s, sig) => s + sig.confidence, 0) / buySignals.length);
       const boostConf = Math.min(avgConf + buySignals.length * 10, 98);
 
       resonanceSignals.push({
@@ -121,8 +127,7 @@ export function filterSignals(signals, options = {}) {
     }
 
     if (sellSignals.length >= 2) {
-      const totalConf = sellSignals.reduce((s, sig) => s + sig.confidence, 0);
-      const avgConf = Math.round(totalConf / sellSignals.length);
+      const avgConf = Math.round(sellSignals.reduce((s, sig) => s + sig.confidence, 0) / sellSignals.length);
       const boostConf = Math.min(avgConf + sellSignals.length * 10, 98);
 
       resonanceSignals.push({
@@ -142,10 +147,8 @@ export function filterSignals(signals, options = {}) {
       });
     }
 
-    // 如果有共振信号，替换原始信号
     if (resonanceSignals.length > 0) {
-      // 保留单独的策略信号（置信度 >= 50），加入共振信号
-      const standalone = filtered.filter(s => s.confidence >= 50 && !resonanceSignals.some(r => r.contributingStrategies.includes(s.strategy)));
+      const standalone = filtered.filter(s => s.confidence >= 50 && !resonanceSignals.some(r => r.contributingStrategies?.includes(s.strategy)));
       return [...standalone, ...resonanceSignals];
     }
   }

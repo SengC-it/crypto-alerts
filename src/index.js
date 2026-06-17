@@ -51,9 +51,11 @@ async function onCandleClosed(symbol, candle, allCandles) {
 
   // 3b. 信号质量过滤
   const signals = filterSignals(rawSignals, {
-    minConfidence: CONFIG.SIGNAL_FILTER?.minConfidence || 30,
+    minConfidence: CONFIG.SIGNAL_FILTER?.minConfidence || 40,
     filterConflicts: CONFIG.SIGNAL_FILTER?.filterConflicts !== false,
     boostResonance: CONFIG.SIGNAL_FILTER?.boostResonance !== false,
+    buyRequiresTrendConfirm: CONFIG.SIGNAL_FILTER?.buyRequiresTrendConfirm !== false,
+    trendIndicators: { sma_50: indicators.sma_50, currentPrice: indicators.currentPrice },
   });
 
   if (signals.length === 0) {
