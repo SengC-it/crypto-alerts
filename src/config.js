@@ -34,6 +34,9 @@ export const CONFIG = {
     PORT: 587,
   },
 
+  // 通知收件人（可以和发件人不同）
+  NOTIFICATION_EMAIL: process.env.NOTIFICATION_EMAIL || process.env.GMAIL_EMAIL || '',
+
   // Supabase (optional)
   SUPABASE: {
     URL: process.env.SUPABASE_URL || '',
@@ -56,17 +59,17 @@ export const CONFIG = {
   // Log Level
   LOG_LEVEL: (process.env.LOG_LEVEL || 'info').toLowerCase(),
 
-  // Default Strategy Config
+  // Default Strategy Config (optimized based on 30-day backtest)
   DEFAULT_STRATEGIES: {
     rsi_reversal: {
       enabled: true,
       rsi_period: 14,
-      oversold: 30,
-      overbought: 70,
+      oversold: 35,      // 从30放宽到35
+      overbought: 65,     // 从70放宽到65
       timeframe: '1h',
     },
     macd_cross: {
-      enabled: true,
+      enabled: false,     // 回测表现差(31%胜率, -5.89%盈亏)，禁用
       fast: 12,
       slow: 26,
       signal: 9,
@@ -76,6 +79,7 @@ export const CONFIG = {
       enabled: true,
       period: 20,
       stdDev: 2,
+      percentB_threshold: 0.10, // %B < 0.10 或 > 0.90 触发
       timeframe: '1h',
     },
     ema_crossover: {
@@ -92,19 +96,27 @@ export const CONFIG = {
     donchian_breakout: {
       enabled: true,
       period: 20,
+      channel_position_threshold: 0.90, // 通道位置 > 90% 或 < 10% 触发
       timeframe: '1h',
     },
     atr_volatility: {
       enabled: true,
       period: 14,
-      atr_multiplier: 2,
+      atr_multiplier: 1.5,   // 从2.0降到1.5
       timeframe: '1h',
     },
     volume_confirmation: {
       enabled: true,
       volume_ma_period: 20,
-      volume_multiplier: 1.5,
+      volume_multiplier: 1.3, // 从1.5降到1.3
       timeframe: '1h',
     },
+  },
+
+  // 信号质量过滤配置
+  SIGNAL_FILTER: {
+    minConfidence: 30,           // 最低置信度（低于此值的信号丢弃）
+    filterConflicts: true,       // 是否过滤矛盾信号
+    boostResonance: true,        // 是否启用共振加权
   },
 };

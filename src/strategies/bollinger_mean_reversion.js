@@ -4,6 +4,10 @@
 /**
  * 布林带均值回归策略
  * 灵感来源: Freqtrade Bollinger Bands
+ * 
+ * 优化: 使用 %B 阈值而非要求价格精确触轨
+ *   %B < 0.10 视为接近下轨 (BUY)
+ *   %B > 0.90 视为接近上轨 (SELL)
  */
 export function bollingerMeanReversion(params, indicators) {
   const bb = indicators.bollinger;
@@ -15,20 +19,24 @@ export function bollingerMeanReversion(params, indicators) {
   let confidence = 0;
   let reason = '';
 
-  if (currentPrice <= bb.lower) {
+  // 价格触及或接近下轨
+  if (bb.percentB <= 0.10) {
     signal = 'BUY';
-    confidence = Math.round((1 - bb.percentB) * 100);
-    confidence = Math.min(confidence, 95);
-    reason = `价格 ($${currentPrice.toFixed(2)}) 触及布林带下轨 ($${bb.lower.toFixed(2)}), %B=${bb.percentB.toFixed(2)}`;
-  } else if (currentPrice >= bb.upper) {
+    confidence = Math.round((0.10 - bb.percentB) / 0.10 * 100);
+    confidence = Math.min(Math.max(confidence, 30), 95);
+    reason = `价格接近布林带下轨 (%B=${bb.percentB.toFixed(2)}, 下轨=$${bb.lower.toFixed(2)})`;
+  }
+  // 价格触及或接近上轨
+  else if (bb.percentB >= 0.90) {
     signal = 'SELL';
-    confidence = Math.round(bb.percentB * 100);
-    confidence = Math.min(confidence, 95);
-    reason = `价格 ($${currentPrice.toFixed(2)}) 触及布林带上轨 ($${bb.upper.toFixed(2)}), %B=${bb.percentB.toFixed(2)}`;
-  } else if (bb.bandwidth < 0.01) {
+    confidence = Math.round((bb.percentB - 0.90) / 0.10 * 100);
+    confidence = Math.min(Math.max(confidence, 30), 95);
+    reason = `价格接近布林带上轨 (%B=${bb.percentB.toFixed(2)}, 上轨=$${bb.upper.toFixed(2)})`;
+  }
+  // 布林带收窄预告
+  else if (bb.bandwidth < 0.03) {
+    signal = 'HOLD';
     reason = `布林带收窄 (带宽=${(bb.bandwidth * 100).toFixed(2)}%), 可能即将突破`;
-  } else {
-    reason = `价格在布林带内运行 (%B=${bb.percentB.toFixed(2)})`;
   }
 
   if (signal === 'HOLD') return null;

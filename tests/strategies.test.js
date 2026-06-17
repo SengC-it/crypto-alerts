@@ -10,7 +10,7 @@ import { multiIndicatorResonance } from '../src/strategies/multi_indicator_reson
 import { donchianBreakout } from '../src/strategies/donchian_breakout.js';
 import { atrVolatility } from '../src/strategies/atr_volatility.js';
 import { volumeConfirmation } from '../src/strategies/volume_confirmation.js';
-import { runStrategies, getAvailableStrategies } from '../src/strategies/manager.js';
+import { runStrategies, filterSignals, getAvailableStrategies } from '../src/strategies/manager.js';
 
 // Sample indicator data for testing
 const bullishIndicators = {
@@ -72,7 +72,7 @@ const neutralIndicators = {
 
 describe('RSI Reversal Strategy', () => {
   it('should return BUY for oversold RSI', () => {
-    const result = rsiReversal({ oversold: 30, overbought: 70, rsi_period: 14 }, bullishIndicators);
+    const result = rsiReversal({ oversold: 35, overbought: 65, rsi_period: 14 }, bullishIndicators);
     assert.ok(result !== null);
     assert.equal(result.signal, 'BUY');
     assert.equal(result.strategy, 'rsi_reversal');
@@ -82,16 +82,32 @@ describe('RSI Reversal Strategy', () => {
   });
 
   it('should return SELL for overbought RSI', () => {
-    const result = rsiReversal({ oversold: 30, overbought: 70, rsi_period: 14 }, bearishIndicators);
+    const result = rsiReversal({ oversold: 35, overbought: 65, rsi_period: 14 }, bearishIndicators);
     assert.ok(result !== null);
     assert.equal(result.signal, 'SELL');
     assert.ok(result.stopLoss > result.suggestedEntry);
     assert.ok(result.targetPrice < result.suggestedEntry);
   });
 
-  it('should return null for neutral RSI', () => {
-    const result = rsiReversal({ oversold: 30, overbought: 70, rsi_period: 14 }, neutralIndicators);
+  it('should return null for neutral RSI (between 40-60)', () => {
+    const result = rsiReversal({ oversold: 35, overbought: 65, rsi_period: 14 }, neutralIndicators);
     assert.equal(result, null);
+  });
+
+  it('should return low-confidence BUY for weak RSI (35-40)', () => {
+    const weakBull = { ...neutralIndicators, rsi_14: 38 };
+    const result = rsiReversal({ oversold: 35, overbought: 65, rsi_period: 14 }, weakBull);
+    assert.ok(result !== null);
+    assert.equal(result.signal, 'BUY');
+    assert.ok(result.confidence < 50);
+  });
+
+  it('should return low-confidence SELL for strong RSI (60-65)', () => {
+    const weakBear = { ...neutralIndicators, rsi_14: 63 };
+    const result = rsiReversal({ oversold: 35, overbought: 65, rsi_period: 14 }, weakBear);
+    assert.ok(result !== null);
+    assert.equal(result.signal, 'SELL');
+    assert.ok(result.confidence < 50);
   });
 });
 
@@ -184,14 +200,28 @@ describe('Multi-Indicator Resonance Strategy', () => {
 
 describe('ATR Volatility Strategy', () => {
   it('should return null for low volatility', () => {
-    const result = atrVolatility({ period: 14, atr_multiplier: 2 }, neutralIndicators);
+    const result = atrVolatility({ period: 14, atr_multiplier: 1.5 }, neutralIndicators);
     assert.equal(result, null);
+  });
+
+  it('should return signal for high volatility + price direction', () => {
+    const highVolIndicators = {
+      ...bullishIndicators,
+      atr_14: 10,  // Very high ATR relative to price
+      currentPrice: 100,
+      sma_20: 97,
+      currentVolume: 3000000,
+      volume_ma_20: 1500000,
+    };
+    const result = atrVolatility({ period: 14, atr_multiplier: 1.5 }, highVolIndicators);
+    assert.ok(result !== null);
+    assert.ok(['BUY', 'SELL'].includes(result.signal));
   });
 });
 
 describe('Volume Confirmation Strategy', () => {
   it('should return BUY for high volume + bullish setup', () => {
-    const result = volumeConfirmation({ volume_ma_period: 20, volume_multiplier: 1.5 }, {
+    const result = volumeConfirmation({ volume_ma_period: 20, volume_multiplier: 1.3 }, {
       ...bullishIndicators,
       currentPrice: 98,  // Above SMA20
       sma_20: 97,
@@ -200,6 +230,41 @@ describe('Volume Confirmation Strategy', () => {
     if (result) {
       assert.equal(result.signal, 'BUY');
     }
+  });
+});
+
+describe('Signal Quality Filter', () => {
+  it('should filter out low confidence signals', () => {
+    const signals = [
+      { signal: 'BUY', strategy: 'test1', confidence: 10, reason: 'low' },
+      { signal: 'BUY', strategy: 'test2', confidence: 60, reason: 'high' },
+    ];
+    const filtered = filterSignals(signals, { minConfidence: 30 });
+    assert.equal(filtered.length, 1);
+    assert.equal(filtered[0].confidence, 60);
+  });
+
+  it('should filter conflicting signals when evenly balanced', () => {
+    const signals = [
+      { signal: 'BUY', strategy: 'test1', confidence: 60, reason: 'buy' },
+      { signal: 'SELL', strategy: 'test2', confidence: 60, reason: 'sell' },
+    ];
+    const filtered = filterSignals(signals, { filterConflicts: true, minConfidence: 30 });
+    assert.equal(filtered.length, 0);
+  });
+
+  it('should boost resonance when multiple strategies agree', () => {
+    const signals = [
+      { signal: 'BUY', strategy: 'rsi_reversal', confidence: 60, reason: 'rsi', 
+        indicators: {}, suggestedEntry: 100, stopLoss: 95, targetPrice: 110 },
+      { signal: 'BUY', strategy: 'ema_crossover', confidence: 50, reason: 'ema',
+        indicators: {}, suggestedEntry: 100, stopLoss: 96, targetPrice: 108 },
+    ];
+    const filtered = filterSignals(signals, { boostResonance: true, minConfidence: 30 });
+    const resonance = filtered.find(s => s.strategy.startsWith('resonance'));
+    assert.ok(resonance);
+    assert.equal(resonance.signal, 'BUY');
+    assert.ok(resonance.confidence > 60);
   });
 });
 

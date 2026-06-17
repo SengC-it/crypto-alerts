@@ -165,12 +165,12 @@ export async function sendSignalEmail(signal) {
 
     const info = await tp.sendMail({
       from: `"Crypto Alerts" <${GMAIL.EMAIL}>`,
-      to: GMAIL.EMAIL,
+      to: CONFIG.NOTIFICATION_EMAIL || GMAIL.EMAIL,
       subject,
       html,
     });
 
-    console.log('[Email] Sent:', subject, '- messageId:', info.messageId);
+    console.log('[Email] Sent:', subject, '- to:', CONFIG.NOTIFICATION_EMAIL || GMAIL.EMAIL);
     return true;
   } catch (err) {
     console.error('[Email] Send failed:', err.message);
@@ -204,7 +204,7 @@ export async function sendStartupEmail(symbols) {
 
     await tp.sendMail({
       from: `"Crypto Alerts" <${GMAIL.EMAIL}>`,
-      to: GMAIL.EMAIL,
+      to: CONFIG.NOTIFICATION_EMAIL || GMAIL.EMAIL,
       subject,
       html,
     });

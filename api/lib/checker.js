@@ -4,7 +4,7 @@
 import { CONFIG } from '../../src/config.js';
 import { getCandles } from '../../src/websocket/rest.js';
 import { computeAllIndicators } from '../../src/indicators/index.js';
-import { runStrategies } from '../../src/strategies/manager.js';
+import { runStrategies, filterSignals } from '../../src/strategies/manager.js';
 import { signalStore } from '../../src/db/signalStore.js';
 import { sendSignalEmail } from '../../src/email/notifier.js';
 
@@ -41,9 +41,16 @@ async function checkSymbol(symbol) {
   }
 
   // 4. 运行策略
-  const signals = runStrategies(symbol, indicators, strategyConfigs);
+  const rawSignals = runStrategies(symbol, indicators, strategyConfigs);
 
-  // 5. 去重 + 存储 + 邮件
+  // 5. 信号质量过滤（置信度+矛盾+共振）
+  const signals = filterSignals(rawSignals, {
+    minConfidence: CONFIG.SIGNAL_FILTER?.minConfidence || 30,
+    filterConflicts: CONFIG.SIGNAL_FILTER?.filterConflicts !== false,
+    boostResonance: CONFIG.SIGNAL_FILTER?.boostResonance !== false,
+  });
+
+  // 6. 去重 + 存储 + 邮件
   const results = [];
   for (const signal of signals) {
     const isDup = await signalStore.isDuplicate(signal);

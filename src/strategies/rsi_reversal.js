@@ -4,9 +4,11 @@
 /**
  * RSI 反转策略 - RSI超卖买入, 超买卖出
  * 灵感来源: Freqtrade RSI + Jesse AI Mean Reversion
+ * 
+ * 优化: 扩展中性区间到 40-60，放宽超卖/超买阈值，增加回调确认
  */
 export function rsiReversal(params, indicators) {
-  const { oversold = 30, overbought = 70, rsi_period = 14 } = params;
+  const { oversold = 35, overbought = 65, rsi_period = 14 } = params;
   const rsiKey = `rsi_${rsi_period}`;
   const rsiVal = indicators[rsiKey];
 
@@ -26,8 +28,18 @@ export function rsiReversal(params, indicators) {
     confidence = Math.round((rsiVal - overbought) / (100 - overbought) * 100);
     confidence = Math.min(confidence, 95);
     reason = `RSI(${rsi_period}) = ${rsiVal.toFixed(2)} (高于 ${overbought} 超买区域)`;
-  } else if (rsiVal > 45 && rsiVal < 55) {
-    reason = `RSI(${rsi_period}) = ${rsiVal.toFixed(2)} (中性区域)`;
+  } else if (rsiVal < 40) {
+    // RSI 在 35-40 之间，偏弱但未超卖——低置信度 BUY
+    signal = 'BUY';
+    confidence = Math.round((40 - rsiVal) / (40 - oversold) * 40);
+    confidence = Math.min(confidence, 40);
+    reason = `RSI(${rsi_period}) = ${rsiVal.toFixed(2)} (偏弱区域，潜在反弹)`;
+  } else if (rsiVal > 60) {
+    // RSI 在 60-65 之间，偏强但未超买——低置信度 SELL
+    signal = 'SELL';
+    confidence = Math.round((rsiVal - 60) / (overbought - 60) * 40);
+    confidence = Math.min(confidence, 40);
+    reason = `RSI(${rsi_period}) = ${rsiVal.toFixed(2)} (偏强区域，潜在回调)`;
   }
 
   if (signal === 'HOLD') return null;
