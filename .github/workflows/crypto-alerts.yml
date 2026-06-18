@@ -1,0 +1,64 @@
+name: Crypto Alerts - Scheduled Checks
+
+on:
+  # Tier1: every 15 minutes
+  schedule:
+    - cron: '*/15 * * * *'
+
+  # Manual trigger for testing
+  workflow_dispatch:
+    inputs:
+      tier:
+        description: 'Tier to check (1, 2, 3, or all)'
+        required: false
+        default: 'all'
+
+jobs:
+  check-tier1:
+    if: github.event.inputs.tier == 'all' || github.event.inputs.tier == '1' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Tier 1
+        run: |
+          HTTP_CODE=$(curl -s -o /tmp/response.txt -w "%{http_code}" \
+            "${{ secrets.VERCEL_URL }}/api/check?tier=1")
+          echo "HTTP Status: $HTTP_CODE"
+          cat /tmp/response.txt
+          if [ "$HTTP_CODE" -ne 200 ]; then
+            echo "::error::Tier1 check failed with HTTP $HTTP_CODE"
+            exit 1
+          fi
+
+  check-tier2:
+    if: |
+      github.event.inputs.tier == 'all' || github.event.inputs.tier == '2' ||
+      (github.event_name == 'schedule' && github.event.schedule == '0 * * * *')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Tier 2
+        run: |
+          HTTP_CODE=$(curl -s -o /tmp/response.txt -w "%{http_code}" \
+            "${{ secrets.VERCEL_URL }}/api/check?tier=2")
+          echo "HTTP Status: $HTTP_CODE"
+          cat /tmp/response.txt
+          if [ "$HTTP_CODE" -ne 200 ]; then
+            echo "::error::Tier2 check failed with HTTP $HTTP_CODE"
+            exit 1
+          fi
+
+  check-tier3:
+    if: |
+      github.event.inputs.tier == 'all' || github.event.inputs.tier == '3' ||
+      (github.event_name == 'schedule' && github.event.schedule == '0 * * * *')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Tier 3
+        run: |
+          HTTP_CODE=$(curl -s -o /tmp/response.txt -w "%{http_code}" \
+            "${{ secrets.VERCEL_URL }}/api/check?tier=3")
+          echo "HTTP Status: $HTTP_CODE"
+          cat /tmp/response.txt
+          if [ "$HTTP_CODE" -ne 200 ]; then
+            echo "::error::Tier3 check failed with HTTP $HTTP_CODE"
+            exit 1
+          fi
