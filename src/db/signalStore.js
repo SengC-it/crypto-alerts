@@ -8,9 +8,19 @@ class SignalStore {
     /** @type {Map<string, {signal: object, timestamp: number}>} */
     this.memoryStore = new Map();
     this.supabase = null;
+    this._initPromise = null;
 
     if (CONFIG.SUPABASE.ENABLED) {
-      this._initSupabase();
+      this._initPromise = this._initSupabase();
+    }
+  }
+
+  /**
+   * 确保 Supabase 初始化完成（所有公共方法调用前必须 await）
+   */
+  async _ready() {
+    if (this._initPromise) {
+      await this._initPromise;
     }
   }
 
@@ -26,22 +36,10 @@ class SignalStore {
         // ws not available, skip realtime config
       }
       this.supabase = createClient(CONFIG.SUPABASE.URL, CONFIG.SUPABASE.KEY, options);
-      await this._ensureTable();
       console.log('[DB] Supabase connected');
     } catch (err) {
       console.warn('[DB] Supabase init failed, falling back to memory:', err.message);
       this.supabase = null;
-    }
-  }
-
-  async _ensureTable() {
-    if (!this.supabase) return;
-
-    // 尝试创建表（如果不存在）
-    const { error } = await this.supabase.rpc('ensure_signals_table', {});
-    if (error) {
-      // 如果 RPC 不存在，忽略（表可能已创建）
-      console.log('[DB] Table ensure skipped (may already exist)');
     }
   }
 
@@ -71,6 +69,7 @@ class SignalStore {
    * @returns {boolean} true = 信号已被去重（应跳过），false = 新信号
    */
   async isDuplicate(signal) {
+    await this._ready();
     const key = this._dedupeKey(signal);
     const cooldownMs = this._getCooldownMinutes(signal.symbol) * 60 * 1000;
     const now = Date.now();
@@ -109,6 +108,7 @@ class SignalStore {
    * 存储信号（写入内存 + Supabase）
    */
   async save(signal) {
+    await this._ready();
     const key = this._dedupeKey(signal);
     const now = Date.now();
 
@@ -152,6 +152,7 @@ class SignalStore {
    * 获取某个交易对的最近信号
    */
   async getRecentSignals(symbol, limit = 10) {
+    await this._ready();
     if (this.supabase) {
       try {
         const { data, error } = await this.supabase

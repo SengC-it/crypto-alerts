@@ -20,7 +20,7 @@ export default async function handler(req, res) {
     // 没有指定 symbol，返回所有监控交易对
     const { CONFIG } = await import('../../src/config.js');
     const allSignals = {};
-    for (const sym of CONFIG.BINANCE.SYMBOLS) {
+    for (const sym of CONFIG.BINANCE_SYMBOLS) {
       allSignals[sym] = await signalStore.getRecentSignals(sym, 5);
     }
     return res.status(200).json({ signals: allSignals });
