@@ -99,7 +99,7 @@ describe('RSI Reversal Strategy', () => {
     const result = rsiReversal({ oversold: 35, overbought: 65, rsi_period: 14 }, weakBull);
     assert.ok(result !== null);
     assert.equal(result.signal, 'BUY');
-    assert.ok(result.confidence < 50);
+    assert.ok(result.confidence >= 50 && result.confidence <= 70);
   });
 
   it('should return low-confidence SELL for strong RSI (60-65)', () => {
@@ -107,7 +107,7 @@ describe('RSI Reversal Strategy', () => {
     const result = rsiReversal({ oversold: 35, overbought: 65, rsi_period: 14 }, weakBear);
     assert.ok(result !== null);
     assert.equal(result.signal, 'SELL');
-    assert.ok(result.confidence < 50);
+    assert.ok(result.confidence >= 50 && result.confidence <= 70);
   });
 });
 

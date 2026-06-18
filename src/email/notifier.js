@@ -114,7 +114,7 @@ function buildHtml(signal) {
         </tr>
         <tr style="background:#1a1a2e;">
           <td style="padding:10px 12px;color:#999;">风险收益比</td>
-          <td style="padding:10px 12px;text-align:right;font-weight:bold;color:#ffd700;">${signal.riskRewardRatio || 'N/A'}</td>
+          <td style="padding:10px 12px;text-align:right;font-weight:bold;color:#ffd700;">${typeof signal.riskRewardRatio === 'number' ? '1:' + signal.riskRewardRatio : (signal.riskRewardRatio || 'N/A')}</td>
         </tr>
       </table>
 

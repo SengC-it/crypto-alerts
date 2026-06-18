@@ -51,7 +51,7 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ symbol, signals }));
       } else {
         const allSignals = {};
-        for (const sym of CONFIG.BINANCE.SYMBOLS) {
+        for (const sym of CONFIG.BINANCE_SYMBOLS) {
           allSignals[sym] = await signalStore.getRecentSignals(sym, 5);
         }
         res.writeHead(200);

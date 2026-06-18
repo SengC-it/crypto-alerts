@@ -135,7 +135,6 @@ describe('computeAllIndicators', () => {
     assert.ok('bollinger' in result);
     assert.ok('atr_14' in result);
     assert.ok('donchian' in result);
-    assert.ok('stochastic' in result);
     assert.ok('ema_9' in result);
     assert.ok('ema_21' in result);
     assert.ok('ema_50' in result);

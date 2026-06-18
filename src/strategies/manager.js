@@ -52,7 +52,7 @@ export function runStrategies(symbol, indicators, strategyConfigs) {
 /**
  * 信号质量过滤
  * 1. 去除低置信度信号
- * 2. 做多趋势确认（价格>SMA50 才允许做多，避免逆势抄底）
+ * 2. 做多趋势确认（价格>SMA50+EMA9>EMA21 才允许做多，避免逆势抄底）
  * 3. 同币种矛盾信号过滤
  * 4. 多策略共振加权
  */
@@ -62,7 +62,7 @@ export function filterSignals(signals, options = {}) {
     filterConflicts = true,
     boostResonance = true,
     buyRequiresTrendConfirm = true,  // 做多需要趋势确认
-    trendIndicators = null,     // 传入 { sma_50, currentPrice } 做趋势判断
+    trendIndicators = null,     // 传入 { sma_50, currentPrice, ema_9, ema_21 } 做趋势判断
   } = options;
 
   if (!signals || signals.length === 0) return [];
@@ -71,16 +71,27 @@ export function filterSignals(signals, options = {}) {
   let filtered = signals.filter(s => s.confidence >= minConfidence);
   if (filtered.length === 0) return [];
 
-  // Step 2: 做多趋势确认 — BUY 信号只在价格 > SMA50 时通过
+  // Step 2: 做多趋势确认 — BUY 信号需要更强的趋势支撑
+  // 回测数据显示 BUY 信号亏损严重，需加强过滤
   if (buyRequiresTrendConfirm && trendIndicators) {
     const { sma_50, currentPrice } = trendIndicators;
     if (sma_50 && currentPrice) {
-      // 价格在 SMA50 下方 → 过滤低置信度 BUY（高置信度 < 70 的一律拒绝）
       if (currentPrice < sma_50) {
-        filtered = filtered.filter(s => {
-          if (s.signal === 'BUY' && s.confidence < 70) return false;
-          return true;
-        });
+        // 价格在 SMA50 下方 → 过滤所有 BUY（不论置信度）
+        // 回测表明即使高置信度 BUY 在下降趋势中也大概率亏损
+        filtered = filtered.filter(s => s.signal !== 'BUY');
+      } else {
+        // 价格在 SMA50 上方，但还需要检查 EMA 趋势
+        // 如果 EMA9 < EMA21，说明短期趋势偏弱，过滤低置信度 BUY
+        const emaTrendUp = trendIndicators.ema_9 && trendIndicators.ema_21 
+          ? trendIndicators.ema_9 > trendIndicators.ema_21 
+          : true;
+        if (!emaTrendUp) {
+          filtered = filtered.filter(s => {
+            if (s.signal === 'BUY' && s.confidence < 75) return false;
+            return true;
+          });
+        }
       }
     }
   }
@@ -91,9 +102,11 @@ export function filterSignals(signals, options = {}) {
     const sellCount = filtered.filter(s => s.signal === 'SELL').length;
 
     if (buyCount > 0 && sellCount > 0) {
-      if (Math.abs(buyCount - sellCount) <= 1) {
+      // 只有买卖信号数量完全相等时才全部过滤（完全矛盾）
+      if (buyCount === sellCount) {
         return [];
       }
+      // 保留多数方向信号
       const majorityDirection = buyCount > sellCount ? 'BUY' : 'SELL';
       filtered = filtered.filter(s => s.signal === majorityDirection);
     }
@@ -119,7 +132,7 @@ export function filterSignals(signals, options = {}) {
         suggestedEntry: buySignals[0].suggestedEntry,
         stopLoss: Math.min(...buySignals.map(s => s.stopLoss)),
         targetPrice: Math.max(...buySignals.map(s => s.targetPrice)),
-        riskRewardRatio: '1:2+',
+        riskRewardRatio: 2.5,
         contributingStrategies: buySignals.map(s => s.strategy),
         timestamp: buySignals[0].timestamp,
         symbol: buySignals[0].symbol,
@@ -140,7 +153,7 @@ export function filterSignals(signals, options = {}) {
         suggestedEntry: sellSignals[0].suggestedEntry,
         stopLoss: Math.max(...sellSignals.map(s => s.stopLoss)),
         targetPrice: Math.min(...sellSignals.map(s => s.targetPrice)),
-        riskRewardRatio: '1:2+',
+        riskRewardRatio: 2.5,
         contributingStrategies: sellSignals.map(s => s.strategy),
         timestamp: sellSignals[0].timestamp,
         symbol: sellSignals[0].symbol,

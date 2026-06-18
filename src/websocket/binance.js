@@ -2,63 +2,12 @@
 // 使用组合流 (Combined Stream) 稳定订阅多个币种
 
 import WebSocket from 'ws';
-import http from 'node:http';
 import https from 'node:https';
 import { CONFIG } from '../config.js';
 import { getCandles } from './rest.js';
+import { getProxyUrl, connectViaProxy } from './proxy.js';
 
 const { BINANCE } = CONFIG;
-
-/**
- * 解析代理地址
- */
-function getProxyUrl() {
-  return process.env.HTTPS_PROXY || process.env.https_proxy
-    || process.env.HTTP_PROXY || process.env.http_proxy
-    || process.env.ALL_PROXY || process.env.all_proxy
-    || null;
-}
-
-/**
- * 通过 HTTP CONNECT 隧道建立 WebSocket 连接
- */
-function connectViaProxy(targetUrl, proxyUrl) {
-  const proxyParsed = new URL(proxyUrl);
-  const targetParsed = new URL(targetUrl);
-
-  const proxyPort = parseInt(proxyParsed.port) || (proxyParsed.protocol === 'https:' ? 443 : 80);
-  const proxyHost = proxyParsed.hostname;
-  const targetHost = targetParsed.hostname;
-  const targetPort = targetParsed.port || (targetParsed.protocol === 'wss:' ? 443 : 80);
-
-  return new Promise((resolve, reject) => {
-    const connectOpts = {
-      host: proxyHost,
-      port: proxyPort,
-      method: 'CONNECT',
-      path: `${targetHost}:${targetPort}`,
-    };
-
-    if (proxyParsed.username || proxyParsed.password) {
-      const auth = Buffer.from(`${proxyParsed.username}:${proxyParsed.password}`).toString('base64');
-      connectOpts.headers = { 'Proxy-Authorization': `Basic ${auth}` };
-    }
-
-    const connectReq = http.request(connectOpts);
-
-    connectReq.on('connect', (res, socket) => {
-      if (res.statusCode !== 200) {
-        reject(new Error(`Proxy CONNECT failed: ${res.statusCode}`));
-        return;
-      }
-      resolve(socket);
-    });
-
-    connectReq.on('error', reject);
-    connectReq.setTimeout(10000, () => { connectReq.destroy(); reject(new Error('Proxy connect timeout')); });
-    connectReq.end();
-  });
-}
 
 /**
  * 构建组合流 URL
@@ -66,11 +15,16 @@ function connectViaProxy(targetUrl, proxyUrl) {
  */
 function buildCombinedStreamUrl() {
   const streams = [];
-  for (const symbol of CONFIG.BINANCE_SYMBOLS) {
-    streams.push(`${symbol.toLowerCase()}@kline_1h`);
+  for (const [tierKey, tier] of Object.entries(CONFIG.MONITOR_TIERS)) {
+    // Tier1 使用 15m K线以匹配其 15 分钟检查间隔，其余使用 1h
+    const interval = tierKey === 'tier1' ? '15m' : '1h';
+    for (const symbol of tier.symbols) {
+      streams.push(`${symbol.toLowerCase()}@kline_${interval}`);
+    }
   }
-  // 不订阅 ticker，减少连接负载；价格从 kline 获取
-  const streamPath = streams.join('/');
+  // 去重（避免同一币种出现在多档时重复订阅）
+  const uniqueStreams = [...new Set(streams)];
+  const streamPath = uniqueStreams.join('/');
   return `wss://fstream.binance.com/stream?streams=${streamPath}`;
 }
 
@@ -221,15 +175,27 @@ class BinanceFuturesWS {
    */
   async warmUpCache() {
     console.log('[WS] Warming up candle cache...');
-    const symbols = CONFIG.BINANCE_SYMBOLS;
+
+    // 收集每个币种对应的 K 线间隔
+    const symbolIntervals = new Map();  // symbol -> interval
+    for (const [tierKey, tier] of Object.entries(CONFIG.MONITOR_TIERS)) {
+      const interval = tierKey === 'tier1' ? '15m' : '1h';
+      for (const symbol of tier.symbols) {
+        if (!symbolIntervals.has(symbol)) {
+          symbolIntervals.set(symbol, interval);
+        }
+      }
+    }
 
     // Parallel fetch in batches of 5 to avoid rate limits
     const batchSize = 5;
+    const symbols = [...symbolIntervals.keys()];
     for (let i = 0; i < symbols.length; i += batchSize) {
       const batch = symbols.slice(i, i + batchSize);
       const results = await Promise.allSettled(
         batch.map(async (symbol) => {
-          const candles = await getCandles(symbol, '1h', 100);
+          const interval = symbolIntervals.get(symbol);
+          const candles = await getCandles(symbol, interval, 100);
           const parsed = candles.map((c) => ({
             open: parseFloat(c[1]),
             high: parseFloat(c[2]),
@@ -239,7 +205,7 @@ class BinanceFuturesWS {
             timestamp: c[6],
           }));
           this.cachedCandles.set(symbol, parsed);
-          console.log('[WS] Cached', parsed.length, 'candles for', symbol);
+          console.log('[WS] Cached', parsed.length, `${interval} candles for`, symbol);
         })
       );
 

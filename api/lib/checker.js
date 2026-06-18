@@ -50,7 +50,7 @@ async function checkSymbol(symbol) {
     filterConflicts: CONFIG.SIGNAL_FILTER?.filterConflicts !== false,
     boostResonance: CONFIG.SIGNAL_FILTER?.boostResonance !== false,
     buyRequiresTrendConfirm: CONFIG.SIGNAL_FILTER?.buyRequiresTrendConfirm !== false,
-    trendIndicators: { sma_50: indicators.sma_50, currentPrice: indicators.currentPrice },
+    trendIndicators: { sma_50: indicators.sma_50, currentPrice: indicators.currentPrice, ema_9: indicators.ema_9, ema_21: indicators.ema_21 },
   });
 
   // 6. 去重 + 存储 + 邮件

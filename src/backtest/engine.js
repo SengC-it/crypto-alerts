@@ -55,6 +55,7 @@ function getTier(symbol) {
  * 对单个交易对执行回测
  */
 export async function backtestSymbol(symbol, days = 30, options = {}) {
+  const rm = CONFIG.RISK_MANAGEMENT || {};
   const {
     minConfidence,
     noConflictFilter = true,
@@ -62,12 +63,12 @@ export async function backtestSymbol(symbol, days = 30, options = {}) {
     leverage = 1,
     initialCapital = 10000,
     boostResonance = true,
-    // 风控参数（可覆盖）
-    stopLossATR = 1.5,          // 止损距离 = N * ATR
-    takeProfitATR = 3.0,        // 止盈距离 = N * ATR
-    trailingStop = false,        // 是否启用移动止损
-    trailingATR = 1.0,          // 移动止损回撤 = N * ATR
-    positionTimeoutHours = 48,   // 持仓超时
+    // 风控参数（优先使用 CONFIG.RISK_MANAGEMENT，可被 options 覆盖）
+    stopLossATR = rm.stopLossATR ?? 1.5,
+    takeProfitATR = rm.takeProfitATR ?? 3.0,
+    trailingStop = rm.trailingStop ?? false,
+    trailingATR = rm.trailingATR ?? 1.0,
+    positionTimeoutHours = rm.positionTimeoutHours ?? 48,
   } = options;
 
   const tier = getTier(symbol);
@@ -214,7 +215,7 @@ export async function backtestSymbol(symbol, days = 30, options = {}) {
         filterConflicts: noConflictFilter,
         boostResonance,
         buyRequiresTrendConfirm: CONFIG.SIGNAL_FILTER?.buyRequiresTrendConfirm !== false,
-        trendIndicators: { sma_50: indicators.sma_50, currentPrice: indicators.currentPrice },
+        trendIndicators: { sma_50: indicators.sma_50, currentPrice: indicators.currentPrice, ema_9: indicators.ema_9, ema_21: indicators.ema_21 },
       });
 
       if (filteredSignals.length > 0) {
@@ -252,7 +253,7 @@ export async function backtestSymbol(symbol, days = 30, options = {}) {
       filterConflicts: noConflictFilter,
       boostResonance,
       buyRequiresTrendConfirm: CONFIG.SIGNAL_FILTER?.buyRequiresTrendConfirm !== false,
-      trendIndicators: { sma_50: indicators.sma_50, currentPrice: indicators.currentPrice },
+      trendIndicators: { sma_50: indicators.sma_50, currentPrice: indicators.currentPrice, ema_9: indicators.ema_9, ema_21: indicators.ema_21 },
     });
 
     if (filteredSignals.length === 0) continue;

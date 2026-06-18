@@ -74,6 +74,6 @@ export function atrVolatility(params, indicators) {
     suggestedEntry: currentPrice,
     stopLoss: signal === 'BUY' ? currentPrice - atr * 1.5 : currentPrice + atr * 1.5,
     targetPrice: signal === 'BUY' ? currentPrice + atr * 3 : currentPrice - atr * 3,
-    riskRewardRatio: '1:2',
+    riskRewardRatio: 2,
   };
 }

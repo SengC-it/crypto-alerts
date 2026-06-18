@@ -23,20 +23,29 @@ export function ema(values, period) {
 }
 
 /**
- * Calculate RSI (Relative Strength Index)
+ * Calculate RSI (Relative Strength Index) using Wilder's smoothing method
  */
 export function rsi(closes, period = 14) {
   if (closes.length < period + 1) return null;
 
-  let gains = 0, losses = 0;
+  // Calculate initial average gain/loss from first period changes
+  let avgGain = 0, avgLoss = 0;
   for (let i = 1; i <= period; i++) {
     const diff = closes[i] - closes[i - 1];
-    if (diff >= 0) gains += diff;
-    else losses -= diff;
+    if (diff >= 0) avgGain += diff;
+    else avgLoss -= diff;
   }
+  avgGain /= period;
+  avgLoss /= period;
 
-  const avgGain = gains / period;
-  const avgLoss = losses / period;
+  // Wilder's smoothing: apply to remaining data points
+  for (let i = period + 1; i < closes.length; i++) {
+    const diff = closes[i] - closes[i - 1];
+    const gain = diff >= 0 ? diff : 0;
+    const loss = diff < 0 ? -diff : 0;
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+  }
 
   if (avgLoss === 0) return 100;
   const rs = avgGain / avgLoss;
@@ -44,32 +53,54 @@ export function rsi(closes, period = 14) {
 }
 
 /**
- * Calculate MACD
+ * Calculate MACD using incremental EMA computation (O(n) instead of O(n²))
  * Returns: { macd, signal, histogram }
  */
 export function macd(closes, fast = 12, slow = 26, signalPeriod = 9) {
   if (closes.length < slow + signalPeriod) return null;
 
-  const macdLineValues = [];
-  for (let i = slow; i <= closes.length; i++) {
-    const fEma = ema(closes.slice(0, i), fast);
-    const sEma = ema(closes.slice(0, i), slow);
-    if (fEma !== null && sEma !== null) {
-      macdLineValues.push(fEma - sEma);
+  // Incremental EMA calculation
+  function emaValues(data, period) {
+    if (data.length < period) return [];
+    const multiplier = 2 / (period + 1);
+    const result = [];
+    // Initial SMA
+    let val = data.slice(0, period).reduce((a, b) => a + b, 0) / period;
+    result.push(val);
+    // Incremental EMA
+    for (let i = period; i < data.length; i++) {
+      val = (data[i] - val) * multiplier + val;
+      result.push(val);
     }
+    return result;
+  }
+
+  const fastEma = emaValues(closes, fast);
+  const slowEma = emaValues(closes, slow);
+
+  if (fastEma.length === 0 || slowEma.length === 0) return null;
+
+  // Align: fastEma has more values, we need ones that correspond to slowEma
+  // fastEma starts at index fast-1, slowEma starts at index slow-1
+  // The overlapping portion: fastEma[slow-fast ... end] aligns with slowEma[0 ... end]
+  const offset = slow - fast;
+  const macdLineValues = [];
+  for (let i = 0; i < slowEma.length; i++) {
+    macdLineValues.push(fastEma[i + offset] - slowEma[i]);
   }
 
   if (macdLineValues.length < signalPeriod) return null;
 
-  const currentMacd = macdLineValues[macdLineValues.length - 1];
-  const signalLine = ema(macdLineValues, signalPeriod);
+  const signalLine = emaValues(macdLineValues, signalPeriod);
+  if (signalLine.length === 0) return null;
 
-  if (signalLine === null) return null;
+  const currentMacd = macdLineValues[macdLineValues.length - 1];
+  const currentSignal = signalLine[signalLine.length - 1];
 
   return {
     macd: currentMacd,
-    signal: signalLine,
-    histogram: currentMacd - signalLine,
+    signal: currentSignal,
+    histogram: currentMacd - currentSignal,
   };
 }
 
@@ -190,7 +221,6 @@ export function computeAllIndicators(candles) {
     bollinger: bollingerBands(closes, 20, 2),
     atr_14: atr(candles, 14),
     donchian: donchianChannel(candles, 20),
-    stochastic: stochastic(candles, 14),
     ema_9: ema(closes, 9),
     ema_21: ema(closes, 21),
     ema_50: ema(closes, 50),

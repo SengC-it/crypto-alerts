@@ -51,15 +51,18 @@ CREATE POLICY "Allow service role full access"
   WITH CHECK (true);
 
 -- ============================================================
--- 3. 自动清理超过30天的旧信号（可选）
+-- 3. 自动清理超过30天的旧信号
 -- ============================================================
--- 取消注释以下代码可启用自动清理
--- CREATE OR REPLACE FUNCTION clean_old_signals()
--- RETURNS void AS $$
--- BEGIN
---   DELETE FROM crypto_signals WHERE created_at < NOW() - INTERVAL '30 days';
--- END;
--- $$ LANGUAGE plpgsql SECURITY DEFINER;
+CREATE OR REPLACE FUNCTION clean_old_signals()
+RETURNS void AS $$
+BEGIN
+  DELETE FROM crypto_signals WHERE created_at < NOW() - INTERVAL '30 days';
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 使用 pg_cron 扩展定时执行（需在 Supabase Dashboard 启用 pg_cron 扩展）
+-- 每天凌晨3点(UTC)执行清理
+-- SELECT cron.schedule('clean-old-signals', '0 3 * * *', 'SELECT clean_old_signals()');
 
 -- ============================================================
 -- 4. 验证

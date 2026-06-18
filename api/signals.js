@@ -17,11 +17,20 @@ export default async function handler(req, res) {
       return res.status(200).json({ symbol, signals });
     }
 
-    // 没有指定 symbol，返回所有监控交易对
+    // 没有指定 symbol，返回所有监控交易对（并行查询）
     const { CONFIG } = await import('../../src/config.js');
+    const symbols = CONFIG.BINANCE_SYMBOLS;
+    const results = await Promise.allSettled(
+      symbols.map(async (sym) => {
+        const data = await signalStore.getRecentSignals(sym, 5);
+        return [sym, data];
+      })
+    );
     const allSignals = {};
-    for (const sym of CONFIG.BINANCE_SYMBOLS) {
-      allSignals[sym] = await signalStore.getRecentSignals(sym, 5);
+    for (const r of results) {
+      if (r.status === 'fulfilled') {
+        allSignals[r.value[0]] = r.value[1];
+      }
     }
     return res.status(200).json({ signals: allSignals });
   } catch (err) {
