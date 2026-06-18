@@ -14,9 +14,20 @@ import { sendSignalEmail } from '../../src/email/notifier.js';
  */
 async function checkSymbol(symbol) {
   // 1. 拉取最近100根1小时K线
-  const rawCandles = await getCandles(symbol, '1h', 100);
-  if (!rawCandles || !Array.isArray(rawCandles) || rawCandles.length < 50) {
-    return { symbol, error: 'Insufficient candle data', signalCount: 0 };
+  let rawCandles;
+  try {
+    rawCandles = await getCandles(symbol, '1h', 100);
+  } catch (fetchErr) {
+    return { symbol, error: `Binance fetch error: ${fetchErr.message}`, signalCount: 0 };
+  }
+
+  if (!rawCandles || !Array.isArray(rawCandles)) {
+    const type = typeof rawCandles;
+    const preview = JSON.stringify(rawCandles).substring(0, 300);
+    return { symbol, error: `Invalid candle data (type=${type}): ${preview}`, signalCount: 0 };
+  }
+  if (rawCandles.length < 50) {
+    return { symbol, error: `Insufficient candle data: ${rawCandles.length} candles`, signalCount: 0 };
   }
 
   const candles = rawCandles.map(c => ({
