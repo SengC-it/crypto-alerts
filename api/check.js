@@ -4,7 +4,7 @@
 // GET /api/check?tier=2   → 仅检测 Tier2 热门币（1小时cron用）
 // GET /api/check?tier=3   → 仅检测 Tier3 新锐币（4小时cron用）
 
-import { checkTierSignals } from '../lib/checker.js';
+import { checkTierSignals } from './lib/checker.js';
 
 function tierFromQuery(query) {
   const t = query.tier;
