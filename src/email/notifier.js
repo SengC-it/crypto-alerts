@@ -37,6 +37,53 @@ function ensureTransporter() {
 }
 
 /**
+ * 根据价格大小自动选择合适的小数位数
+ * 避免低价币（如STX=$0.19）stopLoss也被截断为2位小数导致看不出差异
+ */
+function fmtPrice(price) {
+  if (price == null) return 'N/A';
+  if (price >= 1000) return '$' + price.toFixed(2);       // BTC: $64,156.60
+  if (price >= 1)    return '$' + price.toFixed(4);       // LINK: $7.9820
+  if (price >= 0.01) return '$' + price.toFixed(5);       // STX: $0.18520
+  return '$' + price.toFixed(8);                           // SHIB: $0.00001234
+}
+
+/**
+ * 将专业术语翻译为普通人可理解的语言
+ */
+function translateReason(reason) {
+  return reason
+    .replace(/多指标共振买入\((\d+)\/6\)/g, '$1个指标看涨')
+    .replace(/多指标共振卖出\((\d+)\/6\)/g, '$1个指标看跌')
+    .replace(/MACD金叉/g, '短期趋势向上')
+    .replace(/MACD死叉/g, '短期趋势向下')
+    .replace(/EMA多头/g, '均线向上排列')
+    .replace(/EMA空头/g, '均线向下排列')
+    .replace(/价格>SMA50/g, '价格高于中期均线')
+    .replace(/价格<SMA50/g, '价格低于中期均线')
+    .replace(/RSI偏强/g, '短期偏强')
+    .replace(/RSI偏弱/g, '短期偏弱')
+    .replace(/放量上涨/g, '成交量放大且上涨')
+    .replace(/放量下跌/g, '成交量放大且下跌')
+    .replace(/BB偏上轨/g, '价格接近高位')
+    .replace(/BB偏下轨/g, '价格接近低位');
+}
+
+/**
+ * 将指标key翻译成中文
+ */
+function translateIndicatorKey(key) {
+  const map = {
+    'buy_votes': '看涨因素',
+    'sell_votes': '看跌因素',
+    'rsi_14': '强弱指标',
+    'macd_histogram': '趋势动量',
+    'bb_percentB': '价格位势',
+  };
+  return map[key] || key;
+}
+
+/**
  * 格式化交易对名称 (BTCUSDT -> BTC/USDT)
  */
 function formatPair(symbol) {
@@ -56,8 +103,8 @@ function formatPair(symbol) {
 function buildSubject(signal) {
   const pair = formatPair(signal.symbol);
   const icon = signal.signal === 'BUY' ? '🟢' : '🔴';
-  const direction = signal.signal === 'BUY' ? '建议关注' : '注意风险';
-  return `[${pair}] ${icon} ${signal.name} - ${direction}`;
+  const direction = signal.signal === 'BUY' ? '看涨提醒' : '看跌提醒';
+  return `[${pair}] ${icon} ${direction} - 信号强度${signal.confidence}%`;
 }
 
 /**
@@ -66,10 +113,15 @@ function buildSubject(signal) {
 function buildHtml(signal) {
   const pair = formatPair(signal.symbol);
   const signalColor = signal.signal === 'BUY' ? '#16c784' : '#ea3943';
-  const signalLabel = signal.signal === 'BUY' ? '买入信号' : '卖出信号';
+  const signalLabel = signal.signal === 'BUY' ? '看涨提醒' : '看跌提醒';
+  const simpleDescription = signal.signal === 'BUY'
+    ? '根据多个技术指标分析，该币种短期可能上涨，值得关注。'
+    : '根据多个技术指标分析，该币种短期可能下跌，注意风险。';
+
+  const translatedReason = translateReason(signal.reason || '');
 
   const indicatorRows = Object.entries(signal.indicators || {})
-    .map(([k, v]) => `<tr><td style="padding:4px 12px;color:#999;">${k}</td><td style="padding:4px 12px;font-weight:bold;">${v}</td></tr>`)
+    .map(([k, v]) => `<tr><td style="padding:4px 12px;color:#999;">${translateIndicatorKey(k)}</td><td style="padding:4px 12px;font-weight:bold;">${v}</td></tr>`)
     .join('\n');
 
   return `
@@ -82,7 +134,7 @@ function buildHtml(signal) {
     <div style="padding:24px;background:linear-gradient(135deg,#0f3460,#16213e);border-bottom:2px solid ${signalColor};">
       <h1 style="margin:0;font-size:20px;color:${signalColor};">${signalLabel}</h1>
       <h2 style="margin:8px 0 0;font-size:28px;color:#fff;">${pair}</h2>
-      <p style="margin:4px 0 0;color:#999;font-size:14px;">${signal.name}</p>
+      <p style="margin:4px 0 0;color:#999;font-size:14px;">${simpleDescription}</p>
     </div>
 
     <!-- Price & Signal -->
@@ -90,10 +142,10 @@ function buildHtml(signal) {
       <div style="display:flex;justify-content:space-between;margin-bottom:16px;">
         <div>
           <div style="color:#999;font-size:12px;">当前价格</div>
-          <div style="font-size:24px;font-weight:bold;color:#fff;">$${signal.suggestedEntry?.toFixed(2) || 'N/A'}</div>
+          <div style="font-size:24px;font-weight:bold;color:#fff;">${fmtPrice(signal.suggestedEntry)}</div>
         </div>
         <div style="text-align:right;">
-          <div style="color:#999;font-size:12px;">置信度</div>
+          <div style="color:#999;font-size:12px;">信号强度</div>
           <div style="font-size:24px;font-weight:bold;color:${signalColor};">${signal.confidence}%</div>
         </div>
       </div>
@@ -101,32 +153,32 @@ function buildHtml(signal) {
       <!-- Entry/StopLoss/Target -->
       <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
         <tr style="background:#1a1a2e;">
-          <td style="padding:10px 12px;color:#999;">建议入场</td>
-          <td style="padding:10px 12px;text-align:right;font-weight:bold;color:#fff;">$${signal.suggestedEntry?.toFixed(2) || 'N/A'}</td>
+          <td style="padding:10px 12px;color:#999;">参考入场价</td>
+          <td style="padding:10px 12px;text-align:right;font-weight:bold;color:#fff;">${fmtPrice(signal.suggestedEntry)}</td>
         </tr>
         <tr style="background:#1a1a2e;">
-          <td style="padding:10px 12px;color:#999;">止损位</td>
-          <td style="padding:10px 12px;text-align:right;font-weight:bold;color:#ea3943;">$${signal.stopLoss?.toFixed(2) || 'N/A'}</td>
+          <td style="padding:10px 12px;color:#999;">止损位（跌破此价建议离场）</td>
+          <td style="padding:10px 12px;text-align:right;font-weight:bold;color:#ea3943;">${fmtPrice(signal.stopLoss)}</td>
         </tr>
         <tr style="background:#1a1a2e;">
-          <td style="padding:10px 12px;color:#999;">目标价</td>
-          <td style="padding:10px 12px;text-align:right;font-weight:bold;color:#16c784;">$${signal.targetPrice?.toFixed(2) || 'N/A'}</td>
+          <td style="padding:10px 12px;color:#999;">目标价（可考虑止盈的价位）</td>
+          <td style="padding:10px 12px;text-align:right;font-weight:bold;color:#16c784;">${fmtPrice(signal.targetPrice)}</td>
         </tr>
         <tr style="background:#1a1a2e;">
-          <td style="padding:10px 12px;color:#999;">风险收益比</td>
+          <td style="padding:10px 12px;color:#999;">盈亏比</td>
           <td style="padding:10px 12px;text-align:right;font-weight:bold;color:#ffd700;">${typeof signal.riskRewardRatio === 'number' ? '1:' + signal.riskRewardRatio : (signal.riskRewardRatio || 'N/A')}</td>
         </tr>
       </table>
 
       <!-- Reason -->
       <div style="background:#1a1a2e;border-radius:8px;padding:12px;margin-bottom:16px;">
-        <div style="color:#999;font-size:12px;margin-bottom:6px;">策略逻辑</div>
-        <div style="color:#e0e0e0;font-size:14px;line-height:1.6;">${signal.reason || 'N/A'}</div>
+        <div style="color:#999;font-size:12px;margin-bottom:6px;">触发原因</div>
+        <div style="color:#e0e0e0;font-size:14px;line-height:1.6;">${translatedReason}</div>
       </div>
 
       <!-- Indicators -->
       <div style="background:#1a1a2e;border-radius:8px;padding:12px;">
-        <div style="color:#999;font-size:12px;margin-bottom:6px;">指标数值</div>
+        <div style="color:#999;font-size:12px;margin-bottom:6px;">参考指标（点击可查看详情）</div>
         <table style="width:100%;border-collapse:collapse;">
           ${indicatorRows}
         </table>
@@ -136,15 +188,13 @@ function buildHtml(signal) {
     <!-- Footer -->
     <div style="padding:16px;border-top:1px solid #2a2a4a;">
       <div style="background:#1a0a0a;border:1px solid #ea394355;border-radius:8px;padding:12px;margin-bottom:12px;">
-        <div style="color:#ea3943;font-size:12px;font-weight:bold;margin-bottom:4px;">⚠️ 风险提示</div>
+        <div style="color:#ea3943;font-size:12px;font-weight:bold;margin-bottom:4px;">风险提示</div>
         <div style="color:#ccc;font-size:11px;line-height:1.5;">
-          本信号仅供参考，不构成投资建议。历史回测胜率约40%，扣除手续费/滑点后净收益有限。
-          加密货币波动极大，任何交易均有亏损风险，请根据自身情况谨慎决策。
-          切勿全仓操作，建议单笔风险不超过总资金2%。
+          以上内容仅为技术分析参考，不构成投资建议。加密货币价格波动大，任何交易都有亏损风险，请根据自身情况谨慎决策，切勿投入超过承受能力的资金。
         </div>
       </div>
       <p style="margin:0;color:#666;font-size:11px;text-align:center;">
-        Crypto Alerts 信号提醒系统 | 仅供研究参考 | ${new Date().toISOString()}
+        Crypto Alerts 信号提醒 | 仅供参考 | ${new Date().toISOString()}
       </p>
     </div>
   </div>
