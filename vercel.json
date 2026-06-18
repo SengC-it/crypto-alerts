@@ -5,6 +5,7 @@
       "maxDuration": 60
     }
   },
+  "regions": ["hnd1"],
   "crons": [
     {
       "path": "/api/check?tier=1",
