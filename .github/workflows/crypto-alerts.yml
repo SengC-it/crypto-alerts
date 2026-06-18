@@ -1,9 +1,11 @@
 name: Crypto Alerts - Scheduled Checks
 
 on:
-  # Tier1: every 15 minutes
   schedule:
+    # Tier1: every 15 minutes (also runs at hour marks)
     - cron: '*/15 * * * *'
+    # Tier2 + Tier3: every hour (at :00)
+    - cron: '0 * * * *'
 
   # Manual trigger for testing
   workflow_dispatch:
@@ -15,15 +17,18 @@ on:
 
 jobs:
   check-tier1:
-    if: github.event.inputs.tier == 'all' || github.event.inputs.tier == '1' || github.event_name == 'schedule'
+    if: |
+      github.event_name == 'workflow_dispatch' && (github.event.inputs.tier == 'all' || github.event.inputs.tier == '1') ||
+      github.event_name == 'schedule'
     runs-on: ubuntu-latest
     steps:
-      - name: Check Tier 1
+      - name: Check Tier 1 (BTC, ETH, SOL, BNB)
         run: |
-          HTTP_CODE=$(curl -s -o /tmp/response.txt -w "%{http_code}" \
+          echo "Triggered by: ${{ github.event_name }} schedule=${{ github.event.schedule }}"
+          HTTP_CODE=$(curl -s -o /tmp/t1.txt -w "%{http_code}" \
             "${{ secrets.VERCEL_URL }}/api/check?tier=1")
           echo "HTTP Status: $HTTP_CODE"
-          cat /tmp/response.txt
+          cat /tmp/t1.txt
           if [ "$HTTP_CODE" -ne 200 ]; then
             echo "::error::Tier1 check failed with HTTP $HTTP_CODE"
             exit 1
@@ -31,16 +36,17 @@ jobs:
 
   check-tier2:
     if: |
-      github.event.inputs.tier == 'all' || github.event.inputs.tier == '2' ||
-      (github.event_name == 'schedule' && github.event.schedule == '0 * * * *')
+      github.event_name == 'workflow_dispatch' && (github.event.inputs.tier == 'all' || github.event.inputs.tier == '2') ||
+      github.event_name == 'schedule' && github.event.schedule == '0 * * * *'
     runs-on: ubuntu-latest
     steps:
-      - name: Check Tier 2
+      - name: Check Tier 2 (XRP, ADA, AVAX, LINK, DOT, ARB, NEAR, LTC, ATOM, UNI)
         run: |
-          HTTP_CODE=$(curl -s -o /tmp/response.txt -w "%{http_code}" \
+          echo "Triggered by: ${{ github.event_name }} schedule=${{ github.event.schedule }}"
+          HTTP_CODE=$(curl -s -o /tmp/t2.txt -w "%{http_code}" \
             "${{ secrets.VERCEL_URL }}/api/check?tier=2")
           echo "HTTP Status: $HTTP_CODE"
-          cat /tmp/response.txt
+          cat /tmp/t2.txt
           if [ "$HTTP_CODE" -ne 200 ]; then
             echo "::error::Tier2 check failed with HTTP $HTTP_CODE"
             exit 1
@@ -48,16 +54,17 @@ jobs:
 
   check-tier3:
     if: |
-      github.event.inputs.tier == 'all' || github.event.inputs.tier == '3' ||
-      (github.event_name == 'schedule' && github.event.schedule == '0 * * * *')
+      github.event_name == 'workflow_dispatch' && (github.event.inputs.tier == 'all' || github.event.inputs.tier == '3') ||
+      github.event_name == 'schedule' && github.event.schedule == '0 * * * *'
     runs-on: ubuntu-latest
     steps:
-      - name: Check Tier 3
+      - name: Check Tier 3 (APT, STX, IMX, AAVE)
         run: |
-          HTTP_CODE=$(curl -s -o /tmp/response.txt -w "%{http_code}" \
+          echo "Triggered by: ${{ github.event_name }} schedule=${{ github.event.schedule }}"
+          HTTP_CODE=$(curl -s -o /tmp/t3.txt -w "%{http_code}" \
             "${{ secrets.VERCEL_URL }}/api/check?tier=3")
           echo "HTTP Status: $HTTP_CODE"
-          cat /tmp/response.txt
+          cat /tmp/t3.txt
           if [ "$HTTP_CODE" -ne 200 ]; then
             echo "::error::Tier3 check failed with HTTP $HTTP_CODE"
             exit 1
