@@ -7,12 +7,13 @@ import { getCandles } from '../../src/websocket/rest.js';
 import { computeAllIndicators } from '../../src/indicators/index.js';
 import { runStrategies, filterSignals } from '../../src/strategies/manager.js';
 import { signalStore } from '../../src/db/signalStore.js';
-import { sendSignalEmail } from '../../src/email/notifier.js';
+import { sendSummaryEmail } from '../../src/email/notifier.js';
 
 /**
  * 对单个交易对执行信号检测
+ * @param {boolean} skipEmail - 为 true 时只去重+存储，不发邮件（由上层统一发汇总）
  */
-async function checkSymbol(symbol) {
+async function checkSymbol(symbol, skipEmail = true) {
   // 1. 拉取最近100根1小时K线
   let rawCandles;
   try {
@@ -64,7 +65,7 @@ async function checkSymbol(symbol) {
     trendIndicators: { sma_50: indicators.sma_50, currentPrice: indicators.currentPrice, ema_9: indicators.ema_9, ema_21: indicators.ema_21 },
   });
 
-  // 6. 去重 + 存储 + 邮件
+  // 6. 去重 + 存储
   const results = [];
   for (const signal of signals) {
     const isDup = await signalStore.isDuplicate(signal);
@@ -73,8 +74,7 @@ async function checkSymbol(symbol) {
       continue;
     }
     await signalStore.save(signal);
-    const emailSent = await sendSignalEmail(signal);
-    results.push({ ...signal, deduplicated: false, emailSent });
+    results.push({ ...signal, deduplicated: false });
   }
 
   return {
@@ -121,6 +121,7 @@ export async function checkTierSignals(tierKey = 'all') {
   const settled = await Promise.allSettled(tasks);
   const results = [];
   const errors = [];
+  const newSignals = []; // 收集所有新信号（非去重）
 
   for (const item of settled) {
     if (item.status === 'fulfilled') {
@@ -128,6 +129,10 @@ export async function checkTierSignals(tierKey = 'all') {
       if (val.ok) {
         results.push(val.result);
         if (val.result.error) errors.push(val.result);
+        // 收集新信号
+        for (const s of (val.result.signals || [])) {
+          if (!s.deduplicated) newSignals.push(s);
+        }
       } else {
         errors.push({ symbol: val.symbol, error: val.error });
       }
@@ -136,11 +141,19 @@ export async function checkTierSignals(tierKey = 'all') {
     }
   }
 
+  // 汇总邮件：有新信号时才发，一封搞定
+  let emailSent = false;
+  if (newSignals.length > 0) {
+    emailSent = await sendSummaryEmail(newSignals, tierKey);
+  }
+
   return {
     timestamp: new Date().toISOString(),
     tier: tierKey,
     totalChecked: results.length,
     totalErrors: errors.length,
+    newSignalCount: newSignals.length,
+    emailSent,
     results,
   };
 }

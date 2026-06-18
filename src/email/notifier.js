@@ -203,7 +203,7 @@ function buildHtml(signal) {
 }
 
 /**
- * 发送交易信号邮件
+ * 发送交易信号邮件（单条，保留接口兼容）
  * @param {object} signal - 信号对象
  * @returns {boolean} 是否发送成功
  */
@@ -229,6 +229,113 @@ export async function sendSignalEmail(signal) {
     return true;
   } catch (err) {
     console.error('[Email] Send failed:', err.message);
+    return false;
+  }
+}
+
+/**
+ * 发送汇总邮件 - 一次检测的所有新信号合并为一封邮件
+ * 按信号强度排序，重点信号置顶
+ * @param {Array} signals - 新信号数组
+ * @param {string} tierKey - 档位 key
+ * @returns {boolean} 是否发送成功
+ */
+export async function sendSummaryEmail(signals, tierKey = 'all') {
+  const tp = ensureTransporter();
+  if (!tp) return false;
+
+  // 按置信度降序排列，最强的排最前面
+  const sorted = [...signals].sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
+
+  const buySignals = sorted.filter(s => s.signal === 'BUY');
+  const sellSignals = sorted.filter(s => s.signal === 'SELL');
+
+  const tierNames = { tier1: '主流', tier2: '热门', tier3: '新锐', all: '全部' };
+  const tierLabel = tierNames[tierKey] || '全部';
+
+  // 邮件主题
+  const subject = `[信号汇总] ${buySignals.length}个看涨 / ${sellSignals.length}个看跌 - ${tierLabel}币种`;
+
+  // 构建每条信号的卡片
+  function buildSignalCard(signal) {
+    const color = signal.signal === 'BUY' ? '#16c784' : '#ea3943';
+    const label = signal.signal === 'BUY' ? '看涨' : '看跌';
+    const reason = translateReason(signal.reason || '');
+
+    return `
+    <div style="background:#1a1a2e;border-radius:8px;padding:14px;margin-bottom:10px;border-left:3px solid ${color};">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div>
+          <span style="color:${color};font-weight:bold;font-size:16px;">${formatPair(signal.symbol)}</span>
+          <span style="background:${color}22;color:${color};padding:2px 8px;border-radius:4px;font-size:12px;margin-left:8px;">${label}</span>
+        </div>
+        <span style="color:${color};font-weight:bold;font-size:18px;">${signal.confidence}%</span>
+      </div>
+      <div style="color:#ccc;font-size:13px;margin-bottom:6px;">${reason}</div>
+      <div style="display:flex;gap:16px;font-size:12px;color:#999;">
+        <span>现价 ${fmtPrice(signal.suggestedEntry)}</span>
+        <span style="color:#ea3943;">止损 ${fmtPrice(signal.stopLoss)}</span>
+        <span style="color:#16c784;">目标 ${fmtPrice(signal.targetPrice)}</span>
+      </div>
+    </div>`;
+  }
+
+  const allCards = sorted.map(buildSignalCard).join('\n');
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#1a1a2e;color:#e0e0e0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <div style="max-width:600px;margin:20px auto;background:#16213e;border-radius:12px;overflow:hidden;">
+    <!-- Header -->
+    <div style="padding:20px;background:linear-gradient(135deg,#0f3460,#16213e);">
+      <h1 style="margin:0;font-size:18px;color:#e0e0e0;">信号汇总</h1>
+      <p style="margin:6px 0 0;color:#999;font-size:13px;">
+        ${tierLabel}币种检测完成 · ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}
+      </p>
+      <div style="display:flex;gap:16px;margin-top:12px;">
+        <div style="background:#16c78422;border-radius:6px;padding:6px 14px;">
+          <span style="color:#16c784;font-weight:bold;font-size:20px;">${buySignals.length}</span>
+          <span style="color:#16c784;font-size:12px;margin-left:4px;">看涨</span>
+        </div>
+        <div style="background:#ea394322;border-radius:6px;padding:6px 14px;">
+          <span style="color:#ea3943;font-weight:bold;font-size:20px;">${sellSignals.length}</span>
+          <span style="color:#ea3943;font-size:12px;margin-left:4px;">看跌</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Signals -->
+    <div style="padding:16px;">
+      ${allCards}
+    </div>
+
+    <!-- Footer -->
+    <div style="padding:14px;border-top:1px solid #2a2a4a;">
+      <div style="background:#1a0a0a;border:1px solid #ea394355;border-radius:8px;padding:10px;margin-bottom:10px;">
+        <div style="color:#ea3943;font-size:11px;font-weight:bold;margin-bottom:3px;">风险提示</div>
+        <div style="color:#aaa;font-size:11px;line-height:1.4;">
+          以上内容仅为技术分析参考，不构成投资建议。请根据自身情况谨慎决策。
+        </div>
+      </div>
+      <p style="margin:0;color:#555;font-size:10px;text-align:center;">Crypto Alerts | 仅供参考</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  try {
+    await tp.sendMail({
+      from: `"Crypto Alerts" <${GMAIL.EMAIL}>`,
+      to: CONFIG.NOTIFICATION_EMAIL || GMAIL.EMAIL,
+      subject,
+      html,
+    });
+    console.log(`[Email] Summary sent: ${signals.length} signals (${buySignals.length} buy / ${sellSignals.length} sell)`);
+    return true;
+  } catch (err) {
+    console.error('[Email] Summary send failed:', err.message);
     return false;
   }
 }
