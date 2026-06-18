@@ -1,7 +1,7 @@
 // Vercel Serverless API - 获取最近的信号记录
 // GET /api/signals?symbol=BTCUSDT&limit=20
 
-import { signalStore } from '../../src/db/signalStore.js';
+import { signalStore } from '../src/db/signalStore.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -18,7 +18,7 @@ export default async function handler(req, res) {
     }
 
     // 没有指定 symbol，返回所有监控交易对（并行查询）
-    const { CONFIG } = await import('../../src/config.js');
+    const { CONFIG } = await import('../src/config.js');
     const symbols = CONFIG.BINANCE_SYMBOLS;
     const results = await Promise.allSettled(
       symbols.map(async (sym) => {
