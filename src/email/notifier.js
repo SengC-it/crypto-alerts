@@ -53,21 +53,27 @@ function fmtPrice(price) {
  * 将专业术语翻译为普通人可理解的语言
  */
 function translateReason(reason) {
-  return reason
-    .replace(/多指标共振买入\((\d+)\/6\)/g, '$1个指标看涨')
-    .replace(/多指标共振卖出\((\d+)\/6\)/g, '$1个指标看跌')
-    .replace(/MACD金叉/g, '短期趋势向上')
-    .replace(/MACD死叉/g, '短期趋势向下')
-    .replace(/EMA多头/g, '均线向上排列')
-    .replace(/EMA空头/g, '均线向下排列')
-    .replace(/价格>SMA50/g, '价格高于中期均线')
-    .replace(/价格<SMA50/g, '价格低于中期均线')
-    .replace(/RSI偏强/g, '短期偏强')
-    .replace(/RSI偏弱/g, '短期偏弱')
-    .replace(/放量上涨/g, '成交量放大且上涨')
-    .replace(/放量下跌/g, '成交量放大且下跌')
-    .replace(/BB偏上轨/g, '价格接近高位')
-    .replace(/BB偏下轨/g, '价格接近低位');
+  const translations = [
+    [/\u591a\u6307\u6807\u5171\u632f\u4e70\u5165\((\d+)\/6\)/g, '$1\u4e2a\u6307\u6807\u770b\u6da8'],
+    [/\u591a\u6307\u6807\u5171\u632f\u5356\u51fa\((\d+)\/6\)/g, '$1\u4e2a\u6307\u6807\u770b\u8dcc'],
+    [/MACD\u91d1\u53c9/g, 'MACD \u770b\u6da8'],
+    [/MACD\u6b7b\u53c9/g, 'MACD \u770b\u8dcc'],
+    [/EMA\u591a\u5934/g, 'EMA \u770b\u6da8'],
+    [/EMA\u7a7a\u5934/g, 'EMA \u770b\u8dcc'],
+    [/\u4ef7\u683c>SMA50/g, '\u4ef7\u683c\u9ad8\u4e8e SMA50'],
+    [/\u4ef7\u683c<SMA50/g, '\u4ef7\u683c\u4f4e\u4e8e SMA50'],
+    [/RSI\u504f\u5f3a/g, 'RSI \u504f\u5f3a'],
+    [/RSI\u504f\u5f31/g, 'RSI \u504f\u5f31'],
+    [/\u653e\u91cf\u4e0a\u6da8/g, '\u6210\u4ea4\u91cf\u653e\u5927\u4e14\u4e0a\u6da8'],
+    [/\u653e\u91cf\u4e0b\u8dcc/g, '\u6210\u4ea4\u91cf\u653e\u5927\u4e14\u4e0b\u8dcc'],
+    [/BB\u504f\u4e0a\u8f68/g, '\u4ef7\u683c\u63a5\u8fd1\u9ad8\u4f4d'],
+    [/BB\u504f\u4e0b\u8f68/g, '\u4ef7\u683c\u63a5\u8fd1\u4f4e\u4f4d'],
+  ];
+
+  return translations.reduce(
+    (current, [pattern, replacement]) => current.replace(pattern, replacement),
+    String(reason || '')
+  );
 }
 
 /**
@@ -242,6 +248,18 @@ export async function sendSignalEmail(signal) {
  * @param {string} tierKey - 档位 key
  * @returns {boolean} 是否发送成功
  */
+export function buildSummarySubject(signals, tierKey = 'all') {
+  const annotated = annotateSignalPriorities(signals || []);
+  const buyCount = annotated.filter(s => s.signal === 'BUY').length;
+  const sellCount = annotated.filter(s => s.signal === 'SELL').length;
+  const tradingLayerCount = annotated.filter(s => s.priority === 'high').length;
+  const watchLayerCount = annotated.filter(s => s.priority === 'watch').length;
+  const tierNames = { tier1: '\u4e3b\u6d41', tier2: '\u70ed\u95e8', tier3: '\u65b0\u9510', all: '\u5168\u90e8' };
+  const tierLabel = tierNames[tierKey] || '\u5168\u90e8';
+
+  return '[\u4fe1\u53f7\u6c47\u603b] \u4ea4\u6613\u5c42 ' + tradingLayerCount + ' / \u89c2\u5bdf\u5c42 ' + watchLayerCount + ' | \u770b\u6da8 ' + buyCount + ' / \u770b\u8dcc ' + sellCount + ' - ' + tierLabel + '\u5e01\u79cd';
+}
+
 export async function sendSummaryEmail(signals, tierKey = 'all') {
   const tp = ensureTransporter();
   if (!tp) return false;
@@ -258,7 +276,7 @@ export async function sendSummaryEmail(signals, tierKey = 'all') {
   const tierLabel = tierNames[tierKey] || '全部';
 
   // 邮件主题
-  const subject = `[信号汇总] ${highPrioritySignals.length} high / ${watchSignals.length} watch - ${tierLabel}币种`;
+  const subject = buildSummarySubject(sorted, tierKey);
 
   // 构建每条信号的卡片
   function buildSignalCard(signal) {
