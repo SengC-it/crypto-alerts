@@ -1,6 +1,8 @@
 node_modules/
 .env
+ALL_PROXY.env
 .data/
 *.log
 .vercel/
 .temp/
+reports/

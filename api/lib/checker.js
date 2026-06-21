@@ -6,6 +6,7 @@ import { CONFIG } from '../../src/config.js';
 import { getCandles } from '../../src/websocket/rest.js';
 import { computeAllIndicators } from '../../src/indicators/index.js';
 import { runStrategies, filterSignals } from '../../src/strategies/manager.js';
+import { annotateSignalPriorities } from '../../src/strategies/signalPriority.js';
 import { signalStore } from '../../src/db/signalStore.js';
 import { sendSummaryEmail } from '../../src/email/notifier.js';
 
@@ -57,13 +58,13 @@ async function checkSymbol(symbol, skipEmail = true) {
   const rawSignals = runStrategies(symbol, indicators, strategyConfigs);
 
   // 5. 信号质量过滤（置信度+矛盾+共振+趋势确认）
-  const signals = filterSignals(rawSignals, {
+  const signals = annotateSignalPriorities(filterSignals(rawSignals, {
     minConfidence: CONFIG.SIGNAL_FILTER?.minConfidence || 40,
     filterConflicts: CONFIG.SIGNAL_FILTER?.filterConflicts !== false,
     boostResonance: CONFIG.SIGNAL_FILTER?.boostResonance !== false,
     buyRequiresTrendConfirm: CONFIG.SIGNAL_FILTER?.buyRequiresTrendConfirm !== false,
     trendIndicators: { sma_50: indicators.sma_50, currentPrice: indicators.currentPrice, ema_9: indicators.ema_9, ema_21: indicators.ema_21 },
-  });
+  }));
 
   // 6. 去重 + 存储
   const results = [];
@@ -153,6 +154,8 @@ export async function checkTierSignals(tierKey = 'all') {
     totalChecked: results.length,
     totalErrors: errors.length,
     newSignalCount: newSignals.length,
+    highPriorityCount: newSignals.filter(s => s.priority === 'high').length,
+    watchPriorityCount: newSignals.filter(s => s.priority === 'watch').length,
     emailSent,
     results,
   };

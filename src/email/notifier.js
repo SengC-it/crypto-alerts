@@ -3,6 +3,7 @@
 
 import nodemailer from 'nodemailer';
 import { CONFIG } from '../config.js';
+import { annotateSignalPriorities } from '../strategies/signalPriority.js';
 
 const { GMAIL } = CONFIG;
 
@@ -104,7 +105,8 @@ function buildSubject(signal) {
   const pair = formatPair(signal.symbol);
   const icon = signal.signal === 'BUY' ? '🟢' : '🔴';
   const direction = signal.signal === 'BUY' ? '看涨提醒' : '看跌提醒';
-  return `[${pair}] ${icon} ${direction} - 信号强度${signal.confidence}%`;
+  const priority = signal.priorityLabel ? ` ${signal.priorityLabel}` : '';
+  return `[${pair}]${priority} ${icon} ${direction} - 信号强度${signal.confidence}%`;
 }
 
 /**
@@ -245,22 +247,26 @@ export async function sendSummaryEmail(signals, tierKey = 'all') {
   if (!tp) return false;
 
   // 按置信度降序排列，最强的排最前面
-  const sorted = [...signals].sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
+  const sorted = annotateSignalPriorities(signals);
 
   const buySignals = sorted.filter(s => s.signal === 'BUY');
   const sellSignals = sorted.filter(s => s.signal === 'SELL');
+  const highPrioritySignals = sorted.filter(s => s.priority === 'high');
+  const watchSignals = sorted.filter(s => s.priority === 'watch');
 
   const tierNames = { tier1: '主流', tier2: '热门', tier3: '新锐', all: '全部' };
   const tierLabel = tierNames[tierKey] || '全部';
 
   // 邮件主题
-  const subject = `[信号汇总] ${buySignals.length}个看涨 / ${sellSignals.length}个看跌 - ${tierLabel}币种`;
+  const subject = `[信号汇总] ${highPrioritySignals.length} high / ${watchSignals.length} watch - ${tierLabel}币种`;
 
   // 构建每条信号的卡片
   function buildSignalCard(signal) {
     const color = signal.signal === 'BUY' ? '#16c784' : '#ea3943';
     const label = signal.signal === 'BUY' ? '看涨' : '看跌';
     const reason = translateReason(signal.reason || '');
+    const priorityColor = signal.priority === 'high' ? '#ffd700' : '#7aa2ff';
+    const priorityLabel = signal.priorityLabel || 'Opportunity watch';
 
     return `
     <div style="background:#1a1a2e;border-radius:8px;padding:14px;margin-bottom:10px;border-left:3px solid ${color};">
@@ -268,6 +274,7 @@ export async function sendSummaryEmail(signals, tierKey = 'all') {
         <div>
           <span style="color:${color};font-weight:bold;font-size:16px;">${formatPair(signal.symbol)}</span>
           <span style="background:${color}22;color:${color};padding:2px 8px;border-radius:4px;font-size:12px;margin-left:8px;">${label}</span>
+          <span style="background:${priorityColor}22;color:${priorityColor};padding:2px 8px;border-radius:4px;font-size:12px;margin-left:6px;">${priorityLabel}</span>
         </div>
         <span style="color:${color};font-weight:bold;font-size:18px;">${signal.confidence}%</span>
       </div>
@@ -302,6 +309,10 @@ export async function sendSummaryEmail(signals, tierKey = 'all') {
         <div style="background:#ea394322;border-radius:6px;padding:6px 14px;">
           <span style="color:#ea3943;font-weight:bold;font-size:20px;">${sellSignals.length}</span>
           <span style="color:#ea3943;font-size:12px;margin-left:4px;">看跌</span>
+        </div>
+        <div style="background:#ffd70022;border-radius:6px;padding:6px 14px;">
+          <span style="color:#ffd700;font-weight:bold;font-size:20px;">${highPrioritySignals.length}</span>
+          <span style="color:#ffd700;font-size:12px;margin-left:4px;">High</span>
         </div>
       </div>
     </div>

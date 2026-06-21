@@ -3,9 +3,28 @@
 // 支持三档冷却期、信号冷却模拟、详细交易分析
 
 import { CONFIG } from '../config.js';
-import { getCandles } from '../websocket/rest.js';
+import { fetchHistoricalCandles } from './historicalData.js';
 import { computeAllIndicators } from '../indicators/index.js';
 import { runStrategies, filterSignals } from '../strategies/manager.js';
+
+export function calculateNetTradePnl({
+  direction,
+  entryPrice,
+  exitPrice,
+  feeRatePercent = 0,
+  slippagePercent = 0,
+}) {
+  const gross = direction === 'BUY'
+    ? ((exitPrice - entryPrice) / entryPrice) * 100
+    : ((entryPrice - exitPrice) / entryPrice) * 100;
+  const cost = (feeRatePercent + slippagePercent) * 2;
+
+  return {
+    grossPnlPercent: +gross.toFixed(4),
+    roundTripCostPercent: +cost.toFixed(4),
+    netPnlPercent: +(gross - cost).toFixed(4),
+  };
+}
 
 /**
  * 单笔交易记录
@@ -23,21 +42,27 @@ class Trade {
     this.exitPrice = null;
     this.exitTime = null;
     this.exitReason = null;
+    this.grossPnlPercent = 0;
+    this.roundTripCostPercent = 0;
     this.pnlPercent = 0;
     this.holdHours = 0;
   }
 
-  close(price, time, reason) {
+  close(price, time, reason, costOptions = {}) {
     this.exitPrice = price;
     this.exitTime = time;
     this.exitReason = reason;
     this.holdHours = (time - this.entryTime) / (1000 * 60 * 60);
 
-    if (this.direction === 'BUY') {
-      this.pnlPercent = ((price - this.entryPrice) / this.entryPrice) * 100;
-    } else {
-      this.pnlPercent = ((this.entryPrice - price) / this.entryPrice) * 100;
-    }
+    const pnl = calculateNetTradePnl({
+      direction: this.direction,
+      entryPrice: this.entryPrice,
+      exitPrice: price,
+      ...costOptions,
+    });
+    this.grossPnlPercent = pnl.grossPnlPercent;
+    this.roundTripCostPercent = pnl.roundTripCostPercent;
+    this.pnlPercent = pnl.netPnlPercent;
   }
 }
 
@@ -69,6 +94,12 @@ export async function backtestSymbol(symbol, days = 30, options = {}) {
     trailingStop = rm.trailingStop ?? false,
     trailingATR = rm.trailingATR ?? 1.0,
     positionTimeoutHours = rm.positionTimeoutHours ?? 48,
+    feeRatePercent = rm.feeRatePercent ?? 0.04,
+    slippagePercent = rm.slippagePercent ?? 0.03,
+    candles: injectedCandles = null,
+    indicatorSeries = null,
+    computeIndicatorsFn = computeAllIndicators,
+    strategyOverrides = {},
   } = options;
 
   const tier = getTier(symbol);
@@ -77,26 +108,35 @@ export async function backtestSymbol(symbol, days = 30, options = {}) {
 
   // 1. 拉取历史K线
   const totalCandles = days * 24 + 100;
-  const rawCandles = await getCandles(symbol, '1h', Math.min(totalCandles, 1500));
+  const rawCandles = injectedCandles || await fetchHistoricalCandles({
+    symbol,
+    interval: '1h',
+    candlesNeeded: totalCandles,
+  });
 
   if (!rawCandles || !Array.isArray(rawCandles) || rawCandles.length < 200) {
-    return { symbol, error: 'Insufficient historical data', candlesLoaded: 0 };
+    return { symbol, error: `Insufficient historical data: ${rawCandles?.length || 0} candles`, candlesLoaded: rawCandles?.length || 0 };
   }
 
   const allCandles = rawCandles.map(c => ({
-    open: parseFloat(c[1]),
-    high: parseFloat(c[2]),
-    low: parseFloat(c[3]),
-    close: parseFloat(c[4]),
-    volume: parseFloat(c[5]),
-    timestamp: c[6],
+    open: parseFloat(c.open ?? c[1]),
+    high: parseFloat(c.high ?? c[2]),
+    low: parseFloat(c.low ?? c[3]),
+    close: parseFloat(c.close ?? c[4]),
+    volume: parseFloat(c.volume ?? c[5]),
+    timestamp: Number(c.closeTime ?? c.timestamp ?? c[6]),
   }));
+
+  const getIndicators = (index, candleSlice) => {
+    if (indicatorSeries && indicatorSeries[index]) return indicatorSeries[index];
+    return computeIndicatorsFn(candleSlice);
+  };
 
   // 2. 构建策略配置
   const strategyConfigs = {};
   for (const [key, defaults] of Object.entries(CONFIG.DEFAULT_STRATEGIES)) {
     if (!defaults.enabled) continue;
-    strategyConfigs[key] = { enabled: true, params: { ...defaults } };
+    strategyConfigs[key] = { enabled: true, params: { ...defaults, ...(strategyOverrides[key] || {}) } };
   }
 
   // 3. 逐根K线回测
@@ -146,7 +186,7 @@ export async function backtestSymbol(symbol, days = 30, options = {}) {
 
       // 止损
       if (openTrade.direction === 'BUY' && currentLow <= openTrade.stopLoss) {
-        openTrade.close(openTrade.stopLoss, currentTime, 'stop_loss');
+        openTrade.close(openTrade.stopLoss, currentTime, 'stop_loss', { feeRatePercent, slippagePercent });
         const pnl = equity * (openTrade.pnlPercent / 100) * leverage;
         equity += pnl;
         if (equity > peak) peak = equity;
@@ -157,7 +197,7 @@ export async function backtestSymbol(symbol, days = 30, options = {}) {
         continue;
       }
       if (openTrade.direction === 'SELL' && currentHigh >= openTrade.stopLoss) {
-        openTrade.close(openTrade.stopLoss, currentTime, 'stop_loss');
+        openTrade.close(openTrade.stopLoss, currentTime, 'stop_loss', { feeRatePercent, slippagePercent });
         const pnl = equity * (openTrade.pnlPercent / 100) * leverage;
         equity += pnl;
         if (equity > peak) peak = equity;
@@ -170,7 +210,7 @@ export async function backtestSymbol(symbol, days = 30, options = {}) {
 
       // 止盈
       if (openTrade.direction === 'BUY' && currentHigh >= openTrade.targetPrice) {
-        openTrade.close(openTrade.targetPrice, currentTime, 'target');
+        openTrade.close(openTrade.targetPrice, currentTime, 'target', { feeRatePercent, slippagePercent });
         const pnl = equity * (openTrade.pnlPercent / 100) * leverage;
         equity += pnl;
         if (equity > peak) peak = equity;
@@ -181,7 +221,7 @@ export async function backtestSymbol(symbol, days = 30, options = {}) {
         continue;
       }
       if (openTrade.direction === 'SELL' && currentLow <= openTrade.targetPrice) {
-        openTrade.close(openTrade.targetPrice, currentTime, 'target');
+        openTrade.close(openTrade.targetPrice, currentTime, 'target', { feeRatePercent, slippagePercent });
         const pnl = equity * (openTrade.pnlPercent / 100) * leverage;
         equity += pnl;
         if (equity > peak) peak = equity;
@@ -194,7 +234,7 @@ export async function backtestSymbol(symbol, days = 30, options = {}) {
 
       // 超时平仓
       if (hoursInPosition >= positionTimeoutHours) {
-        openTrade.close(currentPrice, currentTime, 'timeout');
+        openTrade.close(currentPrice, currentTime, 'timeout', { feeRatePercent, slippagePercent });
         const pnl = equity * (openTrade.pnlPercent / 100) * leverage;
         equity += pnl;
         if (equity > peak) peak = equity;
@@ -207,7 +247,7 @@ export async function backtestSymbol(symbol, days = 30, options = {}) {
 
       // 已有持仓，检查反向信号
       // 3b. 计算指标检查反向信号
-      const indicators = computeAllIndicators(candleSlice);
+      const indicators = getIndicators(i, candleSlice);
       if (!indicators || indicators.currentPrice === undefined) continue;
       const rawSignals = runStrategies(symbol, indicators, strategyConfigs);
       const filteredSignals = filterSignals(rawSignals, {
@@ -227,7 +267,7 @@ export async function backtestSymbol(symbol, days = 30, options = {}) {
           // 只在反向信号置信度 >= 当前持仓置信度时才平仓
           const best = oppositeSignals.reduce((a, b) => a.confidence > b.confidence ? a : b);
           if (best.confidence >= openTrade.confidence * 0.8) {
-            openTrade.close(currentPrice, currentTime, 'opposite_signal');
+            openTrade.close(currentPrice, currentTime, 'opposite_signal', { feeRatePercent, slippagePercent });
             const pnl = equity * (openTrade.pnlPercent / 100) * leverage;
             equity += pnl;
             if (equity > peak) peak = equity;
@@ -244,7 +284,7 @@ export async function backtestSymbol(symbol, days = 30, options = {}) {
 
     // 没有持仓 — 检查新信号
     // 3c. 计算指标 & 运行策略
-    const indicators = computeAllIndicators(candleSlice);
+    const indicators = getIndicators(i, candleSlice);
     if (!indicators || indicators.currentPrice === undefined) continue;
 
     const rawSignals = runStrategies(symbol, indicators, strategyConfigs);
@@ -276,18 +316,23 @@ export async function backtestSymbol(symbol, days = 30, options = {}) {
   if (openTrade) {
     const lastPrice = allCandles[allCandles.length - 1].close;
     const lastTime = allCandles[allCandles.length - 1].timestamp;
-    openTrade.close(lastPrice, lastTime, 'end_of_backtest');
+    openTrade.close(lastPrice, lastTime, 'end_of_backtest', { feeRatePercent, slippagePercent });
+    const pnl = equity * (openTrade.pnlPercent / 100) * leverage;
+    equity += pnl;
+    if (equity > peak) peak = equity;
+    const ddPct = ((peak - equity) / peak) * 100;
+    if (ddPct > maxDrawdownPercent) { maxDrawdownPercent = ddPct; maxDrawdown = peak - equity; }
     trades.push(openTrade);
   }
 
   // 4. 计算统计数据
-  return calculateStats(symbol, trades, initialCapital, leverage, days, allCandles.length - warmup, tier, maxDrawdown, maxDrawdownPercent, equity);
+  return calculateStats(symbol, trades, initialCapital, leverage, days, allCandles.length - warmup, tier, maxDrawdown, maxDrawdownPercent, equity, { feeRatePercent, slippagePercent });
 }
 
 /**
  * 计算回测统计数据
  */
-function calculateStats(symbol, trades, initialCapital, leverage, days, totalHours, tier, maxDD, maxDDPct, finalEquity) {
+function calculateStats(symbol, trades, initialCapital, leverage, days, totalHours, tier, maxDD, maxDDPct, finalEquity, costAssumptions = {}) {
   if (trades.length === 0) {
     return { symbol, tier: tier.key, days, totalTrades: 0, message: 'No trades generated' };
   }
@@ -344,6 +389,8 @@ function calculateStats(symbol, trades, initialCapital, leverage, days, totalHou
   const sharpeRatio = stdPnl > 0 ? (avgPnl / stdPnl) * Math.sqrt(tradesPerYear) : 0;
 
   const totalPnlPercent = ((finalEquity - initialCapital) / initialCapital) * 100;
+  const grossPnlPercent = trades.reduce((s, t) => s + t.grossPnlPercent, 0);
+  const totalCostPercent = trades.reduce((s, t) => s + t.roundTripCostPercent, 0);
   const avgWin = wins.length > 0 ? wins.reduce((s, t) => s + t.pnlPercent, 0) / wins.length : 0;
   const avgLoss = losses.length > 0 ? Math.abs(losses.reduce((s, t) => s + t.pnlPercent, 0) / losses.length) : 0;
   const profitFactor = losses.length > 0 && losses.reduce((s, t) => s + t.pnlPercent, 0) !== 0
@@ -360,6 +407,8 @@ function calculateStats(symbol, trades, initialCapital, leverage, days, totalHou
     target: +t.targetPrice.toFixed(4),
     exitReason: t.exitReason,
     pnl: +t.pnlPercent.toFixed(2),
+    grossPnl: +t.grossPnlPercent.toFixed(2),
+    cost: +t.roundTripCostPercent.toFixed(2),
     confidence: t.confidence,
     holdHours: +t.holdHours.toFixed(1),
   }));
@@ -378,6 +427,9 @@ function calculateStats(symbol, trades, initialCapital, leverage, days, totalHou
     avgLossPnl: +avgLoss.toFixed(2),
     profitFactor: profitFactor === Infinity ? 999 : +profitFactor.toFixed(2),
     totalPnlPercent: +totalPnlPercent.toFixed(2),
+    grossPnlPercent: +grossPnlPercent.toFixed(2),
+    totalCostPercent: +totalCostPercent.toFixed(2),
+    costAssumptions,
     finalEquity: +finalEquity.toFixed(2),
     maxDrawdown: +maxDD.toFixed(2),
     maxDrawdownPercent: +maxDDPct.toFixed(2),
@@ -410,7 +462,14 @@ export async function backtestAll(days = 30, options = {}) {
     const batch = symbols.slice(i, i + BATCH_SIZE);
     const tasks = batch.map(async (symbol) => {
       try {
-        const result = await backtestSymbol(symbol, days, options);
+        const symbolOptions = options.candlesBySymbol?.[symbol]
+          ? {
+              ...options,
+              candles: options.candlesBySymbol[symbol],
+              indicatorSeries: options.indicatorsBySymbol?.[symbol] || options.indicatorSeries,
+            }
+          : options;
+        const result = await backtestSymbol(symbol, days, symbolOptions);
         return { ok: true, result };
       } catch (err) {
         return { ok: false, symbol, error: err.message };

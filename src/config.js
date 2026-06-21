@@ -6,17 +6,20 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Load .env file manually (no dotenv dependency needed)
+// Load env files manually (no dotenv dependency needed)
 function loadEnv() {
-  const envPath = path.join(__dirname, '..', '.env');
-  if (fs.existsSync(envPath)) {
+  const envFiles = ['.env', 'ALL_PROXY.env'];
+  for (const fileName of envFiles) {
+    const envPath = path.join(__dirname, '..', fileName);
+    if (!fs.existsSync(envPath)) continue;
+
     const lines = fs.readFileSync(envPath, 'utf-8').split('\n');
     for (const line of lines) {
       const trimmed = line.trim();
       if (!trimmed || trimmed.startsWith('#')) continue;
       const [key, ...valueParts] = trimmed.split('=');
       const value = valueParts.join('=').trim();
-      if (key && value) {
+      if (key && value && process.env[key] === undefined) {
         process.env[key] = value;
       }
     }
@@ -144,6 +147,7 @@ export const CONFIG = {
   // 信号质量过滤配置（v4 优化 - 基于诊断回测数据）
   SIGNAL_FILTER: {
     minConfidence: 50,              // 降低到50%以不错过机会（回测显示50%比60%多15%收益）
+    highPriorityConfidence: 75,     // 30/90/180d scans: use 75+ as high-priority action layer
     filterConflicts: true,
     boostResonance: true,
     buyRequiresTrendConfirm: true,  // 做多需要趋势确认（价格>SMA50）
@@ -153,7 +157,7 @@ export const CONFIG = {
   // 风控配置（v5 优化 - 基于全流程验证数据）
   RISK_MANAGEMENT: {
     trailingStop: true,             // 默认启用移动止损（回测: 812% vs 222%）
-    trailingATR: 0.6,              // v5: 0.8→0.6（扣费PnL +172%, 胜率+7pp, DD-1pp）
+    trailingATR: 0.5,              // 30d optimization: best net PnL/score with fee-adjusted backtest
     stopLossATR: 1.5,              // 初始止损距离 = 1.5 * ATR
     takeProfitATR: 3.0,            // 止盈距离 = 3.0 * ATR（移动止损启用时较少触发）
     positionTimeoutHours: 48,      // 持仓超时（小时）

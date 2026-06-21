@@ -39,8 +39,8 @@ async function get(path, params = {}) {
 /**
  * Get K-line / Candlestick data
  */
-export async function getCandles(symbol, interval = '1h', limit = 100) {
-  return get('/fapi/v1/klines', { symbol, interval, limit });
+export async function getCandles(symbol, interval = '1h', limit = 100, extraParams = {}) {
+  return get('/fapi/v1/klines', { symbol, interval, limit, ...extraParams });
 }
 
 /**
