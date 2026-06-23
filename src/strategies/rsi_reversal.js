@@ -19,31 +19,32 @@ export function rsiReversal(params, indicators) {
 
   let signal = 'HOLD';
   let confidence = 0;
+  let score = 0;
   let reason = '';
 
   if (rsiVal < oversold) {
     signal = 'BUY';
     // RSI越低置信度越高, 基础50起
-    confidence = 50 + Math.round((oversold - rsiVal) / oversold * 45);
-    confidence = Math.min(confidence, 95);
+    score = Math.min(50 + ((oversold - rsiVal) / oversold * 45), 95);
+    confidence = Math.round(score);
     reason = `RSI(${rsi_period}) = ${rsiVal.toFixed(2)} (低于 ${oversold} 超卖区域)`;
   } else if (rsiVal > overbought) {
     signal = 'SELL';
-    confidence = 50 + Math.round((rsiVal - overbought) / (100 - overbought) * 45);
-    confidence = Math.min(confidence, 95);
+    score = Math.min(50 + ((rsiVal - overbought) / (100 - overbought) * 45), 95);
+    confidence = Math.round(score);
     reason = `RSI(${rsi_period}) = ${rsiVal.toFixed(2)} (高于 ${overbought} 超买区域)`;
   } else if (rsiVal < 40) {
     // RSI 在 35-40 之间，偏弱但未超卖
     signal = 'BUY';
     // 提高置信度到50-65区间，不再被minConfidence=50过滤
-    confidence = 50 + Math.round((40 - rsiVal) / (40 - oversold) * 15);
-    confidence = Math.min(confidence, 65);
+    score = Math.min(50 + ((40 - rsiVal) / (40 - oversold) * 15), 65);
+    confidence = Math.round(score);
     reason = `RSI(${rsi_period}) = ${rsiVal.toFixed(2)} (偏弱区域，潜在反弹)`;
   } else if (rsiVal > 60) {
     // RSI 在 60-65 之间，偏强但未超买
     signal = 'SELL';
-    confidence = 50 + Math.round((rsiVal - 60) / (overbought - 60) * 15);
-    confidence = Math.min(confidence, 65);
+    score = Math.min(50 + ((rsiVal - 60) / (overbought - 60) * 15), 65);
+    confidence = Math.round(score);
     reason = `RSI(${rsi_period}) = ${rsiVal.toFixed(2)} (偏强区域，潜在回调)`;
   }
 
@@ -54,10 +55,12 @@ export function rsiReversal(params, indicators) {
     const macdBullish = indicators.macd.histogram > 0 && indicators.macd.macd > indicators.macd.signal;
     const macdBearish = indicators.macd.histogram < 0 && indicators.macd.macd < indicators.macd.signal;
     if (signal === 'BUY' && macdBullish) {
-      confidence = Math.min(confidence + 10, 95);
+      score = Math.min(score + 10, 95);
+      confidence = Math.round(score);
       reason += ' +MACD确认';
     } else if (signal === 'SELL' && macdBearish) {
-      confidence = Math.min(confidence + 10, 95);
+      score = Math.min(score + 10, 95);
+      confidence = Math.round(score);
       reason += ' +MACD确认';
     }
   }
@@ -70,6 +73,7 @@ export function rsiReversal(params, indicators) {
     name: 'RSI 反转策略',
     signal,
     confidence,
+    score: +score.toFixed(1),
     reason,
     indicators: { rsi: rsiVal.toFixed(2) },
     suggestedEntry: currentPrice,

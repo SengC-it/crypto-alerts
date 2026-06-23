@@ -20,6 +20,7 @@ export function volumeConfirmation(params, indicators) {
 
   let signal = 'HOLD';
   let confidence = 0;
+  let score = 0;
   let reason = '';
 
   if (volumeRatio >= volume_multiplier) {
@@ -29,11 +30,13 @@ export function volumeConfirmation(params, indicators) {
 
     if (currentPrice > sma20 && rsi > 45 && rsi < 75) {
       signal = 'BUY';
-      confidence = Math.round(Math.min(volumeRatio * 20, 85));
+      score = Math.min(volumeRatio * 20, 85);
+      confidence = Math.round(score);
       reason = `放量上涨确认 - 成交量=${(volumeRatio * 100).toFixed(0)}%均量, RSI=${rsi ? rsi.toFixed(2) : 'N/A'}, 价格在SMA20上方`;
     } else if (currentPrice < sma20 && rsi > 25 && rsi < 55) {
       signal = 'SELL';
-      confidence = Math.round(Math.min(volumeRatio * 20, 85));
+      score = Math.min(volumeRatio * 20, 85);
+      confidence = Math.round(score);
       reason = `放量下跌确认 - 成交量=${(volumeRatio * 100).toFixed(0)}%均量, RSI=${rsi ? rsi.toFixed(2) : 'N/A'}, 价格在SMA20下方`;
     } else {
       reason = `放量但方向不明确 - 成交量=${(volumeRatio * 100).toFixed(0)}%均量`;
@@ -49,6 +52,7 @@ export function volumeConfirmation(params, indicators) {
     name: '成交量确认策略',
     signal,
     confidence,
+    score: +score.toFixed(1),
     reason,
     indicators: {
       volume_ratio: (volumeRatio * 100).toFixed(0) + '%',

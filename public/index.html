@@ -143,6 +143,7 @@
           const sym = s.symbol || '--';
           const strategy = s.name || s.strategy || '--';
           const conf = s.confidence || '--';
+          const score = Number.isFinite(Number(s.score)) ? Number(s.score).toFixed(1) : conf;
           const priority = s.priority || (Number(conf) >= 75 ? 'high' : 'watch');
           const priorityLabel = s.priority_label || s.priorityLabel || (priority === 'high' ? 'High priority' : 'Opportunity watch');
           const time = s.created_at || s.timestamp || '--';
@@ -151,7 +152,7 @@
             <div class="strategy">${strategy}</div>
             <div class="direction ${cls}">${dirLabel}</div>
             <div class="priority ${priority}">${priorityLabel}</div>
-            <div class="confidence">置信度: ${conf}%</div>
+            <div class="confidence">信号评分: ${score}</div>
             <div class="time">${time}</div>
           </div>`;
         }).join('') + '</div>';

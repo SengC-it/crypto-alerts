@@ -120,13 +120,16 @@ export function filterSignals(signals, options = {}) {
 
     if (buySignals.length >= 2) {
       const avgConf = Math.round(buySignals.reduce((s, sig) => s + sig.confidence, 0) / buySignals.length);
+      const avgScore = buySignals.reduce((s, sig) => s + Number(sig.score ?? sig.confidence), 0) / buySignals.length;
       const boostConf = Math.min(avgConf + buySignals.length * 10, 98);
+      const boostScore = Math.min(avgScore + buySignals.length * 10, 98);
 
       resonanceSignals.push({
         strategy: 'resonance_BUY',
         name: `${buySignals.length}策略共振做多`,
         signal: 'BUY',
         confidence: boostConf,
+        score: +boostScore.toFixed(1),
         reason: buySignals.map(s => s.reason).join(' | '),
         indicators: Object.assign({}, ...buySignals.map(s => s.indicators || {})),
         suggestedEntry: buySignals[0].suggestedEntry,
@@ -141,13 +144,16 @@ export function filterSignals(signals, options = {}) {
 
     if (sellSignals.length >= 2) {
       const avgConf = Math.round(sellSignals.reduce((s, sig) => s + sig.confidence, 0) / sellSignals.length);
+      const avgScore = sellSignals.reduce((s, sig) => s + Number(sig.score ?? sig.confidence), 0) / sellSignals.length;
       const boostConf = Math.min(avgConf + sellSignals.length * 10, 98);
+      const boostScore = Math.min(avgScore + sellSignals.length * 10, 98);
 
       resonanceSignals.push({
         strategy: 'resonance_SELL',
         name: `${sellSignals.length}策略共振做空`,
         signal: 'SELL',
         confidence: boostConf,
+        score: +boostScore.toFixed(1),
         reason: sellSignals.map(s => s.reason).join(' | '),
         indicators: Object.assign({}, ...sellSignals.map(s => s.indicators || {})),
         suggestedEntry: sellSignals[0].suggestedEntry,

@@ -103,6 +103,14 @@ function formatPair(symbol) {
   }
   return symbol;
 }
+export function formatSignalScore(signal) {
+  const score = Number(signal?.score);
+  if (Number.isFinite(score)) return score.toFixed(1);
+  const confidence = Number(signal?.confidence);
+  if (Number.isFinite(confidence)) return String(confidence);
+  return '--';
+}
+
 
 /**
  * 生成邮件主题
@@ -112,7 +120,7 @@ function buildSubject(signal) {
   const icon = signal.signal === 'BUY' ? '🟢' : '🔴';
   const direction = signal.signal === 'BUY' ? '看涨提醒' : '看跌提醒';
   const priority = signal.priorityLabel ? ` ${signal.priorityLabel}` : '';
-  return `[${pair}]${priority} ${icon} ${direction} - 信号强度${signal.confidence}%`;
+  return `[${pair}]${priority} ${icon} ${direction} - 信号评分${formatSignalScore(signal)}`;
 }
 
 /**
@@ -127,6 +135,7 @@ function buildHtml(signal) {
     : '根据多个技术指标分析，该币种短期可能下跌，注意风险。';
 
   const translatedReason = translateReason(signal.reason || '');
+  const signalScore = formatSignalScore(signal);
 
   const indicatorRows = Object.entries(signal.indicators || {})
     .map(([k, v]) => `<tr><td style="padding:4px 12px;color:#999;">${translateIndicatorKey(k)}</td><td style="padding:4px 12px;font-weight:bold;">${v}</td></tr>`)
@@ -153,8 +162,8 @@ function buildHtml(signal) {
           <div style="font-size:24px;font-weight:bold;color:#fff;">${fmtPrice(signal.suggestedEntry)}</div>
         </div>
         <div style="text-align:right;">
-          <div style="color:#999;font-size:12px;">信号强度</div>
-          <div style="font-size:24px;font-weight:bold;color:${signalColor};">${signal.confidence}%</div>
+          <div style="color:#999;font-size:12px;">信号评分</div>
+          <div style="font-size:24px;font-weight:bold;color:${signalColor};">${signalScore}</div>
         </div>
       </div>
 
@@ -283,6 +292,7 @@ export async function sendSummaryEmail(signals, tierKey = 'all') {
     const color = signal.signal === 'BUY' ? '#16c784' : '#ea3943';
     const label = signal.signal === 'BUY' ? '看涨' : '看跌';
     const reason = translateReason(signal.reason || '');
+    const signalScore = formatSignalScore(signal);
     const priorityColor = signal.priority === 'high' ? '#ffd700' : '#7aa2ff';
     const priorityLabel = signal.priorityLabel || 'Opportunity watch';
 
@@ -294,7 +304,7 @@ export async function sendSummaryEmail(signals, tierKey = 'all') {
           <span style="background:${color}22;color:${color};padding:2px 8px;border-radius:4px;font-size:12px;margin-left:8px;">${label}</span>
           <span style="background:${priorityColor}22;color:${priorityColor};padding:2px 8px;border-radius:4px;font-size:12px;margin-left:6px;">${priorityLabel}</span>
         </div>
-        <span style="color:${color};font-weight:bold;font-size:18px;">${signal.confidence}%</span>
+        <span style="color:${color};font-weight:bold;font-size:18px;">${signalScore}</span>
       </div>
       <div style="color:#ccc;font-size:13px;margin-bottom:6px;">${reason}</div>
       <div style="display:flex;gap:16px;font-size:12px;color:#999;">
