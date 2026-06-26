@@ -1,70 +1,116 @@
 // Fee-adjusted backtest comparison.
 // Usage: node scripts/fee-adjusted-backtest.js [days]
 
+import { CONFIG } from '../src/config.js';
 import { backtestAll } from '../src/backtest/engine.js';
-import { assertUsableBacktestResults } from '../src/backtest/report.js';
 
-const days = parseInt(process.argv[2], 10) || 30;
-const scenarios = [
-  { label: 'high-frequency', minConfidence: 40 },
-  { label: 'balanced', minConfidence: 60 },
-  { label: 'selective', minConfidence: 75 },
-];
+const days = parseInt(process.argv[2]) || 30;
+const roundTripCostPercent = CONFIG.TRADING_COSTS.roundTripPercent;
 
-console.log(`\n${'='.repeat(72)}`);
-console.log(`  Fee-adjusted backtest comparison (${days} days)`);
-console.log('  Costs are applied inside the backtest engine per closed trade.');
-console.log(`${'='.repeat(72)}\n`);
+console.log(`\n${'='.repeat(70)}`);
+console.log('  Fee-adjusted backtest comparison');
+console.log(`  Round-trip cost: ${roundTripCostPercent.toFixed(2)}% per trade`);
+console.log(`${'='.repeat(70)}\n`);
 
-async function runScenario({ label, minConfidence }) {
-  console.log(`\n${'-'.repeat(56)}`);
-  console.log(`  Scenario: ${label} (minConfidence=${minConfidence})`);
-  console.log(`${'-'.repeat(56)}`);
+function summarizeTrades(trades) {
+  return trades.reduce(
+    (acc, trade) => {
+      acc.gross += trade.grossPnl ?? trade.pnl;
+      acc.cost += trade.cost ?? 0;
+      acc.net += trade.pnl;
+      return acc;
+    },
+    { gross: 0, cost: 0, net: 0 }
+  );
+}
 
-  const result = assertUsableBacktestResults(await backtestAll(days, { minConfidence }));
-  const usable = result.results.filter(r => !r.error && r.totalTrades > 0);
-  const totals = usable.reduce((acc, r) => {
-    acc.trades += r.totalTrades || 0;
-    acc.wins += r.wins || 0;
-    acc.net += r.totalPnlPercent || 0;
-    acc.gross += r.grossPnlPercent || 0;
-    acc.cost += r.totalCostPercent || 0;
-    acc.profitable += (r.totalPnlPercent || 0) > 0 ? 1 : 0;
-    return acc;
-  }, { trades: 0, wins: 0, net: 0, gross: 0, cost: 0, profitable: 0 });
+async function runScenario(label, minConfidence) {
+  console.log(`\n${'-'.repeat(50)}`);
+  console.log(`  Scenario: ${label} (minConfidence=${minConfidence}%)`);
+  console.log(`${'-'.repeat(50)}`);
 
-  const count = usable.length;
-  const avg = value => count > 0 ? +(value / count).toFixed(2) : 0;
-  const winRate = totals.trades > 0 ? +((totals.wins / totals.trades) * 100).toFixed(1) : 0;
+  const result = await backtestAll(days, { minConfidence });
 
-  console.log(`  Usable symbols: ${count}/${result.totalSymbols}`);
-  console.log(`  Trades: ${totals.trades}`);
-  console.log(`  Win rate: ${winRate}%`);
-  console.log(`  Avg simple gross trade PnL/symbol: ${avg(totals.gross)}%`);
-  console.log(`  Avg simple round-trip cost/symbol: ${avg(totals.cost)}%`);
-  console.log(`  Avg compounded net return/symbol: ${avg(totals.net)}%`);
-  console.log(`  Profitable symbols: ${totals.profitable}/${count}`);
+  let totalGrossPnl = 0;
+  let totalCost = 0;
+  let totalNetPnl = 0;
+  let totalTrades = 0;
+  let totalWins = 0;
+  let profitableCoins = 0;
 
-  if (result.errors?.length) {
-    console.log(`  Data errors: ${result.errors.length}`);
-    for (const err of result.errors.slice(0, 5)) {
-      console.log(`    - ${err.symbol || 'unknown'}: ${err.error || JSON.stringify(err)}`);
-    }
+  const coinPnls = result.results
+    .filter(r => !r.error && r.trades)
+    .map(r => {
+      const totals = summarizeTrades(r.trades);
+      totalGrossPnl += totals.gross;
+      totalCost += totals.cost;
+      totalNetPnl += totals.net;
+      totalTrades += r.trades.length;
+      totalWins += r.wins || 0;
+      if (totals.net > 0) profitableCoins++;
+
+      return {
+        symbol: r.symbol,
+        tier: r.tier,
+        trades: r.trades.length,
+        gross: +totals.gross.toFixed(2),
+        cost: +totals.cost.toFixed(2),
+        net: +totals.net.toFixed(2),
+        winRate: r.winRate,
+      };
+    })
+    .sort((a, b) => b.net - a.net);
+
+  const coinCount = coinPnls.length;
+  const totalWinRate = totalTrades > 0 ? ((totalWins / totalTrades) * 100).toFixed(1) : '0';
+  const avgNetPnl = coinCount > 0 ? (totalNetPnl / coinCount).toFixed(2) : '0';
+  const expectancy = totalTrades > 0 ? (totalNetPnl / totalTrades).toFixed(2) : '0';
+
+  console.log('\n  Summary:');
+  console.log(`    Symbols:          ${coinCount}`);
+  console.log(`    Trades:           ${totalTrades}`);
+  console.log(`    Win rate:         ${totalWinRate}%`);
+  console.log(`    Gross PnL:        ${totalGrossPnl.toFixed(2)}%`);
+  console.log(`    Cost:             ${totalCost.toFixed(2)}%`);
+  console.log(`    Net PnL:          ${totalNetPnl.toFixed(2)}%`);
+  console.log(`    Avg net / symbol: ${avgNetPnl}%`);
+  console.log(`    Expectancy:       ${expectancy}% per trade`);
+  console.log(`    Profitable coins: ${profitableCoins}/${coinCount}`);
+
+  console.log('\n  Coin ranking:');
+  console.log('  Symbol'.padEnd(14) + 'Tier\tTrades\tGross\tCost\tNet\tWinRate');
+  console.log('  ' + '-'.repeat(70));
+  for (const coin of coinPnls) {
+    const mark = coin.net > 0 ? '+' : '';
+    console.log(
+      `  ${coin.symbol.padEnd(14)}${coin.tier}\t${coin.trades}\t${coin.gross}%\t${coin.cost}%\t${mark}${coin.net}%\t${coin.winRate}%`
+    );
   }
 
-  return { label, minConfidence, ...totals, symbols: count, winRate, avgNet: avg(totals.net) };
+  return { avgNetPnl: +avgNetPnl, profitableCoins, coinCount, totalTrades };
 }
+
+const scenarios = [
+  { label: 'High frequency', minConfidence: 40 },
+  { label: 'Balanced', minConfidence: 60 },
+  { label: 'Selective', minConfidence: 75 },
+];
 
 const compared = [];
 for (const scenario of scenarios) {
-  compared.push(await runScenario(scenario));
+  const result = await runScenario(scenario.label, scenario.minConfidence);
+  compared.push({ ...scenario, ...result });
 }
 
-console.log(`\n${'='.repeat(72)}`);
-console.log('  Scenario summary');
-console.log(`${'='.repeat(72)}\n`);
-console.log('Scenario'.padEnd(18) + 'Conf\tTrades\tWinRate\tAvgNetReturn\tProfitable');
-console.log('-'.repeat(64));
+console.log(`\n${'='.repeat(70)}`);
+console.log('  Scenario comparison');
+console.log(`${'='.repeat(70)}\n`);
+console.log('Scenario'.padEnd(16) + 'MinConf\tTrades\tAvgNet/Symbol\tProfitable');
+console.log('-'.repeat(62));
 for (const row of compared) {
-  console.log(`${row.label.padEnd(18)}${row.minConfidence}\t${row.trades}\t${row.winRate}%\t${row.avgNet}%\t${row.profitable}/${row.symbols}`);
+  console.log(
+    `${row.label.padEnd(16)}${row.minConfidence}%\t${row.totalTrades}\t${row.avgNetPnl}%\t\t${row.profitableCoins}/${row.coinCount}`
+  );
 }
+
+console.log('\n====== Analysis complete ======\n');
