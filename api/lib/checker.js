@@ -5,31 +5,18 @@
 import { CONFIG } from '../../src/config.js';
 import { getCandles } from '../../src/websocket/rest.js';
 import { computeAllIndicators } from '../../src/indicators/index.js';
-import { runStrategies, filterSignals } from '../../src/strategies/manager.js';
-import { annotateSignalPriorities } from '../../src/strategies/signalPriority.js';
+import { runStrategies, filterSignals, applyProfitFilter } from '../../src/strategies/manager.js';
 import { signalStore } from '../../src/db/signalStore.js';
-import { sendSummaryEmail } from '../../src/email/notifier.js';
+import { sendSignalEmail } from '../../src/email/notifier.js';
 
 /**
  * 对单个交易对执行信号检测
- * @param {boolean} skipEmail - 为 true 时只去重+存储，不发邮件（由上层统一发汇总）
  */
-async function checkSymbol(symbol, skipEmail = true) {
+async function checkSymbol(symbol) {
   // 1. 拉取最近100根1小时K线
-  let rawCandles;
-  try {
-    rawCandles = await getCandles(symbol, '1h', 100);
-  } catch (fetchErr) {
-    return { symbol, error: `Binance fetch error: ${fetchErr.message}`, signalCount: 0 };
-  }
-
-  if (!rawCandles || !Array.isArray(rawCandles)) {
-    const type = typeof rawCandles;
-    const preview = JSON.stringify(rawCandles).substring(0, 300);
-    return { symbol, error: `Invalid candle data (type=${type}): ${preview}`, signalCount: 0 };
-  }
-  if (rawCandles.length < 50) {
-    return { symbol, error: `Insufficient candle data: ${rawCandles.length} candles`, signalCount: 0 };
+  const rawCandles = await getCandles(symbol, '1h', 100);
+  if (!rawCandles || !Array.isArray(rawCandles) || rawCandles.length < 50) {
+    return { symbol, error: 'Insufficient candle data', signalCount: 0 };
   }
 
   const candles = rawCandles.map(c => ({
@@ -58,15 +45,19 @@ async function checkSymbol(symbol, skipEmail = true) {
   const rawSignals = runStrategies(symbol, indicators, strategyConfigs);
 
   // 5. 信号质量过滤（置信度+矛盾+共振+趋势确认）
-  const signals = annotateSignalPriorities(filterSignals(rawSignals, {
+  const qualitySignals = filterSignals(rawSignals, {
     minConfidence: CONFIG.SIGNAL_FILTER?.minConfidence || 40,
     filterConflicts: CONFIG.SIGNAL_FILTER?.filterConflicts !== false,
     boostResonance: CONFIG.SIGNAL_FILTER?.boostResonance !== false,
     buyRequiresTrendConfirm: CONFIG.SIGNAL_FILTER?.buyRequiresTrendConfirm !== false,
-    trendIndicators: { sma_50: indicators.sma_50, currentPrice: indicators.currentPrice, ema_9: indicators.ema_9, ema_21: indicators.ema_21 },
-  }));
+    trendIndicators: { sma_50: indicators.sma_50, currentPrice: indicators.currentPrice },
+  });
+  const signals = applyProfitFilter(qualitySignals, {
+    ...CONFIG.PROFIT_FILTER,
+    roundTripCostPercent: CONFIG.TRADING_COSTS.roundTripPercent,
+  });
 
-  // 6. 去重 + 存储
+  // 6. 去重 + 存储 + 邮件
   const results = [];
   for (const signal of signals) {
     const isDup = await signalStore.isDuplicate(signal);
@@ -75,7 +66,8 @@ async function checkSymbol(symbol, skipEmail = true) {
       continue;
     }
     await signalStore.save(signal);
-    results.push({ ...signal, deduplicated: false });
+    const emailSent = await sendSignalEmail(signal);
+    results.push({ ...signal, deduplicated: false, emailSent });
   }
 
   return {
@@ -122,7 +114,6 @@ export async function checkTierSignals(tierKey = 'all') {
   const settled = await Promise.allSettled(tasks);
   const results = [];
   const errors = [];
-  const newSignals = []; // 收集所有新信号（非去重）
 
   for (const item of settled) {
     if (item.status === 'fulfilled') {
@@ -130,10 +121,6 @@ export async function checkTierSignals(tierKey = 'all') {
       if (val.ok) {
         results.push(val.result);
         if (val.result.error) errors.push(val.result);
-        // 收集新信号
-        for (const s of (val.result.signals || [])) {
-          if (!s.deduplicated) newSignals.push(s);
-        }
       } else {
         errors.push({ symbol: val.symbol, error: val.error });
       }
@@ -142,21 +129,11 @@ export async function checkTierSignals(tierKey = 'all') {
     }
   }
 
-  // 汇总邮件：有新信号时才发，一封搞定
-  let emailSent = false;
-  if (newSignals.length > 0) {
-    emailSent = await sendSummaryEmail(newSignals, tierKey);
-  }
-
   return {
     timestamp: new Date().toISOString(),
     tier: tierKey,
     totalChecked: results.length,
     totalErrors: errors.length,
-    newSignalCount: newSignals.length,
-    highPriorityCount: newSignals.filter(s => s.priority === 'high').length,
-    watchPriorityCount: newSignals.filter(s => s.priority === 'watch').length,
-    emailSent,
     results,
   };
 }
