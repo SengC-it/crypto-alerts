@@ -10,7 +10,7 @@ import { multiIndicatorResonance } from '../src/strategies/multi_indicator_reson
 import { donchianBreakout } from '../src/strategies/donchian_breakout.js';
 import { atrVolatility } from '../src/strategies/atr_volatility.js';
 import { volumeConfirmation } from '../src/strategies/volume_confirmation.js';
-import { runStrategies, filterSignals, getAvailableStrategies } from '../src/strategies/manager.js';
+import { runStrategies, filterSignals, applyProfitFilter, getAvailableStrategies } from '../src/strategies/manager.js';
 
 // Sample indicator data for testing
 const bullishIndicators = {
@@ -99,7 +99,7 @@ describe('RSI Reversal Strategy', () => {
     const result = rsiReversal({ oversold: 35, overbought: 65, rsi_period: 14 }, weakBull);
     assert.ok(result !== null);
     assert.equal(result.signal, 'BUY');
-    assert.ok(result.confidence >= 50 && result.confidence <= 70);
+    assert.ok(result.confidence < 50);
   });
 
   it('should return low-confidence SELL for strong RSI (60-65)', () => {
@@ -107,7 +107,7 @@ describe('RSI Reversal Strategy', () => {
     const result = rsiReversal({ oversold: 35, overbought: 65, rsi_period: 14 }, weakBear);
     assert.ok(result !== null);
     assert.equal(result.signal, 'SELL');
-    assert.ok(result.confidence >= 50 && result.confidence <= 70);
+    assert.ok(result.confidence < 50);
   });
 });
 
@@ -265,6 +265,61 @@ describe('Signal Quality Filter', () => {
     assert.ok(resonance);
     assert.equal(resonance.signal, 'BUY');
     assert.ok(resonance.confidence > 60);
+  });
+});
+
+describe('Profit Filter', () => {
+  it('should remove excluded strategies', () => {
+    const signals = [
+      { signal: 'SELL', strategy: 'bollinger_mean_reversion', confidence: 90, suggestedEntry: 100, targetPrice: 98 },
+      { signal: 'SELL', strategy: 'volume_confirmation', confidence: 90, suggestedEntry: 100, targetPrice: 98 },
+    ];
+
+    const filtered = applyProfitFilter(signals, {
+      enabled: true,
+      excludeStrategies: ['bollinger_mean_reversion'],
+      allowDirections: ['SELL'],
+      minNetTargetPercent: 1,
+      roundTripCostPercent: 0.14,
+    });
+
+    assert.equal(filtered.length, 1);
+    assert.equal(filtered[0].strategy, 'volume_confirmation');
+  });
+
+  it('should remove disallowed directions', () => {
+    const signals = [
+      { signal: 'BUY', strategy: 'volume_confirmation', confidence: 90, suggestedEntry: 100, targetPrice: 102 },
+      { signal: 'SELL', strategy: 'volume_confirmation', confidence: 90, suggestedEntry: 100, targetPrice: 98 },
+    ];
+
+    const filtered = applyProfitFilter(signals, {
+      enabled: true,
+      allowDirections: ['SELL'],
+      minNetTargetPercent: 1,
+      roundTripCostPercent: 0.14,
+    });
+
+    assert.equal(filtered.length, 1);
+    assert.equal(filtered[0].signal, 'SELL');
+  });
+
+  it('should remove signals without enough net target space after costs', () => {
+    const signals = [
+      { signal: 'SELL', strategy: 'volume_confirmation', confidence: 90, suggestedEntry: 100, targetPrice: 99.2 },
+      { signal: 'SELL', strategy: 'volume_confirmation', confidence: 90, suggestedEntry: 100, targetPrice: 98.5 },
+    ];
+
+    const filtered = applyProfitFilter(signals, {
+      enabled: true,
+      allowDirections: ['SELL'],
+      minNetTargetPercent: 1,
+      roundTripCostPercent: 0.14,
+    });
+
+    assert.equal(filtered.length, 1);
+    assert.equal(filtered[0].targetPrice, 98.5);
+    assert.equal(filtered[0].netTargetPercent, 1.36);
   });
 });
 
