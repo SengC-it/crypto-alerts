@@ -4,7 +4,7 @@
 import { CONFIG } from './config.js';
 import { wsClient } from './websocket/binance.js';
 import { computeAllIndicators } from './indicators/index.js';
-import { runStrategies, filterSignals } from './strategies/manager.js';
+import { runStrategies, filterSignals, applyProfitFilter } from './strategies/manager.js';
 import { signalStore } from './db/signalStore.js';
 import { sendSignalEmail, sendStartupEmail, verifyEmailConfig } from './email/notifier.js';
 
@@ -50,12 +50,16 @@ async function onCandleClosed(symbol, candle, allCandles) {
   }
 
   // 3b. 信号质量过滤
-  const signals = filterSignals(rawSignals, {
+  const qualitySignals = filterSignals(rawSignals, {
     minConfidence: CONFIG.SIGNAL_FILTER?.minConfidence || 40,
     filterConflicts: CONFIG.SIGNAL_FILTER?.filterConflicts !== false,
     boostResonance: CONFIG.SIGNAL_FILTER?.boostResonance !== false,
     buyRequiresTrendConfirm: CONFIG.SIGNAL_FILTER?.buyRequiresTrendConfirm !== false,
-    trendIndicators: { sma_50: indicators.sma_50, currentPrice: indicators.currentPrice, ema_9: indicators.ema_9, ema_21: indicators.ema_21 },
+    trendIndicators: { sma_50: indicators.sma_50, currentPrice: indicators.currentPrice },
+  });
+  const signals = applyProfitFilter(qualitySignals, {
+    ...CONFIG.PROFIT_FILTER,
+    roundTripCostPercent: CONFIG.TRADING_COSTS.roundTripPercent,
   });
 
   if (signals.length === 0) {

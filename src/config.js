@@ -6,20 +6,17 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Load env files manually (no dotenv dependency needed)
+// Load .env file manually (no dotenv dependency needed)
 function loadEnv() {
-  const envFiles = ['.env', 'ALL_PROXY.env'];
-  for (const fileName of envFiles) {
-    const envPath = path.join(__dirname, '..', fileName);
-    if (!fs.existsSync(envPath)) continue;
-
+  const envPath = path.join(__dirname, '..', '.env');
+  if (fs.existsSync(envPath)) {
     const lines = fs.readFileSync(envPath, 'utf-8').split('\n');
     for (const line of lines) {
       const trimmed = line.trim();
       if (!trimmed || trimmed.startsWith('#')) continue;
       const [key, ...valueParts] = trimmed.split('=');
       const value = valueParts.join('=').trim();
-      if (key && value && process.env[key] === undefined) {
+      if (key && value) {
         process.env[key] = value;
       }
     }
@@ -60,21 +57,21 @@ export const CONFIG = {
       symbols: (process.env.TIER1_PAIRS || 'BTCUSDT,ETHUSDT,SOLUSDT,BNBUSDT')
         .split(',').map(s => s.toUpperCase().trim()),
       intervalMinutes: 15,    // 15分钟检查一次
-      cooldownMinutes: 30,    // 30分钟冷却（v5: 扣费PnL +9.5%, 风险收益比更优）
+      cooldownMinutes: 120,   // 2小时冷却
     },
     tier2: {
       name: '热门',
       symbols: (process.env.TIER2_PAIRS || 'XRPUSDT,ADAUSDT,AVAXUSDT,LINKUSDT,DOTUSDT,ARBUSDT,NEARUSDT,LTCUSDT,ATOMUSDT,UNIUSDT')
         .split(',').map(s => s.toUpperCase().trim()),
       intervalMinutes: 60,    // 1小时检查一次
-      cooldownMinutes: 60,    // 1小时冷却（v5: 2h→1h, 扣费PnL +9.5%）
+      cooldownMinutes: 240,   // 4小时冷却
     },
     tier3: {
       name: '新锐',
       symbols: (process.env.TIER3_PAIRS || 'APTUSDT,STXUSDT,IMXUSDT,AAVEUSDT')
         .split(',').map(s => s.toUpperCase().trim()),
-      intervalMinutes: 60,    // 1小时检查一次（v4: 从4h降至1h，STX/APT表现超预期+68%/+67%）
-      cooldownMinutes: 120,   // 2小时冷却（v5: 4h→2h）
+      intervalMinutes: 240,   // 4小时检查一次
+      cooldownMinutes: 480,   // 8小时冷却
     },
   },
 
@@ -125,13 +122,13 @@ export const CONFIG = {
       timeframe: '1h',
     },
     donchian_breakout: {
-      enabled: false,    // v4: 禁用 — 胜率46.5%，PnL仅+6%，拖累整体
+      enabled: true,
       period: 20,
       channel_position_threshold: 0.90,
       timeframe: '1h',
     },
     atr_volatility: {
-      enabled: false,    // v4: 禁用 — 胜率49.4%，PnL仅+11%，拖累整体
+      enabled: true,
       period: 14,
       atr_multiplier: 1.5,
       timeframe: '1h',
@@ -144,22 +141,30 @@ export const CONFIG = {
     },
   },
 
-  // 信号质量过滤配置（v4 优化 - 基于诊断回测数据）
+  // 信号质量过滤配置（v2 优化）
   SIGNAL_FILTER: {
-    minConfidence: 50,              // 降低到50%以不错过机会（回测显示50%比60%多15%收益）
-    highPriorityConfidence: 75,     // 30/90/180d scans: use 75+ as high-priority action layer
+    minConfidence: 60,              // 中频方案：60% 只通知高确定性信号
     filterConflicts: true,
     boostResonance: true,
     buyRequiresTrendConfirm: true,  // 做多需要趋势确认（价格>SMA50）
     sellAlwaysAllowed: true,        // 做空不限（下跌市中做空更安全）
   },
+  TRADING_COSTS: {
+    takerFeePercent: parseFloat(process.env.TAKER_FEE_PERCENT || '0.04'),
+    slippagePercent: parseFloat(process.env.SLIPPAGE_PERCENT || '0.03'),
+    get roundTripPercent() {
+      return (this.takerFeePercent + this.slippagePercent) * 2;
+    },
+  },
 
-  // 风控配置（v5 优化 - 基于全流程验证数据）
-  RISK_MANAGEMENT: {
-    trailingStop: true,             // 默认启用移动止损（回测: 812% vs 222%）
-    trailingATR: 0.5,              // 30d optimization: best net PnL/score with fee-adjusted backtest
-    stopLossATR: 1.5,              // 初始止损距离 = 1.5 * ATR
-    takeProfitATR: 3.0,            // 止盈距离 = 3.0 * ATR（移动止损启用时较少触发）
-    positionTimeoutHours: 48,      // 持仓超时（小时）
+  PROFIT_FILTER: {
+    enabled: (process.env.PROFIT_FILTER_ENABLED || 'true').toLowerCase() !== 'false',
+    allowDirections: (process.env.PROFIT_FILTER_DIRECTIONS || 'SELL')
+      .split(',').map(s => s.toUpperCase().trim()).filter(Boolean),
+    excludeStrategies: (process.env.PROFIT_FILTER_EXCLUDE_STRATEGIES || 'bollinger_mean_reversion')
+      .split(',').map(s => s.trim()).filter(Boolean),
+    minNetTargetPercent: parseFloat(process.env.PROFIT_FILTER_MIN_NET_TARGET_PERCENT || '1'),
   },
 };
+
+CONFIG.SIGNAL_FILTER.minConfidence = parseFloat(process.env.MIN_CONFIDENCE || '75');
