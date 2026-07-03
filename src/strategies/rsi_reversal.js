@@ -36,14 +36,14 @@ export function rsiReversal(params, indicators) {
   } else if (rsiVal < 40) {
     // RSI 在 35-40 之间，偏弱但未超卖
     signal = 'BUY';
-    // 提高置信度到50-65区间，不再被minConfidence=50过滤
-    score = Math.min(50 + ((40 - rsiVal) / (40 - oversold) * 15), 65);
+    // Keep weak-zone RSI below action threshold; this remains watch-only.
+    score = Math.min(35 + ((40 - rsiVal) / (40 - oversold) * 14), 49);
     confidence = Math.round(score);
     reason = `RSI(${rsi_period}) = ${rsiVal.toFixed(2)} (偏弱区域，潜在反弹)`;
   } else if (rsiVal > 60) {
     // RSI 在 60-65 之间，偏强但未超买
     signal = 'SELL';
-    score = Math.min(50 + ((rsiVal - 60) / (overbought - 60) * 15), 65);
+    score = Math.min(35 + ((rsiVal - 60) / (overbought - 60) * 14), 49);
     confidence = Math.round(score);
     reason = `RSI(${rsi_period}) = ${rsiVal.toFixed(2)} (偏强区域，潜在回调)`;
   }
@@ -54,11 +54,11 @@ export function rsiReversal(params, indicators) {
   if (indicators.macd) {
     const macdBullish = indicators.macd.histogram > 0 && indicators.macd.macd > indicators.macd.signal;
     const macdBearish = indicators.macd.histogram < 0 && indicators.macd.macd < indicators.macd.signal;
-    if (signal === 'BUY' && macdBullish) {
+    if (confidence >= 50 && signal === 'BUY' && macdBullish) {
       score = Math.min(score + 10, 95);
       confidence = Math.round(score);
       reason += ' +MACD确认';
-    } else if (signal === 'SELL' && macdBearish) {
+    } else if (confidence >= 50 && signal === 'SELL' && macdBearish) {
       score = Math.min(score + 10, 95);
       confidence = Math.round(score);
       reason += ' +MACD确认';

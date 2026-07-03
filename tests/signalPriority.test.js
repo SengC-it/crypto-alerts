@@ -7,12 +7,16 @@ describe('Signal priority tiers', () => {
     const priority = getSignalPriority({ confidence: 75 });
     assert.equal(priority.level, 'high');
     assert.equal(priority.label, 'High priority');
+    assert.equal(priority.action, 'trade_candidate');
+    assert.match(priority.description, /main action list/);
   });
 
   it('marks confidence 50-74 as watch priority', () => {
     const priority = getSignalPriority({ confidence: 60 });
     assert.equal(priority.level, 'watch');
     assert.equal(priority.label, 'Opportunity watch');
+    assert.equal(priority.action, 'watch_only');
+    assert.match(priority.description, /Do not trade directly/);
   });
 
   it('annotates signals without mutating the original object', () => {
@@ -22,6 +26,7 @@ describe('Signal priority tiers', () => {
     assert.equal(signal.priority, undefined);
     assert.equal(annotated.priority, 'high');
     assert.equal(annotated.priorityLabel, 'High priority');
+    assert.equal(annotated.priorityAction, 'trade_candidate');
   });
 
   it('sorts annotated signals by priority before confidence', () => {

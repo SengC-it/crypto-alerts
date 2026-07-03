@@ -4,13 +4,15 @@ const PRIORITY_TIERS = [
     minConfidence: 75,
     label: 'High priority',
     description: 'Higher-confidence signal validated by 30/90/180 day scans; treat as the main action list.',
+    action: 'trade_candidate',
     rank: 2,
   },
   {
     level: 'watch',
     minConfidence: 50,
     label: 'Opportunity watch',
-    description: 'Lower-confidence opportunity layer designed to avoid missing moves; wait for confirmation or use smaller size.',
+    description: 'Lower-confidence opportunity layer designed to avoid missing moves. Do not trade directly; wait for confirmation or use paper tracking.',
+    action: 'watch_only',
     rank: 1,
   },
 ];
@@ -19,6 +21,7 @@ const DEFAULT_PRIORITY = {
   level: 'low',
   label: 'Low confidence',
   description: 'Below the active opportunity threshold.',
+  action: 'ignore',
   rank: 0,
 };
 
@@ -34,6 +37,7 @@ export function annotateSignalPriority(signal) {
     priority: priority.level,
     priorityLabel: priority.label,
     priorityDescription: priority.description,
+    priorityAction: priority.action,
     priorityRank: priority.rank,
   };
 }

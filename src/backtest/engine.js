@@ -7,6 +7,25 @@ import { getCandles } from '../websocket/rest.js';
 import { computeAllIndicators } from '../indicators/index.js';
 import { runStrategies, filterSignals, applyProfitFilter } from '../strategies/manager.js';
 
+export function calculateNetTradePnl({
+  direction,
+  entryPrice,
+  exitPrice,
+  feeRatePercent = 0,
+  slippagePercent = 0,
+}) {
+  const gross = direction === 'BUY'
+    ? ((exitPrice - entryPrice) / entryPrice) * 100
+    : ((entryPrice - exitPrice) / entryPrice) * 100;
+  const cost = (feeRatePercent + slippagePercent) * 2;
+
+  return {
+    grossPnlPercent: +gross.toFixed(4),
+    roundTripCostPercent: +cost.toFixed(4),
+    netPnlPercent: +(gross - cost).toFixed(4),
+  };
+}
+
 /**
  * 单笔交易记录
  */
@@ -74,6 +93,9 @@ export async function backtestSymbol(symbol, days = 30, options = {}) {
     positionTimeoutHours = 48,   // 持仓超时
     roundTripCostPercent = CONFIG.TRADING_COSTS?.roundTripPercent ?? 0,
     profitFilter = CONFIG.PROFIT_FILTER,
+    candles: injectedCandles = null,
+    indicatorSeries = null,
+    computeIndicatorsFn = computeAllIndicators,
   } = options;
 
   const tier = getTier(symbol);
@@ -82,20 +104,25 @@ export async function backtestSymbol(symbol, days = 30, options = {}) {
 
   // 1. 拉取历史K线
   const totalCandles = days * 24 + 100;
-  const rawCandles = await getCandles(symbol, '1h', Math.min(totalCandles, 1500));
+  const rawCandles = injectedCandles || await getCandles(symbol, '1h', Math.min(totalCandles, 1500));
 
   if (!rawCandles || !Array.isArray(rawCandles) || rawCandles.length < 200) {
     return { symbol, error: 'Insufficient historical data', candlesLoaded: 0 };
   }
 
   const allCandles = rawCandles.map(c => ({
-    open: parseFloat(c[1]),
-    high: parseFloat(c[2]),
-    low: parseFloat(c[3]),
-    close: parseFloat(c[4]),
-    volume: parseFloat(c[5]),
-    timestamp: c[6],
+    open: parseFloat(c.open ?? c[1]),
+    high: parseFloat(c.high ?? c[2]),
+    low: parseFloat(c.low ?? c[3]),
+    close: parseFloat(c.close ?? c[4]),
+    volume: parseFloat(c.volume ?? c[5]),
+    timestamp: Number(c.closeTime ?? c.timestamp ?? c[6]),
   }));
+
+  const getIndicators = (index, candleSlice) => {
+    if (indicatorSeries && indicatorSeries[index]) return indicatorSeries[index];
+    return computeIndicatorsFn(candleSlice);
+  };
 
   // 2. 构建策略配置
   const strategyConfigs = {};
@@ -212,7 +239,7 @@ export async function backtestSymbol(symbol, days = 30, options = {}) {
 
       // 已有持仓，检查反向信号
       // 3b. 计算指标检查反向信号
-      const indicators = computeAllIndicators(candleSlice);
+      const indicators = getIndicators(i, candleSlice);
       if (!indicators || indicators.currentPrice === undefined) continue;
       const rawSignals = runStrategies(symbol, indicators, strategyConfigs);
       const qualitySignals = filterSignals(rawSignals, {
@@ -253,7 +280,7 @@ export async function backtestSymbol(symbol, days = 30, options = {}) {
 
     // 没有持仓 — 检查新信号
     // 3c. 计算指标 & 运行策略
-    const indicators = computeAllIndicators(candleSlice);
+    const indicators = getIndicators(i, candleSlice);
     if (!indicators || indicators.currentPrice === undefined) continue;
 
     const rawSignals = runStrategies(symbol, indicators, strategyConfigs);

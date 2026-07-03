@@ -1,49 +1,70 @@
--- Crypto Alerts - Supabase 建表脚本
--- 在 Supabase SQL Editor 中执行此脚本
+-- Crypto Alerts - Supabase schema
+-- Run this script in the Supabase SQL Editor.
 
 -- ============================================================
--- 1. 信号记录表
+-- 1. Signal records
 -- ============================================================
 CREATE TABLE IF NOT EXISTS crypto_signals (
-  id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  dedupe_key    TEXT NOT NULL,                -- 去重键: "SYMBOL:STRATEGY:DIRECTION"
-  symbol        TEXT NOT NULL,                -- 交易对: BTCUSDT
-  strategy      TEXT NOT NULL,                -- 策略ID: rsi_reversal
-  signal_direction TEXT NOT NULL CHECK (signal_direction IN ('BUY', 'SELL')),
-  confidence    INTEGER NOT NULL DEFAULT 0,   -- 置信度 0-100
-  reason        TEXT,                         -- 策略原因说明
-  suggested_entry DOUBLE PRECISION,           -- 建议入场价
-  stop_loss     DOUBLE PRECISION,             -- 止损价
-  target_price  DOUBLE PRECISION,             -- 目标价
-  risk_reward_ratio TEXT,                     -- 风险收益比: "1:2"
-  indicators    JSONB,                        -- 指标数值快照
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  dedupe_key        TEXT NOT NULL,                -- "SYMBOL:STRATEGY:DIRECTION"
+  symbol            TEXT NOT NULL,                -- BTCUSDT
+  strategy          TEXT NOT NULL,                -- rsi_reversal
+  signal_direction  TEXT NOT NULL CHECK (signal_direction IN ('BUY', 'SELL')),
+  confidence        INTEGER NOT NULL DEFAULT 0,   -- 0-100 confidence
+  score             DOUBLE PRECISION,             -- ranking score, falls back to confidence
+  priority          TEXT NOT NULL DEFAULT 'low' CHECK (priority IN ('high', 'watch', 'low')),
+  priority_label    TEXT,                         -- reader-facing priority label
+  priority_action   TEXT NOT NULL DEFAULT 'ignore' CHECK (priority_action IN ('trade_candidate', 'watch_only', 'ignore')),
+  reason            TEXT,
+  suggested_entry   DOUBLE PRECISION,
+  stop_loss         DOUBLE PRECISION,
+  target_price      DOUBLE PRECISION,
+  risk_reward_ratio TEXT,
+  indicators        JSONB,
+  email_sent_at     TIMESTAMPTZ,                  -- alert email send timestamp
+  tracking_status   TEXT NOT NULL DEFAULT 'ignored' CHECK (tracking_status IN ('open', 'watch_only', 'closed', 'ignored')),
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 去重键 + 时间戳索引（用于去重查询）
+-- Safe upgrades for existing projects created from older schema versions.
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS score DOUBLE PRECISION;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS priority TEXT NOT NULL DEFAULT 'low' CHECK (priority IN ('high', 'watch', 'low'));
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS priority_label TEXT;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS priority_action TEXT NOT NULL DEFAULT 'ignore' CHECK (priority_action IN ('trade_candidate', 'watch_only', 'ignore'));
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS email_sent_at TIMESTAMPTZ;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS tracking_status TEXT NOT NULL DEFAULT 'ignored' CHECK (tracking_status IN ('open', 'watch_only', 'closed', 'ignored'));
+
+-- Dedupe lookup.
 CREATE INDEX IF NOT EXISTS idx_signals_dedupe_time
   ON crypto_signals (dedupe_key, created_at DESC);
 
--- 交易对索引（用于查询某交易对最近信号）
+-- Recent signals by symbol.
 CREATE INDEX IF NOT EXISTS idx_signals_symbol_time
   ON crypto_signals (symbol, created_at DESC);
 
--- 创建时间索引
+-- Recent signals globally.
 CREATE INDEX IF NOT EXISTS idx_signals_created_at
   ON crypto_signals (created_at DESC);
 
+-- Signal review and performance tracking.
+CREATE INDEX IF NOT EXISTS idx_signals_priority_time
+  ON crypto_signals (priority, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_signals_tracking_status
+  ON crypto_signals (tracking_status, created_at DESC);
+
 -- ============================================================
--- 2. 启用 RLS（行级安全）- 匿名只读，服务端全权
+-- 2. Row level security
 -- ============================================================
 ALTER TABLE crypto_signals ENABLE ROW LEVEL SECURITY;
 
--- 匿名访问：只允许读取（用于 API 展示）
+-- Anonymous clients may read signals for dashboard/API display.
 CREATE POLICY "Allow anonymous read access"
   ON crypto_signals FOR SELECT
   TO anon
   USING (true);
 
--- 服务端密钥：全部权限（用于写入信号）
+-- Service role may write and manage signals.
 CREATE POLICY "Allow service role full access"
   ON crypto_signals FOR ALL
   TO service_role
@@ -51,7 +72,7 @@ CREATE POLICY "Allow service role full access"
   WITH CHECK (true);
 
 -- ============================================================
--- 3. 自动清理超过30天的旧信号
+-- 3. Cleanup helper
 -- ============================================================
 CREATE OR REPLACE FUNCTION clean_old_signals()
 RETURNS void AS $$
@@ -60,12 +81,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 使用 pg_cron 扩展定时执行（需在 Supabase Dashboard 启用 pg_cron 扩展）
--- 每天凌晨3点(UTC)执行清理
+-- Optional pg_cron schedule:
 -- SELECT cron.schedule('clean-old-signals', '0 3 * * *', 'SELECT clean_old_signals()');
 
--- ============================================================
--- 4. 验证
--- ============================================================
--- 执行后可通过以下命令验证表创建成功：
+-- Verification:
 -- SELECT * FROM crypto_signals LIMIT 5;

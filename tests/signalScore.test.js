@@ -21,8 +21,8 @@ describe('Signal score precision', () => {
   it('keeps a decimal score for RSI signals while preserving integer confidence', () => {
     const signal = rsiReversal({ oversold: 35, overbought: 65, rsi_period: 14 }, baseIndicators);
 
-    assert.equal(signal.confidence, 53);
-    assert.equal(signal.score, 52.7);
+    assert.equal(signal.confidence, 38);
+    assert.equal(signal.score, 37.5);
   });
 
   it('keeps a decimal score for volume signals while preserving integer confidence', () => {
@@ -36,7 +36,7 @@ describe('Signal score precision', () => {
   });
 
   it('formats the decimal score for display and falls back to confidence for old signals', () => {
-    assert.equal(formatSignalScore({ confidence: 53, score: 52.7 }), '52.7');
+    assert.equal(formatSignalScore({ confidence: 38, score: 37.5 }), '37.5');
     assert.equal(formatSignalScore({ confidence: 53 }), '53');
   });
 });

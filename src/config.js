@@ -6,17 +6,20 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Load .env file manually (no dotenv dependency needed)
+// Load env files manually (no dotenv dependency needed)
 function loadEnv() {
-  const envPath = path.join(__dirname, '..', '.env');
-  if (fs.existsSync(envPath)) {
+  const envFiles = ['.env', 'ALL_PROXY.env'];
+  for (const fileName of envFiles) {
+    const envPath = path.join(__dirname, '..', fileName);
+    if (!fs.existsSync(envPath)) continue;
+
     const lines = fs.readFileSync(envPath, 'utf-8').split('\n');
     for (const line of lines) {
       const trimmed = line.trim();
       if (!trimmed || trimmed.startsWith('#')) continue;
       const [key, ...valueParts] = trimmed.split('=');
       const value = valueParts.join('=').trim();
-      if (key && value) {
+      if (key && value && process.env[key] === undefined) {
         process.env[key] = value;
       }
     }

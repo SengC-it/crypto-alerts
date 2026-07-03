@@ -2,6 +2,8 @@
 
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { prepareSignalForStorage } from '../src/db/signalStore.js';
 
 // We test the in-memory logic directly (no Supabase dependency)
 // Since signalStore is a singleton with Supabase, we create a test version
@@ -86,5 +88,65 @@ describe('Signal Store - Deduplication', () => {
     const isDup = await shortCooldownStore.isDuplicate(signal);
     // With 0 cooldown, should be expired
     assert.equal(isDup, false);
+  });
+});
+
+describe('Signal Store - Persistence Enrichment', () => {
+  it('prepares high priority signals with tracking metadata', () => {
+    const now = '2026-07-03T12:00:00.000Z';
+    const signal = {
+      symbol: 'UNIUSDT',
+      strategy: 'rsi_reversal',
+      signal: 'SELL',
+      confidence: 80,
+      score: 82.5,
+      suggestedEntry: 3.254,
+      stopLoss: 3.3542,
+      targetPrice: 3.0536,
+    };
+
+    const row = prepareSignalForStorage(signal, {
+      dedupeKey: 'UNIUSDT:rsi_reversal:SELL',
+      now,
+    });
+
+    assert.equal(row.priority, 'high');
+    assert.equal(row.priority_label, 'High priority');
+    assert.equal(row.priority_action, 'trade_candidate');
+    assert.equal(row.score, 82.5);
+    assert.equal(row.email_sent_at, now);
+    assert.equal(row.tracking_status, 'open');
+    assert.equal(row.signal_direction, 'SELL');
+  });
+
+  it('prepares watch signals as observation-only records', () => {
+    const row = prepareSignalForStorage({
+      symbol: 'BTCUSDT',
+      strategy: 'volume_confirmation',
+      signal: 'BUY',
+      confidence: 60,
+    }, {
+      dedupeKey: 'BTCUSDT:volume_confirmation:BUY',
+      now: '2026-07-03T12:05:00.000Z',
+    });
+
+    assert.equal(row.priority, 'watch');
+    assert.equal(row.priority_action, 'watch_only');
+    assert.equal(row.tracking_status, 'watch_only');
+  });
+
+  it('schema includes columns needed for signal performance tracking', () => {
+    const schema = fs.readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8');
+
+    for (const column of [
+      'score',
+      'priority',
+      'priority_label',
+      'priority_action',
+      'email_sent_at',
+      'tracking_status',
+    ]) {
+      assert.match(schema, new RegExp(`\\b${column}\\b`));
+    }
   });
 });

@@ -2,6 +2,38 @@
 // 支持内存存储和 Supabase 持久化
 
 import { CONFIG } from '../config.js';
+import { annotateSignalPriority } from '../strategies/signalPriority.js';
+
+export function prepareSignalForStorage(signal, { dedupeKey, now = new Date().toISOString() } = {}) {
+  const annotated = annotateSignalPriority(signal);
+  const priorityAction = annotated.priorityAction;
+  const trackingStatus = priorityAction === 'trade_candidate'
+    ? 'open'
+    : priorityAction === 'watch_only'
+      ? 'watch_only'
+      : 'ignored';
+
+  return {
+    dedupe_key: dedupeKey || `${signal.symbol}:${signal.strategy}:${signal.signal}`,
+    symbol: signal.symbol,
+    strategy: signal.strategy,
+    signal_direction: signal.signal,
+    confidence: signal.confidence,
+    score: Number.isFinite(Number(signal.score)) ? Number(signal.score) : Number(signal.confidence || 0),
+    priority: annotated.priority,
+    priority_label: annotated.priorityLabel,
+    priority_action: priorityAction,
+    reason: signal.reason,
+    suggested_entry: signal.suggestedEntry,
+    stop_loss: signal.stopLoss,
+    target_price: signal.targetPrice,
+    risk_reward_ratio: signal.riskRewardRatio,
+    indicators: signal.indicators,
+    email_sent_at: now,
+    tracking_status: trackingStatus,
+    created_at: now,
+  };
+}
 
 class SignalStore {
   constructor() {
@@ -111,9 +143,20 @@ class SignalStore {
     await this._ready();
     const key = this._dedupeKey(signal);
     const now = Date.now();
+    const savedAt = new Date(now).toISOString();
+    const storageRow = prepareSignalForStorage(signal, { dedupeKey: key, now: savedAt });
+    const enrichedSignal = {
+      ...signal,
+      priority: storageRow.priority,
+      priorityLabel: storageRow.priority_label,
+      priorityAction: storageRow.priority_action,
+      score: storageRow.score,
+      emailSentAt: storageRow.email_sent_at,
+      trackingStatus: storageRow.tracking_status,
+    };
 
     // 内存存储
-    this.memoryStore.set(key, { signal, timestamp: now });
+    this.memoryStore.set(key, { signal: enrichedSignal, timestamp: now });
 
     // 清理过期缓存（取最长冷却期 * 2 作为清理阈值）
     const maxCooldown = Math.max(
@@ -128,20 +171,7 @@ class SignalStore {
     // Supabase 持久化
     if (this.supabase) {
       try {
-        await this.supabase.from('crypto_signals').insert({
-          dedupe_key: key,
-          symbol: signal.symbol,
-          strategy: signal.strategy,
-          signal_direction: signal.signal,
-          confidence: signal.confidence,
-          reason: signal.reason,
-          suggested_entry: signal.suggestedEntry,
-          stop_loss: signal.stopLoss,
-          target_price: signal.targetPrice,
-          risk_reward_ratio: signal.riskRewardRatio,
-          indicators: signal.indicators,
-          created_at: new Date().toISOString(),
-        });
+        await this.supabase.from('crypto_signals').insert(storageRow);
       } catch (err) {
         console.warn('[DB] Supabase save failed:', err.message);
       }
