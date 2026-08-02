@@ -1,13 +1,6 @@
-name: Crypto Alerts - Scheduled Checks
+name: Crypto Alerts - Manual Checks
 
 on:
-  schedule:
-    # Tier1: every 15 minutes (also runs at hour marks)
-    - cron: '*/15 * * * *'
-    # Tier2 + Tier3: every hour (at :00)
-    - cron: '0 * * * *'
-
-  # Manual trigger for testing
   workflow_dispatch:
     inputs:
       tier:
@@ -18,14 +11,14 @@ on:
 jobs:
   check-tier1:
     if: |
-      github.event_name == 'workflow_dispatch' && (github.event.inputs.tier == 'all' || github.event.inputs.tier == '1') ||
-      github.event_name == 'schedule'
+      github.event.inputs.tier == 'all' || github.event.inputs.tier == '1'
     runs-on: ubuntu-latest
     steps:
       - name: Check Tier 1 (BTC, ETH, SOL, BNB)
         run: |
-          echo "Triggered by: ${{ github.event_name }} schedule=${{ github.event.schedule }}"
+          echo "Triggered manually"
           HTTP_CODE=$(curl -s -o /tmp/t1.txt -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "${{ secrets.VERCEL_URL }}/api/check?tier=1")
           echo "HTTP Status: $HTTP_CODE"
           cat /tmp/t1.txt
@@ -36,14 +29,14 @@ jobs:
 
   check-tier2:
     if: |
-      github.event_name == 'workflow_dispatch' && (github.event.inputs.tier == 'all' || github.event.inputs.tier == '2') ||
-      github.event_name == 'schedule' && github.event.schedule == '0 * * * *'
+      github.event.inputs.tier == 'all' || github.event.inputs.tier == '2'
     runs-on: ubuntu-latest
     steps:
       - name: Check Tier 2 (XRP, ADA, AVAX, LINK, DOT, ARB, NEAR, LTC, ATOM, UNI)
         run: |
-          echo "Triggered by: ${{ github.event_name }} schedule=${{ github.event.schedule }}"
+          echo "Triggered manually"
           HTTP_CODE=$(curl -s -o /tmp/t2.txt -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "${{ secrets.VERCEL_URL }}/api/check?tier=2")
           echo "HTTP Status: $HTTP_CODE"
           cat /tmp/t2.txt
@@ -54,14 +47,14 @@ jobs:
 
   check-tier3:
     if: |
-      github.event_name == 'workflow_dispatch' && (github.event.inputs.tier == 'all' || github.event.inputs.tier == '3') ||
-      github.event_name == 'schedule' && github.event.schedule == '0 * * * *'
+      github.event.inputs.tier == 'all' || github.event.inputs.tier == '3'
     runs-on: ubuntu-latest
     steps:
       - name: Check Tier 3 (APT, STX, IMX, AAVE)
         run: |
-          echo "Triggered by: ${{ github.event_name }} schedule=${{ github.event.schedule }}"
+          echo "Triggered manually"
           HTTP_CODE=$(curl -s -o /tmp/t3.txt -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "${{ secrets.VERCEL_URL }}/api/check?tier=3")
           echo "HTTP Status: $HTTP_CODE"
           cat /tmp/t3.txt
