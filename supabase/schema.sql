@@ -44,7 +44,28 @@ CREATE TABLE IF NOT EXISTS crypto_signals (
   delivery_status   TEXT NOT NULL DEFAULT 'pending',
   delivery_error    TEXT,
   email_sent_at     TIMESTAMPTZ,                  -- alert email send timestamp
+  take_profit_1     DOUBLE PRECISION,
+  take_profit_2     DOUBLE PRECISION,
+  take_profit_3     DOUBLE PRECISION,
+  email_delivery_status TEXT NOT NULL DEFAULT 'pending' CHECK (email_delivery_status IN ('pending', 'sent', 'failed')),
   tracking_status   TEXT NOT NULL DEFAULT 'ignored' CHECK (tracking_status IN ('open', 'watch_only', 'closed', 'ignored')),
+  review_status     TEXT NOT NULL DEFAULT 'open' CHECK (review_status IN ('open', 'closed', 'invalid')),
+  review_outcome    TEXT CHECK (review_outcome IN ('win', 'loss')),
+  review_exit_price DOUBLE PRECISION,
+  review_exit_time  TIMESTAMPTZ,
+  review_exit_reason TEXT,
+  review_trigger_level TEXT,
+  review_gross_pnl_percent DOUBLE PRECISION,
+  review_net_pnl_percent DOUBLE PRECISION,
+  review_round_trip_cost_percent DOUBLE PRECISION,
+  review_r_multiple DOUBLE PRECISION,
+  review_hold_hours DOUBLE PRECISION,
+  review_last_price DOUBLE PRECISION,
+  review_unrealized_pnl_percent DOUBLE PRECISION,
+  review_checked_at TIMESTAMPTZ,
+  review_checked_until TIMESTAMPTZ,
+  review_ambiguous_candle BOOLEAN NOT NULL DEFAULT FALSE,
+  review_error      TEXT,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -77,6 +98,27 @@ ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS signal_status TEXT DEFAULT '
 ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMPTZ;
 ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS delivery_status TEXT DEFAULT 'pending';
 ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS delivery_error TEXT;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS take_profit_1 DOUBLE PRECISION;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS take_profit_2 DOUBLE PRECISION;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS take_profit_3 DOUBLE PRECISION;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS email_delivery_status TEXT NOT NULL DEFAULT 'pending' CHECK (email_delivery_status IN ('pending', 'sent', 'failed'));
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS review_status TEXT NOT NULL DEFAULT 'open' CHECK (review_status IN ('open', 'closed', 'invalid'));
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS review_outcome TEXT CHECK (review_outcome IN ('win', 'loss'));
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS review_exit_price DOUBLE PRECISION;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS review_exit_time TIMESTAMPTZ;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS review_exit_reason TEXT;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS review_trigger_level TEXT;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS review_gross_pnl_percent DOUBLE PRECISION;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS review_net_pnl_percent DOUBLE PRECISION;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS review_round_trip_cost_percent DOUBLE PRECISION;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS review_r_multiple DOUBLE PRECISION;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS review_hold_hours DOUBLE PRECISION;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS review_last_price DOUBLE PRECISION;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS review_unrealized_pnl_percent DOUBLE PRECISION;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS review_checked_at TIMESTAMPTZ;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS review_checked_until TIMESTAMPTZ;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS review_ambiguous_candle BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS review_error TEXT;
 
 -- Dedupe lookup.
 CREATE INDEX IF NOT EXISTS idx_signals_dedupe_time
@@ -99,6 +141,12 @@ CREATE INDEX IF NOT EXISTS idx_signals_tracking_status
 
 CREATE INDEX IF NOT EXISTS idx_signals_status
   ON crypto_signals (signal_status, delivery_status, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_signals_email_delivery_status
+  ON crypto_signals (email_delivery_status, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_signals_review_status
+  ON crypto_signals (review_status, created_at DESC);
 
 -- ============================================================
 -- 2. Row level security

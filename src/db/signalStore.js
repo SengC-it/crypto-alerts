@@ -49,6 +49,7 @@ export function prepareSignalForStorage(signal, { dedupeKey, now = new Date().to
     target_price: signal.targetPrice,
     risk_reward_ratio: signal.riskRewardRatio,
     indicators: signal.indicators,
+    email_delivery_status: 'pending',
     email_sent_at: null,
     tracking_status: trackingStatus(priorityAction),
     created_at: now,
@@ -155,6 +156,7 @@ export class SignalStore {
       delivered_at: null,
       delivery_status: 'pending',
       delivery_error: null,
+      email_delivery_status: 'pending',
       email_sent_at: null,
       tracking_status: trackingStatus(annotated.priorityAction),
       created_at: now,
@@ -262,6 +264,7 @@ export class SignalStore {
       signal_status: 'delivery_pending',
       delivery_status: 'pending',
       delivery_error: null,
+      email_delivery_status: 'pending',
     });
   }
 
@@ -274,6 +277,7 @@ export class SignalStore {
       delivered_at: deliveredAt,
       email_sent_at: deliveredAt,
       delivery_error: null,
+      email_delivery_status: 'sent',
     });
   }
 
@@ -284,6 +288,7 @@ export class SignalStore {
       signal_status: 'delivery_failed',
       delivery_status: 'delivery_failed',
       delivery_error: asErrorMessage(error),
+      email_delivery_status: 'failed',
     });
   }
 

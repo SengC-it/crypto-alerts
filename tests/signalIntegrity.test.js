@@ -677,6 +677,7 @@ describe('Signal storage and delivery state', () => {
     }]);
     assert.equal(result.record.signal_status, 'delivered');
     assert.equal(result.record.delivery_status, 'delivered');
+    assert.equal(result.record.email_delivery_status, 'sent');
     assert.ok(result.record.delivered_at);
     assert.equal(await store.isDuplicate(signal), true);
   });
@@ -689,6 +690,7 @@ describe('Signal storage and delivery state', () => {
     const failed = await store.markDeliveryFailed(pending, new Error('SMTP down'));
     assert.equal(failed.signal_status, 'delivery_failed');
     assert.equal(failed.delivery_status, 'delivery_failed');
+    assert.equal(failed.email_delivery_status, 'failed');
     assert.match(failed.delivery_error, /SMTP down/);
     assert.equal(await store.isDuplicate(signal), false);
   });
@@ -803,14 +805,20 @@ describe('Serverless authorization and migration compatibility', () => {
 
   it('keeps the signal migration additive and preserves existing rows', () => {
     const migration = readFileSync(new URL('../supabase/migrations/20260828_signal_integrity.sql', import.meta.url), 'utf8');
+    const reviewSchemaMigration = readFileSync(new URL('../supabase/migrations/20260901_sync_signal_review_schema.sql', import.meta.url), 'utf8');
     const schema = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8');
     assert.doesNotMatch(migration, /^\s*(DROP|DELETE|UPDATE)\s+/im);
+    assert.doesNotMatch(reviewSchemaMigration, /^\s*(DROP|DELETE|UPDATE)\s+/im);
     for (const field of ['model_version', 'commit_sha', 'config_hash', 'raw_features', 'delivery_status']) {
       assert.match(migration, new RegExp('ADD COLUMN IF NOT EXISTS ' + field));
     }
     assert.match(migration, /GRANT SELECT ON TABLE public\.crypto_signals TO anon/i);
     assert.match(migration, /GRANT SELECT, INSERT, UPDATE ON TABLE public\.crypto_signals TO service_role/i);
     assert.match(schema, /REVOKE ALL PRIVILEGES ON TABLE public\.crypto_signals FROM anon, authenticated, service_role/i);
+    for (const field of ['email_delivery_status', 'review_status', 'review_checked_until', 'review_ambiguous_candle']) {
+      assert.match(reviewSchemaMigration, new RegExp('ADD COLUMN IF NOT EXISTS ' + field));
+      assert.match(schema, new RegExp(field));
+    }
     assert.doesNotMatch(schema, /DELETE FROM crypto_signals/i);
     assert.doesNotMatch(schema, /clean_old_signals/i);
   });

@@ -86,6 +86,14 @@ and after; the migration does not update, delete, or backfill historical rows.
 Legacy rows therefore keep null M0 lineage fields, while every new application
 record supplies them explicitly.
 
+An additive review-schema sync migration records the existing production
+review columns and indexes in the repository schema. The delivery state machine
+also maintains legacy `email_delivery_status` (`pending`/`sent`/`failed`) beside
+the M0 delivery fields so existing review consumers remain compatible.
+The sync migration was applied on 2026-09-01: the row count remained 543,
+the table has 62 columns and 9 indexes, and the post-DDL security advisor has
+no finding for `crypto_signals`.
+
 The repository bootstrap schema uses least-privilege table grants and does not
 define an age-based signal deletion helper. Existing production role grants
 were not revoked during M0 because changing them could disrupt other consumers
