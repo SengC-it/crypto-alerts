@@ -20,6 +20,7 @@ const EXECUTION_OPTION_KEYS = [
   'strategyOverrides',
   'strictCoverage',
   'asOf',
+  'indicatorLookbackCandles',
   'warmup',
   'config',
 ];

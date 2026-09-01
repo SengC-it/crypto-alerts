@@ -1,6 +1,6 @@
 // The single signal-generation entry point for live, serverless and backtest.
 
-import { CONFIG } from '../config.js';
+import { CONFIG, getIndicatorLookback } from '../config.js';
 import {
   candleToIso,
   filterClosedCandles,
@@ -8,6 +8,7 @@ import {
   assertClosedCandle,
 } from '../market/candle.js';
 import { computeAllIndicators } from '../indicators/index.js';
+import { isIndicatorSnapshotForWindow } from '../indicators/provenance.js';
 import { runStrategies, filterSignals, applyProfitFilter } from '../strategies/manager.js';
 import { buildLineage, hashConfig } from '../lineage.js';
 
@@ -52,6 +53,10 @@ function strategyKeys(signal) {
 
 function effectiveConfig(config, strategyConfigs, options) {
   return {
+    indicator_window: {
+      lookback_candles: options.indicatorLookbackCandles,
+      closed_only: true,
+    },
     strategies: strategyConfigs,
     signal_filter: {
       minConfidence: options.minConfidence,
@@ -90,9 +95,11 @@ export class SignalEngine {
     buyRequiresTrendConfirm,
     profitFilter,
     roundTripCostPercent,
+    indicatorLookbackCandles,
     requireClosed = true,
     generatedAt,
   } = {}) {
+    const lookbackCandles = getIndicatorLookback(this.config, { indicatorLookbackCandles });
     const normalizedInput = normalizeCandles(candles || [], {
       symbol,
       timeframe,
@@ -108,6 +115,7 @@ export class SignalEngine {
         symbol,
         timeframe,
         candles: normalizedCandles,
+        indicatorLookbackCandles: lookbackCandles,
         rawSignals: [],
         signals: [],
       };
@@ -120,6 +128,7 @@ export class SignalEngine {
         symbol,
         timeframe,
         candles: normalizedCandles,
+        indicatorLookbackCandles: lookbackCandles,
         rawSignals: [],
         signals: [],
       };
@@ -133,11 +142,28 @@ export class SignalEngine {
         symbol,
         timeframe,
         candles: normalizedCandles,
+        indicatorLookbackCandles: lookbackCandles,
         rawSignals: [],
         signals: [],
       };
     }
     assertClosedCandle(candle);
+
+    if (normalizedCandles.length < lookbackCandles) {
+      return {
+        eligible: false,
+        reason: 'INSUFFICIENT_CANDLE_WINDOW',
+        symbol,
+        timeframe,
+        candle,
+        candles: normalizedCandles,
+        indicatorLookbackCandles: lookbackCandles,
+        rawSignals: [],
+        signals: [],
+      };
+    }
+
+    const indicatorCandles = normalizedCandles.slice(-lookbackCandles);
 
     const effectiveMinConfidence = minConfidence
       ?? this.config.SIGNAL_FILTER?.minConfidence
@@ -162,10 +188,18 @@ export class SignalEngine {
       buyRequiresTrendConfirm: effectiveBuyTrendConfirm,
       profitFilter: effectiveProfitFilter,
       roundTripCostPercent: effectiveRoundTripCostPercent,
+      indicatorLookbackCandles: lookbackCandles,
     });
     const candleTimestamp = candleToIso(candle.close_time ?? candle.open_time);
     const evaluationTimestamp = generatedAt || new Date(now ?? Date.now()).toISOString();
-    const computedIndicators = indicators || computeAllIndicators(normalizedCandles);
+    const computedIndicators = isIndicatorSnapshotForWindow(indicators, {
+      symbol,
+      timeframe,
+      candles: indicatorCandles,
+      lookbackCandles,
+    })
+      ? indicators
+      : computeAllIndicators(indicatorCandles);
 
     if (!computedIndicators || computedIndicators.currentPrice === undefined) {
       return {
@@ -174,7 +208,8 @@ export class SignalEngine {
         symbol,
         timeframe,
         candle,
-        candles: normalizedCandles,
+        candles: indicatorCandles,
+        indicatorLookbackCandles: lookbackCandles,
         rawSignals: [],
         signals: [],
       };
@@ -242,7 +277,9 @@ export class SignalEngine {
       symbol,
       timeframe,
       candle,
-      candles: normalizedCandles,
+      candles: indicatorCandles,
+      indicatorCandles,
+      indicatorLookbackCandles: lookbackCandles,
       indicators: computedIndicators,
       rawSignals,
       qualitySignals,

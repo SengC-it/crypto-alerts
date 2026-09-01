@@ -1,6 +1,7 @@
 // Historical candle loading and hard coverage validation for experiments.
 
 import { getHistoricalCandles } from '../websocket/rest.js';
+import { CONFIG, getIndicatorLookback } from '../config.js';
 import {
   candleToIso,
   filterClosedCandles,
@@ -101,7 +102,7 @@ export function assertCoverage(report, { minCoveragePercent = 100 } = {}) {
 export async function loadBacktestHistory(symbol, days, options = {}) {
   const timeframe = options.timeframe || '1h';
   const asOf = options.asOf ?? Date.now();
-  const warmup = options.warmup ?? 100;
+  const indicatorLookbackCandles = getIndicatorLookback(options.config || CONFIG, options);
   const window = requestedWindow(days, { asOf, timeframe });
   const fetchPage = options.fetchPage;
 
@@ -110,7 +111,7 @@ export async function loadBacktestHistory(symbol, days, options = {}) {
     rawCandles = options.candles;
   } else {
     rawCandles = await getHistoricalCandles(symbol, timeframe, {
-      startTime: window.startOpen - warmup * window.step,
+      startTime: window.startOpen - indicatorLookbackCandles * window.step,
       endTime: window.requestedEnd,
       pageLimit: options.pageLimit,
       maxPages: options.maxPages,
@@ -124,11 +125,13 @@ export async function loadBacktestHistory(symbol, days, options = {}) {
     now: asOf,
   })), { symbol, timeframe, now: asOf });
   const coverage = buildCoverageReport(normalized, days, { symbol, timeframe, asOf });
-  const warmupCandles = normalized.filter(candle => candle.open_time !== null && candle.open_time < window.startOpen).slice(-warmup);
+  const warmupCandles = normalized
+    .filter(candle => candle.open_time !== null && candle.open_time < window.startOpen)
+    .slice(-indicatorLookbackCandles);
   const requestedCandles = normalized.filter(candle => candle.open_time !== null && candle.open_time >= window.startOpen && candle.open_time <= window.endOpen);
-  coverage.warmup_expected = warmup;
+  coverage.warmup_expected = indicatorLookbackCandles;
   coverage.warmup_loaded = warmupCandles.length;
-  coverage.warmup_missing_candles = Math.max(0, warmup - warmupCandles.length);
+  coverage.warmup_missing_candles = Math.max(0, indicatorLookbackCandles - warmupCandles.length);
   if (options.strictCoverage !== false) {
     assertCoverage(coverage, options);
     if (coverage.warmup_missing_candles > 0) throw new CoverageError(coverage);
@@ -138,5 +141,6 @@ export async function loadBacktestHistory(symbol, days, options = {}) {
     candles: [...warmupCandles, ...requestedCandles],
     coverage,
     window,
+    indicatorLookbackCandles,
   };
 }

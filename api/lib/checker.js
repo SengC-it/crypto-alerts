@@ -2,7 +2,7 @@
 // 拉取 Binance REST 数据 → 计算指标 → 运行策略 → 去重 → 存储 + 发邮件
 // 支持按档位 (tier) 检测不同币种
 
-import { CONFIG } from '../../src/config.js';
+import { CONFIG, getIndicatorLookback } from '../../src/config.js';
 import { getCandles } from '../../src/websocket/rest.js';
 import { SignalEngine } from '../../src/signal/engine.js';
 import { filterClosedCandles } from '../../src/market/candle.js';
@@ -23,6 +23,10 @@ export function evaluateSymbolCandles(symbol, rawCandles, {
     timeframe: '1h',
     now,
   });
+  const indicatorLookbackCandles = getIndicatorLookback(config);
+  const canonicalClosedCandles = closedCandles.length > indicatorLookbackCandles
+    ? closedCandles.slice(-indicatorLookbackCandles)
+    : closedCandles;
   const effectiveEngine = engine || (config === CONFIG
     ? signalEngine
     : new SignalEngine({ config }));
@@ -30,7 +34,8 @@ export function evaluateSymbolCandles(symbol, rawCandles, {
   return effectiveEngine.evaluate({
     symbol,
     timeframe: '1h',
-    candles: closedCandles,
+    candles: canonicalClosedCandles,
+    indicatorLookbackCandles,
     now,
     requireClosed: true,
     generatedAt,
@@ -40,17 +45,22 @@ export function evaluateSymbolCandles(symbol, rawCandles, {
 /**
  * 对单个交易对执行信号检测
  */
-async function checkSymbol(symbol, { candleFetcher = getCandles, now = Date.now() } = {}) {
-  // 1. 拉取最近100根1小时K线
-  const rawCandles = await candleFetcher(symbol, '1h', 100);
-  if (!rawCandles || !Array.isArray(rawCandles) || rawCandles.length < 50) {
-    return { symbol, error: 'Insufficient candle data', signalCount: 0 };
+async function checkSymbol(symbol, {
+  candleFetcher = getCandles,
+  now = Date.now(),
+  config = CONFIG,
+} = {}) {
+  const indicatorLookbackCandles = getIndicatorLookback(config);
+  // REST can include the forming candle, so request a small margin above N.
+  const rawCandles = await candleFetcher(symbol, '1h', indicatorLookbackCandles + 2);
+  if (!Array.isArray(rawCandles)) {
+    return { symbol, error: 'Invalid candle data', signalCount: 0 };
   }
 
   // REST usually includes the currently forming candle. Remove it before the
   // shared engine so the last closed candle remains eligible for evaluation.
   // The serverless path shares all signal logic with live and backtest.
-  const evaluation = evaluateSymbolCandles(symbol, rawCandles, { now });
+  const evaluation = evaluateSymbolCandles(symbol, rawCandles, { now, config });
   if (!evaluation.eligible) {
     return {
       symbol,
@@ -115,7 +125,7 @@ export async function checkTierSignals(tierKey = 'all') {
   // 并行请求所有交易对
   const tasks = symbols.map(async (symbol) => {
     try {
-      const result = await checkSymbol(symbol);
+      const result = await checkSymbol(symbol, { config: CONFIG });
       return { ok: true, result };
     } catch (err) {
       return { ok: false, symbol, error: err.message };

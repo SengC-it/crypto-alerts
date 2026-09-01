@@ -2,7 +2,7 @@
 // 支持 HTTP/SOCKS 代理（国内访问 Binance 需要）
 
 import https from 'node:https';
-import { CONFIG } from '../config.js';
+import { CONFIG, getIndicatorLookback } from '../config.js';
 import { getProxyUrl, requestViaProxy } from './proxy.js';
 import { intervalToMs } from '../market/candle.js';
 
@@ -42,7 +42,7 @@ async function get(path, params = {}) {
 /**
  * Get K-line / Candlestick data
  */
-export async function getCandles(symbol, interval = '1h', limit = 100, extraParams = {}) {
+export async function getCandles(symbol, interval = '1h', limit = getIndicatorLookback(CONFIG), extraParams = {}) {
   return get('/fapi/v1/klines', { symbol, interval, limit, ...extraParams });
 }
 

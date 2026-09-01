@@ -2,12 +2,17 @@
 // 拉取 Binance 历史 K 线数据，逐根模拟策略运行
 // 支持三档冷却期、信号冷却模拟、详细交易分析
 
-import { CONFIG } from '../config.js';
+import { CONFIG, getIndicatorLookback } from '../config.js';
 import { loadBacktestHistory } from './history.js';
 import { SignalEngine } from '../signal/engine.js';
 import { SignalEvaluator } from '../evaluation/signalEvaluator.js';
 import { candleToIso, normalizeCandles } from '../market/candle.js';
 import { computeAllIndicators } from '../indicators/index.js';
+import {
+  createIndicatorSnapshot,
+  getIndicatorProvenance,
+  isIndicatorSnapshotForWindow,
+} from '../indicators/provenance.js';
 
 export function calculateNetTradePnl({
   direction,
@@ -93,6 +98,7 @@ export function evaluateBacktestCandle({
   buyRequiresTrendConfirm,
   profitFilter,
   roundTripCostPercent,
+  indicatorLookbackCandles,
   generatedAt,
 } = {}) {
   const engine = signalEngine || new SignalEngine({ config });
@@ -109,6 +115,7 @@ export function evaluateBacktestCandle({
     buyRequiresTrendConfirm,
     profitFilter,
     roundTripCostPercent,
+    indicatorLookbackCandles,
     generatedAt,
   });
 }
@@ -156,7 +163,10 @@ export async function backtestSymbol(symbol, days = 30, options = {}) {
   const tier = getTier(symbol, config);
   const cooldownMs = (options.cooldownMinutes ?? tier.cooldownMinutes) * 60 * 1000;
   const effectiveMinConf = minConfidence ?? config.SIGNAL_FILTER?.minConfidence ?? 30;
-  const warmup = options.warmup ?? 100;
+  const canonicalLookbackCandles = getIndicatorLookback(config, options);
+  // Warmup is the same value as the indicator lookback. Keeping one resolved
+  // value prevents history loading and per-candle evaluation from drifting.
+  const warmup = canonicalLookbackCandles;
 
   // The older optimized scan API supplied a complete synthetic candle array
   // with indicatorSeries but no asOf. Keep that fixture contract while all
@@ -178,8 +188,9 @@ export async function backtestSymbol(symbol, days = 30, options = {}) {
     : await loadBacktestHistory(symbol, days, {
         ...options,
         candles: options.candles || options.candlesBySymbol?.[symbol],
+        config,
         timeframe: '1h',
-        warmup,
+        indicatorLookbackCandles: canonicalLookbackCandles,
         strictCoverage: options.strictCoverage,
         asOf: options.asOf,
       });
@@ -191,22 +202,62 @@ export async function backtestSymbol(symbol, days = 30, options = {}) {
   // Legacy indicatorSeries remains supported; new optimizer callers should
   // pass indicatorsBySymbol so every path shares this same evaluator.
   const indicatorSource = options.indicatorsBySymbol?.[symbol] ?? indicatorSeries;
+  const indicatorSnapshotsByOpenTime = new Map();
+  if (Array.isArray(indicatorSource)) {
+    for (const candidate of indicatorSource) {
+      const provenance = getIndicatorProvenance(candidate);
+      if (provenance?.candle_open_time !== null && provenance?.candle_open_time !== undefined) {
+        indicatorSnapshotsByOpenTime.set(provenance.candle_open_time, candidate);
+      }
+    }
+  }
   const signalEngine = new SignalEngine({ config });
   const indicatorAt = (index, candleSlice) => {
+    const indicatorWindow = candleSlice.slice(-canonicalLookbackCandles);
+    const snapshotOptions = {
+      symbol,
+      timeframe: '1h',
+      candles: indicatorWindow,
+      lookbackCandles: canonicalLookbackCandles,
+    };
+
+    const useVerifiedSnapshot = candidate => isIndicatorSnapshotForWindow(candidate, snapshotOptions)
+      ? candidate
+      : null;
+
     if (indicatorSource) {
       if (typeof indicatorSource === 'function') {
-        return indicatorSource({ index, candles: candleSlice, symbol });
+        const candidate = indicatorSource({
+          index,
+          candles: indicatorWindow,
+          symbol,
+          timeframe: '1h',
+          lookbackCandles: canonicalLookbackCandles,
+        });
+        return useVerifiedSnapshot(candidate)
+          || createIndicatorSnapshot(candidate, snapshotOptions);
       }
       if (Array.isArray(indicatorSource)) {
-        return indicatorSource[index] || null;
+        // Plain legacy values are deliberately not trusted: they have no
+        // proof that they were calculated from this exact rolling window.
+        const byIndex = useVerifiedSnapshot(indicatorSource[index]);
+        const byTimestamp = useVerifiedSnapshot(
+          indicatorSnapshotsByOpenTime.get(indicatorWindow.at(-1)?.open_time),
+        );
+        return byIndex
+          || byTimestamp
+          || createIndicatorSnapshot(computeIndicatorsFn(indicatorWindow), snapshotOptions);
       }
       if (indicatorSource[index] && typeof indicatorSource[index] === 'object') {
-        return indicatorSource[index];
+        return useVerifiedSnapshot(indicatorSource[index])
+          || createIndicatorSnapshot(computeIndicatorsFn(indicatorWindow), snapshotOptions);
       }
-      const timestamp = candleSlice.at(-1)?.open_time;
-      return indicatorSource[timestamp] || indicatorSource;
+      const timestamp = indicatorWindow.at(-1)?.open_time;
+      const candidate = indicatorSource[timestamp] || indicatorSource;
+      return useVerifiedSnapshot(candidate)
+        || createIndicatorSnapshot(computeIndicatorsFn(indicatorWindow), snapshotOptions);
     }
-    return computeIndicatorsFn(candleSlice);
+    return createIndicatorSnapshot(computeIndicatorsFn(indicatorWindow), snapshotOptions);
   };
   const evaluateAt = (index, candleSlice, currentTime) => evaluateBacktestCandle({
     symbol,
@@ -223,6 +274,7 @@ export async function backtestSymbol(symbol, days = 30, options = {}) {
     buyRequiresTrendConfirm: config.SIGNAL_FILTER?.buyRequiresTrendConfirm !== false,
     profitFilter,
     roundTripCostPercent,
+    indicatorLookbackCandles: canonicalLookbackCandles,
     generatedAt: candleToIso(currentTime),
   });
 

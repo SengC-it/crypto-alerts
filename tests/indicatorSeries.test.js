@@ -14,7 +14,7 @@ function candle(index) {
 }
 
 describe('Indicator series precomputation', () => {
-  it('computes indicators once per candle index after warmup', () => {
+  it('computes indicators from the exact rolling lookback window', () => {
     const calls = [];
     const candles = Array.from({ length: 6 }, (_, i) => candle(i));
 
@@ -27,9 +27,8 @@ describe('Indicator series precomputation', () => {
     });
 
     assert.equal(series.length, candles.length);
-    assert.deepEqual(calls, [3, 4, 5, 6]);
+    assert.deepEqual(calls, [2, 2, 2, 2, 2]);
     assert.equal(series[0], null);
-    assert.equal(series[1], null);
     assert.deepEqual(series[5], { currentPrice: 105 });
   });
 });

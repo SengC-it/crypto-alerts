@@ -6,6 +6,10 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// One canonical indicator window shared by every signal-generation path.
+// Keep this value in configuration so changing it also changes signal lineage.
+export const INDICATOR_LOOKBACK_CANDLES = 100;
+
 // Load env files manually (no dotenv dependency needed)
 function loadEnv() {
   const envFiles = ['.env', 'ALL_PROXY.env'];
@@ -29,6 +33,9 @@ function loadEnv() {
 loadEnv();
 
 export const CONFIG = {
+  // The last N closed candles are the only input to indicator calculation.
+  INDICATOR_LOOKBACK_CANDLES,
+
   // Gmail SMTP
   GMAIL: {
     EMAIL: process.env.GMAIL_EMAIL || '',
@@ -171,3 +178,25 @@ export const CONFIG = {
 };
 
 CONFIG.SIGNAL_FILTER.minConfidence = parseFloat(process.env.MIN_CONFIDENCE || '75');
+
+/**
+ * Resolve the one indicator window used by history loading, precomputation,
+ * backtests and the live/serverless SignalEngine.
+ *
+ * `warmup` is accepted only as a backwards-compatible alias for callers that
+ * previously used it as the indicator window size; it is never independent
+ * from the resolved lookback.
+ */
+export function getIndicatorLookback(config = CONFIG, options = {}) {
+  const candidate = options.indicatorLookbackCandles
+    ?? options.lookbackCandles
+    ?? options.lookback
+    ?? options.warmup
+    ?? config?.INDICATOR_LOOKBACK_CANDLES
+    ?? INDICATOR_LOOKBACK_CANDLES;
+  const lookback = Number(candidate);
+  if (!Number.isInteger(lookback) || lookback < 1) {
+    throw new Error(`INDICATOR_LOOKBACK_CANDLES must be a positive integer, got ${candidate}`);
+  }
+  return lookback;
+}

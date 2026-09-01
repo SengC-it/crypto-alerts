@@ -24,6 +24,7 @@ import { SignalStore } from '../src/db/signalStore.js';
 import { persistAndNotify } from '../src/delivery.js';
 import { authorizeCronRequest } from '../src/api/auth.js';
 import { evaluateSymbolCandles } from '../api/lib/checker.js';
+import { createIndicatorSnapshot } from '../src/indicators/provenance.js';
 
 const HOUR = intervalToMs('1h');
 
@@ -54,6 +55,7 @@ function makeDonchianDataset(count = 60, start = Date.UTC(2026, 0, 1)) {
 
 function signalConfig() {
   return {
+    INDICATOR_LOOKBACK_CANDLES: 21,
     DEFAULT_STRATEGIES: {
       donchian_breakout: { enabled: true, period: 20, channel_position_threshold: 0.9, timeframe: '1h' },
     },
@@ -178,18 +180,31 @@ describe('SignalEngine parity and lineage', () => {
   });
 
   it('preserves the strategy score as raw_score without integer rounding', () => {
-    const candle = makeCandle(Date.UTC(2026, 0, 1), 100);
+    const candles = Array.from({ length: 21 }, (_, index) => makeCandle(
+      Date.UTC(2026, 0, 1) + index * HOUR,
+      100,
+    ));
     const config = {
       ...signalConfig(),
       DEFAULT_STRATEGIES: {
         rsi_reversal: { enabled: true, oversold: 35, overbought: 65, rsi_period: 14 },
       },
     };
+    const indicators = createIndicatorSnapshot({
+      currentPrice: 100,
+      atr_14: 2,
+      rsi_14: 20,
+    }, {
+      symbol: 'BTCUSDT',
+      timeframe: '1h',
+      candles,
+      lookbackCandles: 21,
+    });
     const result = new SignalEngine({ config }).evaluate({
       symbol: 'BTCUSDT',
-      candles: [candle],
-      now: candle.close_time + 1,
-      indicators: { currentPrice: 100, atr_14: 2, rsi_14: 20 },
+      candles,
+      now: candles.at(-1).close_time + 1,
+      indicators,
     });
 
     assert.equal(result.signals[0].score, 69.3);
@@ -362,7 +377,6 @@ describe('Historical pagination and coverage', () => {
         config,
         candlesBySymbol: { BTCUSDT: candles },
         asOf,
-        warmup: 0,
       }),
       error => {
         assert.match(error.message, /failed closed/i);
@@ -428,9 +442,9 @@ describe('Backtest shared-engine parity', () => {
     };
     const asOf = Date.UTC(2026, 0, 3);
     const window = requestedWindow(2, { asOf, timeframe: '1h' });
-    const candles = Array.from({ length: 68 }, (_, index) => {
-      const breakout = index === 67;
-      return makeCandle(window.startOpen - 20 * HOUR + index * HOUR, breakout ? 200 : 100 + index * 0.1, {
+    const candles = Array.from({ length: 69 }, (_, index) => {
+      const breakout = index === 68;
+      return makeCandle(window.startOpen - 21 * HOUR + index * HOUR, breakout ? 200 : 100 + index * 0.1, {
         highExtra: breakout ? 0 : 1,
       });
     });
@@ -445,7 +459,7 @@ describe('Backtest shared-engine parity', () => {
         },
       },
       asOf,
-      warmup: 20,
+      warmup: 21,
       minConfidence: 0,
       noConflictFilter: false,
       boostResonance: false,
@@ -476,7 +490,7 @@ describe('Backtest shared-engine parity', () => {
       config,
       candles,
       indicatorSeries: ({ candles: slice }) => computeAllIndicators(slice),
-      warmup: 20,
+      warmup: 21,
       minConfidence: 0,
       noConflictFilter: false,
       boostResonance: false,
@@ -500,7 +514,7 @@ describe('Backtest shared-engine parity', () => {
       config,
       candles,
       indicatorSeries: ({ candles: slice }) => computeAllIndicators(slice),
-      warmup: 20,
+      warmup: 21,
       minConfidence: 0,
       noConflictFilter: false,
       boostResonance: false,
@@ -610,7 +624,7 @@ describe('Optimizer parameter-effect checks', () => {
         config,
         candles,
         indicatorSeries: ({ candles: slice }) => computeAllIndicators(slice),
-        warmup: 20,
+        warmup: 21,
         minConfidence: 0,
         noConflictFilter: false,
         boostResonance: false,

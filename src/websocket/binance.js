@@ -3,7 +3,7 @@
 
 import WebSocket from 'ws';
 import https from 'node:https';
-import { CONFIG } from '../config.js';
+import { CONFIG, getIndicatorLookback } from '../config.js';
 import { getCandles } from './rest.js';
 import { getProxyUrl, connectViaProxy } from './proxy.js';
 import { filterClosedCandles, normalizeCandle } from '../market/candle.js';
@@ -135,6 +135,7 @@ class BinanceFuturesWS {
       }, { symbol, timeframe: '1h', isClosed: kline.x });
 
       if (candle.is_closed) {
+        const indicatorLookbackCandles = getIndicatorLookback(CONFIG);
 
         // Update cached candles
         if (!this.cachedCandles.has(symbol)) {
@@ -148,13 +149,14 @@ class BinanceFuturesWS {
           candles.push(candle);
         }
         candles.sort((a, b) => a.open_time - b.open_time);
-        if (candles.length > 100) candles.shift();  // Keep last 100
+        const canonicalCandles = candles.slice(-indicatorLookbackCandles);
+        this.cachedCandles.set(symbol, canonicalCandles);
 
         // Notify listeners
         const listeners = this.klineListeners.get(symbol);
         if (listeners) {
           for (const fn of listeners) {
-            fn(candle, candles);
+            fn(candle, canonicalCandles);
           }
         }
       }
@@ -206,12 +208,13 @@ class BinanceFuturesWS {
       const results = await Promise.allSettled(
         batch.map(async (symbol) => {
           const interval = symbolIntervals.get(symbol);
-          const candles = await getCandles(symbol, interval, 100);
+          const indicatorLookbackCandles = getIndicatorLookback(CONFIG);
+          const candles = await getCandles(symbol, interval, indicatorLookbackCandles + 2);
           const parsed = filterClosedCandles(candles, {
             symbol,
             timeframe: interval,
             now: Date.now(),
-          }).slice(-100);
+          }).slice(-indicatorLookbackCandles);
           this.cachedCandles.set(symbol, parsed);
           console.log('[WS] Cached', parsed.length, `${interval} candles for`, symbol);
         })

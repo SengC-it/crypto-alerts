@@ -3,7 +3,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { CONFIG } from '../src/config.js';
+import { CONFIG, getIndicatorLookback } from '../src/config.js';
 import { loadBacktestHistory } from '../src/backtest/history.js';
 import { precomputeIndicatorSeries } from '../src/backtest/indicatorSeries.js';
 import { runOptimizationGrid } from '../src/backtest/optimizer.js';
@@ -12,7 +12,7 @@ import { buildOptimizationMarkdown } from '../src/backtest/report.js';
 const days = parseInt(process.argv[2], 10) || 30;
 const generatedAt = new Date().toISOString();
 const asOf = Date.parse(generatedAt);
-const warmup = 100;
+const indicatorLookbackCandles = getIndicatorLookback(CONFIG);
 const stamp = generatedAt.replace(/[:.]/g, '-');
 const outDir = path.join(process.cwd(), 'reports', 'backtests');
 
@@ -40,12 +40,17 @@ async function main() {
       const history = await loadBacktestHistory(symbol, days, {
         timeframe: '1h',
         asOf,
-        warmup,
+        indicatorLookbackCandles,
         strictCoverage: true,
       });
       candlesBySymbol[symbol] = history.candles;
       coverageBySymbol[symbol] = history.coverage;
-      indicatorsBySymbol[symbol] = precomputeIndicatorSeries(candlesBySymbol[symbol]);
+      indicatorsBySymbol[symbol] = precomputeIndicatorSeries(candlesBySymbol[symbol], {
+        symbol,
+        timeframe: '1h',
+        config: CONFIG,
+        indicatorLookbackCandles,
+      });
       console.log(`  ${symbol}: ${history.coverage.coverage_percent}% coverage, ${candlesBySymbol[symbol].length} candles`);
     } catch (err) {
       dataErrors.push({ symbol, error: err.message });
@@ -64,7 +69,7 @@ async function main() {
       candlesBySymbol,
       indicatorsBySymbol,
       asOf,
-      warmup,
+      indicatorLookbackCandles,
       strictCoverage: true,
       trailingStop: true,
     },

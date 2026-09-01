@@ -19,6 +19,21 @@ open_time, close_time, timeframe, is_closed, and symbol. Primary signals
 require a closed candle. REST ingestion explicitly removes the current
 forming candle before evaluation.
 
+## Canonical indicator window
+
+`CONFIG.INDICATOR_LOOKBACK_CANDLES` is the single source for the indicator
+window and is currently `100`, preserving the production lookback semantics.
+The SignalEngine filters closed candles, requires at least N rows, and then
+calculates indicators from exactly the last N closed candles. History loading,
+WebSocket warm-up/cache trimming, Serverless REST requests, backtest evaluation,
+and optimizer precomputation all resolve this same value. The legacy `warmup`
+option is only an alias for that value, never a second independent window.
+
+Precomputed snapshots carry non-persisted provenance for symbol, timeframe,
+candle boundaries, window hash, and lookback. The SignalEngine accepts them
+only when that provenance matches its exact canonical window; unverified plain
+indicator objects are ignored and recalculated from the canonical window.
+
 ## Research lineage
 
 New signals carry model version, commit SHA, effective config hash, signal
@@ -40,8 +55,8 @@ kept as an auxiliary view; SignalEvaluator reports direction-normalized
 ordering, and signal decay. These are research metrics, not user account
 returns.
 
-The strict loader also requires all warmup candles. A 100% requested window
-with incomplete indicator warmup fails instead of silently shortening the
+The strict loader also requires all N canonical warmup candles. A 100% requested
+window with incomplete indicator warmup fails instead of silently shortening the
 experiment. The requested window ends at the latest fully closed candle; the
 currently forming interval is never counted as expected coverage.
 
@@ -56,13 +71,18 @@ Real BTCUSDT verification on 2026-09-01 used one fixed as-of time:
 
 ## Optimizer integrity
 
-The production optimizer passes `candlesBySymbol`, `indicatorsBySymbol`, the
-fixed as-of time, strict coverage, and strategy overrides into the same
-backtest path. `trailingATR` is rejected unless every scenario enables
+The production optimizer passes `candlesBySymbol`, canonical rolling
+`indicatorsBySymbol`, the fixed as-of time, strict coverage, and strategy
+overrides into the same backtest path. `trailingATR` is rejected unless every scenario enables
 `trailingStop`. Each scenario records an effective execution-config hash and
 a detailed output hash. Parameter-effect analysis compares scenarios while
 holding all other parameters fixed; identical output from different
 parameters is reported as a no-op and can fail the run.
+
+The canonical-window regression suite uses 360-candle histories and covers
+long-history parity, old-history poisoning, N closed plus one forming candle,
+N-1 fail-closed behavior, and precomputed versus on-demand values for every
+indicator family and signal projection.
 
 The /api/signals endpoint is the read-only review surface for recent stored
 signals; there is no separate /api/review handler in M0.
