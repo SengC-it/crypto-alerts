@@ -25,8 +25,9 @@ const STRATEGY_MAP = {
  * Run all enabled strategies for a given symbol
  * 返回原始信号列表（不过滤），供回测引擎和通知系统各自过滤
  */
-export function runStrategies(symbol, indicators, strategyConfigs) {
+export function runStrategies(symbol, indicators, strategyConfigs, options = {}) {
   const signals = [];
+  const timestamp = options.timestamp || new Date().toISOString();
 
   for (const [strategyKey, config] of Object.entries(strategyConfigs)) {
     if (!config.enabled) continue;
@@ -38,7 +39,8 @@ export function runStrategies(symbol, indicators, strategyConfigs) {
       const result = strategyDef.fn(config.params, indicators);
       if (result) {
         result.symbol = symbol;
-        result.timestamp = new Date().toISOString();
+        result.timestamp = timestamp;
+        if (options.timeframe) result.timeframe = options.timeframe;
         signals.push(result);
       }
     } catch (err) {

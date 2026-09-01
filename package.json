@@ -7,7 +7,9 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test": "node --test tests/*.js"
+    "test": "node --test tests/*.js",
+    "check": "node scripts/check-syntax.js",
+    "lint": "node scripts/check-syntax.js"
   },
   "dependencies": {
     "ws": "^8.18.0",
@@ -15,7 +17,7 @@
     "@supabase/supabase-js": "^2.39.0"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   }
 }
 

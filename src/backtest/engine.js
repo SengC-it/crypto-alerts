@@ -3,9 +3,11 @@
 // 支持三档冷却期、信号冷却模拟、详细交易分析
 
 import { CONFIG } from '../config.js';
-import { getCandles } from '../websocket/rest.js';
+import { loadBacktestHistory } from './history.js';
+import { SignalEngine } from '../signal/engine.js';
+import { SignalEvaluator } from '../evaluation/signalEvaluator.js';
+import { candleToIso, normalizeCandles } from '../market/candle.js';
 import { computeAllIndicators } from '../indicators/index.js';
-import { runStrategies, filterSignals, applyProfitFilter } from '../strategies/manager.js';
 
 export function calculateNetTradePnl({
   direction,
@@ -30,7 +32,9 @@ export function calculateNetTradePnl({
  * 单笔交易记录
  */
 class Trade {
-  constructor(entrySignal, entryTime) {
+  constructor(entrySignal, entryTime, entryIndex) {
+    this.signal = entrySignal;
+    this.entryIndex = entryIndex;
     this.symbol = entrySignal.symbol;
     this.strategy = entrySignal.strategy;
     this.direction = entrySignal.signal;
@@ -67,17 +71,68 @@ class Trade {
 /**
  * 获取币种所属档位
  */
-function getTier(symbol) {
-  for (const [key, tier] of Object.entries(CONFIG.MONITOR_TIERS)) {
-    if (tier.symbols.includes(symbol)) return { key, ...tier };
+function getTier(symbol, config = CONFIG) {
+  for (const [key, tier] of Object.entries(config.MONITOR_TIERS || {})) {
+    if (tier.symbols?.includes(symbol)) return { key, ...tier };
   }
   return { key: 'unknown', name: '未知', cooldownMinutes: 240, intervalMinutes: 60 };
+}
+
+export function evaluateBacktestCandle({
+  symbol,
+  timeframe = '1h',
+  candles,
+  config = CONFIG,
+  signalEngine,
+  indicators = null,
+  now,
+  strategyOverrides,
+  minConfidence,
+  filterConflicts,
+  boostResonance,
+  buyRequiresTrendConfirm,
+  profitFilter,
+  roundTripCostPercent,
+  generatedAt,
+} = {}) {
+  const engine = signalEngine || new SignalEngine({ config });
+  return engine.evaluate({
+    symbol,
+    timeframe,
+    candles,
+    indicators,
+    now,
+    strategyOverrides,
+    minConfidence,
+    filterConflicts,
+    boostResonance,
+    buyRequiresTrendConfirm,
+    profitFilter,
+    roundTripCostPercent,
+    generatedAt,
+  });
+}
+
+function applyAccountRiskParameters(signal, indicators, stopLossATR, takeProfitATR) {
+  const entry = Number(signal?.suggestedEntry ?? signal?.entry_reference);
+  const atr = Number(indicators?.atr_14);
+  if (!Number.isFinite(entry) || !Number.isFinite(atr) || atr <= 0) return signal;
+
+  const isBuy = signal.signal === 'BUY';
+  return {
+    ...signal,
+    suggestedEntry: entry,
+    stopLoss: isBuy ? entry - atr * stopLossATR : entry + atr * stopLossATR,
+    targetPrice: isBuy ? entry + atr * takeProfitATR : entry - atr * takeProfitATR,
+    riskRewardRatio: +(takeProfitATR / stopLossATR).toFixed(6),
+  };
 }
 
 /**
  * 对单个交易对执行回测
  */
 export async function backtestSymbol(symbol, days = 30, options = {}) {
+  const config = options.config || CONFIG;
   const {
     minConfidence,
     noConflictFilter = true,
@@ -91,51 +146,93 @@ export async function backtestSymbol(symbol, days = 30, options = {}) {
     trailingStop = false,        // 是否启用移动止损
     trailingATR = 1.0,          // 移动止损回撤 = N * ATR
     positionTimeoutHours = 48,   // 持仓超时
-    roundTripCostPercent = CONFIG.TRADING_COSTS?.roundTripPercent ?? 0,
-    profitFilter = CONFIG.PROFIT_FILTER,
+    roundTripCostPercent = config.TRADING_COSTS?.roundTripPercent ?? 0,
+    profitFilter = config.PROFIT_FILTER,
     candles: injectedCandles = null,
     indicatorSeries = null,
     computeIndicatorsFn = computeAllIndicators,
   } = options;
 
-  const tier = getTier(symbol);
-  const cooldownMs = (options.cooldownMinutes || tier.cooldownMinutes) * 60 * 1000;
-  const effectiveMinConf = minConfidence ?? CONFIG.SIGNAL_FILTER?.minConfidence ?? 30;
+  const tier = getTier(symbol, config);
+  const cooldownMs = (options.cooldownMinutes ?? tier.cooldownMinutes) * 60 * 1000;
+  const effectiveMinConf = minConfidence ?? config.SIGNAL_FILTER?.minConfidence ?? 30;
+  const warmup = options.warmup ?? 100;
 
-  // 1. 拉取历史K线
-  const totalCandles = days * 24 + 100;
-  const rawCandles = injectedCandles || await getCandles(symbol, '1h', Math.min(totalCandles, 1500));
-
-  if (!rawCandles || !Array.isArray(rawCandles) || rawCandles.length < 200) {
-    return { symbol, error: 'Insufficient historical data', candlesLoaded: 0 };
+  // The older optimized scan API supplied a complete synthetic candle array
+  // with indicatorSeries but no asOf. Keep that fixture contract while all
+  // normal backtests use the strict requested-window coverage gate.
+  const legacyFixture = Boolean(
+    indicatorSeries
+    && injectedCandles
+    && options.asOf === undefined,
+  );
+  const history = legacyFixture
+    ? {
+        candles: normalizeCandles(injectedCandles, {
+          symbol,
+          timeframe: '1h',
+          now: Date.now(),
+        }),
+        coverage: null,
+      }
+    : await loadBacktestHistory(symbol, days, {
+        ...options,
+        candles: options.candles || options.candlesBySymbol?.[symbol],
+        timeframe: '1h',
+        warmup,
+        strictCoverage: options.strictCoverage,
+        asOf: options.asOf,
+      });
+  const allCandles = history.candles;
+  if (!Array.isArray(allCandles) || allCandles.length <= warmup) {
+    throw new Error('Insufficient historical data after warmup');
   }
 
-  const allCandles = rawCandles.map(c => ({
-    open: parseFloat(c.open ?? c[1]),
-    high: parseFloat(c.high ?? c[2]),
-    low: parseFloat(c.low ?? c[3]),
-    close: parseFloat(c.close ?? c[4]),
-    volume: parseFloat(c.volume ?? c[5]),
-    timestamp: Number(c.closeTime ?? c.timestamp ?? c[6]),
-  }));
-
-  const getIndicators = (index, candleSlice) => {
-    if (indicatorSeries && indicatorSeries[index]) return indicatorSeries[index];
+  // Legacy indicatorSeries remains supported; new optimizer callers should
+  // pass indicatorsBySymbol so every path shares this same evaluator.
+  const indicatorSource = options.indicatorsBySymbol?.[symbol] ?? indicatorSeries;
+  const signalEngine = new SignalEngine({ config });
+  const indicatorAt = (index, candleSlice) => {
+    if (indicatorSource) {
+      if (typeof indicatorSource === 'function') {
+        return indicatorSource({ index, candles: candleSlice, symbol });
+      }
+      if (Array.isArray(indicatorSource)) {
+        return indicatorSource[index] || null;
+      }
+      if (indicatorSource[index] && typeof indicatorSource[index] === 'object') {
+        return indicatorSource[index];
+      }
+      const timestamp = candleSlice.at(-1)?.open_time;
+      return indicatorSource[timestamp] || indicatorSource;
+    }
     return computeIndicatorsFn(candleSlice);
   };
-
-  // 2. 构建策略配置
-  const strategyConfigs = {};
-  for (const [key, defaults] of Object.entries(CONFIG.DEFAULT_STRATEGIES)) {
-    if (!defaults.enabled) continue;
-    strategyConfigs[key] = { enabled: true, params: { ...defaults } };
-  }
+  const evaluateAt = (index, candleSlice, currentTime) => evaluateBacktestCandle({
+    symbol,
+    timeframe: '1h',
+    candles: candleSlice,
+    config,
+    signalEngine,
+    indicators: indicatorAt(index, candleSlice),
+    now: currentTime,
+    strategyOverrides: options.strategyOverrides,
+    minConfidence: effectiveMinConf,
+    filterConflicts: noConflictFilter,
+    boostResonance,
+    buyRequiresTrendConfirm: config.SIGNAL_FILTER?.buyRequiresTrendConfirm !== false,
+    profitFilter,
+    roundTripCostPercent,
+    generatedAt: candleToIso(currentTime),
+  });
 
   // 3. 逐根K线回测
   const trades = [];
+  const evaluatedSignals = [];
+  let rawSignalCount = 0;
+  let filteredSignalCount = 0;
   let openTrade = null;
   const signalCooldowns = new Map();   // signal cooldown tracking
-  const warmup = 100;
   let highestEquity = initialCapital;
   let peak = initialCapital;
   let maxDrawdown = 0;
@@ -145,11 +242,18 @@ export async function backtestSymbol(symbol, days = 30, options = {}) {
   let trailHigh = 0;  // 持仓期间最高价 (BUY) 或最低价 (SELL)
 
   for (let i = warmup; i < allCandles.length; i++) {
-    const currentTime = allCandles[i].timestamp;
+    const currentTime = allCandles[i].close_time ?? allCandles[i].timestamp ?? allCandles[i].open_time;
     const currentPrice = allCandles[i].close;
     const currentHigh = allCandles[i].high;
     const currentLow = allCandles[i].low;
     const candleSlice = allCandles.slice(0, i + 1);
+    const evaluation = evaluateAt(i, candleSlice, currentTime);
+    const filteredSignals = evaluation.signals || [];
+    rawSignalCount += evaluation.rawSignals?.length || 0;
+    filteredSignalCount += filteredSignals.length;
+    for (const signal of filteredSignals) {
+      evaluatedSignals.push({ signal, signalIndex: i });
+    }
 
     // 3a. 检查持仓
     if (openTrade) {
@@ -237,23 +341,7 @@ export async function backtestSymbol(symbol, days = 30, options = {}) {
         continue;
       }
 
-      // 已有持仓，检查反向信号
-      // 3b. 计算指标检查反向信号
-      const indicators = getIndicators(i, candleSlice);
-      if (!indicators || indicators.currentPrice === undefined) continue;
-      const rawSignals = runStrategies(symbol, indicators, strategyConfigs);
-      const qualitySignals = filterSignals(rawSignals, {
-        minConfidence: effectiveMinConf,
-        filterConflicts: noConflictFilter,
-        boostResonance,
-        buyRequiresTrendConfirm: CONFIG.SIGNAL_FILTER?.buyRequiresTrendConfirm !== false,
-        trendIndicators: { sma_50: indicators.sma_50, currentPrice: indicators.currentPrice },
-      });
-      const filteredSignals = applyProfitFilter(qualitySignals, {
-        ...profitFilter,
-        roundTripCostPercent,
-      });
-
+      // Existing positions also use the shared SignalEngine for reversal checks.
       if (filteredSignals.length > 0) {
         const oppositeSignals = filteredSignals.filter(s =>
           (openTrade.direction === 'BUY' && s.signal === 'SELL') ||
@@ -278,24 +366,7 @@ export async function backtestSymbol(symbol, days = 30, options = {}) {
       if (usePosition && openTrade) continue;
     }
 
-    // 没有持仓 — 检查新信号
-    // 3c. 计算指标 & 运行策略
-    const indicators = getIndicators(i, candleSlice);
-    if (!indicators || indicators.currentPrice === undefined) continue;
-
-    const rawSignals = runStrategies(symbol, indicators, strategyConfigs);
-    const qualitySignals = filterSignals(rawSignals, {
-      minConfidence: effectiveMinConf,
-      filterConflicts: noConflictFilter,
-      boostResonance,
-      buyRequiresTrendConfirm: CONFIG.SIGNAL_FILTER?.buyRequiresTrendConfirm !== false,
-      trendIndicators: { sma_50: indicators.sma_50, currentPrice: indicators.currentPrice },
-    });
-    const filteredSignals = applyProfitFilter(qualitySignals, {
-      ...profitFilter,
-      roundTripCostPercent,
-    });
-
+    // No position — check new signals through the shared SignalEngine.
     if (filteredSignals.length === 0) continue;
 
     // 3d. 信号冷却检查
@@ -307,7 +378,13 @@ export async function backtestSymbol(symbol, days = 30, options = {}) {
     }
 
     // 开仓
-    openTrade = new Trade(bestSignal, currentTime);
+    const tradeSignal = applyAccountRiskParameters(
+      bestSignal,
+      evaluation.indicators,
+      stopLossATR,
+      takeProfitATR,
+    );
+    openTrade = new Trade(tradeSignal, currentTime, i);
     trailHigh = openTrade.direction === 'BUY' ? currentHigh : currentLow;
     signalCooldowns.set(cooldownKey, currentTime);
   }
@@ -315,21 +392,61 @@ export async function backtestSymbol(symbol, days = 30, options = {}) {
   // 收盘未平仓
   if (openTrade) {
     const lastPrice = allCandles[allCandles.length - 1].close;
-    const lastTime = allCandles[allCandles.length - 1].timestamp;
+    const lastTime = allCandles[allCandles.length - 1].close_time
+      ?? allCandles[allCandles.length - 1].timestamp
+      ?? allCandles[allCandles.length - 1].open_time;
     openTrade.close(lastPrice, lastTime, 'end_of_backtest', roundTripCostPercent);
+    const pnl = equity * (openTrade.pnlPercent / 100) * leverage;
+    equity += pnl;
+    if (equity > peak) peak = equity;
+    const ddPct = ((peak - equity) / peak) * 100;
+    if (ddPct > maxDrawdownPercent) { maxDrawdownPercent = ddPct; maxDrawdown = peak - equity; }
     trades.push(openTrade);
   }
 
-  // 4. 计算统计数据
-  return calculateStats(symbol, trades, initialCapital, leverage, days, allCandles.length - warmup, tier, maxDrawdown, maxDrawdownPercent, equity);
+  // Keep signal-level forward evaluation separate from account simulation.
+  const signalEvaluator = new SignalEvaluator({ roundTripCostPercent });
+  const signalEvaluations = evaluatedSignals.map(item => signalEvaluator.evaluate(
+    item.signal,
+    allCandles,
+    { signalIndex: item.signalIndex },
+  ));
+
+  // 5. 计算统计数据
+  return calculateStats(
+    symbol,
+    trades,
+    initialCapital,
+    leverage,
+    days,
+    allCandles.length - warmup,
+    tier,
+    maxDrawdown,
+    maxDrawdownPercent,
+    equity,
+    history.coverage,
+    signalEvaluations,
+    rawSignalCount,
+    filteredSignalCount,
+  );
 }
 
 /**
  * 计算回测统计数据
  */
-function calculateStats(symbol, trades, initialCapital, leverage, days, totalHours, tier, maxDD, maxDDPct, finalEquity) {
+function calculateStats(symbol, trades, initialCapital, leverage, days, totalHours, tier, maxDD, maxDDPct, finalEquity, coverage, signalEvaluations, rawSignalCount, filteredSignalCount) {
   if (trades.length === 0) {
-    return { symbol, tier: tier.key, days, totalTrades: 0, message: 'No trades generated' };
+    return {
+      symbol,
+      tier: tier.key,
+      days,
+      totalTrades: 0,
+      rawSignalCount,
+      filteredSignalCount,
+      coverage,
+      signalEvaluations,
+      message: 'No trades generated',
+    };
   }
 
   const wins = trades.filter(t => t.pnlPercent > 0);
@@ -403,6 +520,7 @@ function calculateStats(symbol, trades, initialCapital, leverage, days, totalHou
     cost: +t.costPercent.toFixed(2),
     pnl: +t.pnlPercent.toFixed(2),
     confidence: t.confidence,
+    signalTimestamp: t.signal?.signal_timestamp || null,
     holdHours: +t.holdHours.toFixed(1),
   }));
 
@@ -431,6 +549,10 @@ function calculateStats(symbol, trades, initialCapital, leverage, days, totalHou
     byStrategy,
     byDirection,
     trades: allTradeDetails,
+    rawSignalCount,
+    filteredSignalCount,
+    coverage,
+    signalEvaluations,
   };
 }
 
@@ -438,13 +560,14 @@ function calculateStats(symbol, trades, initialCapital, leverage, days, totalHou
  * 全币种回测
  */
 export async function backtestAll(days = 30, options = {}) {
+  const config = options.config || CONFIG;
   const results = [];
   const errors = [];
 
   // 按档位分批，避免同时请求太多
   const symbols = options.tier
-    ? CONFIG.MONITOR_TIERS[options.tier]?.symbols || CONFIG.BINANCE_SYMBOLS
-    : CONFIG.BINANCE_SYMBOLS;
+    ? config.MONITOR_TIERS[options.tier]?.symbols || config.BINANCE_SYMBOLS
+    : config.BINANCE_SYMBOLS;
 
   // 分批处理，每批5个，避免API限流
   const BATCH_SIZE = 5;
@@ -455,7 +578,7 @@ export async function backtestAll(days = 30, options = {}) {
         const result = await backtestSymbol(symbol, days, options);
         return { ok: true, result };
       } catch (err) {
-        return { ok: false, symbol, error: err.message };
+        return { ok: false, symbol, error: err.message, coverage: err.coverage };
       }
     });
 
@@ -466,12 +589,28 @@ export async function backtestAll(days = 30, options = {}) {
         if (val.ok && !val.result.error) {
           results.push(val.result);
         } else {
-          errors.push(val.result || val.value);
+          errors.push(val.result || val);
         }
       } else {
-        errors.push({ error: item.reason?.message || 'Unknown error' });
+        errors.push({
+          error: item.reason?.message || 'Unknown error',
+          coverage: item.reason?.coverage,
+        });
       }
     }
+  }
+
+  if (options.strictCoverage !== false && errors.length > 0) {
+    const details = errors.map(error => {
+      const coverage = error?.coverage;
+      const coverageDetail = coverage
+        ? ` coverage=${coverage.candles_loaded}/${coverage.candles_expected}`
+        : '';
+      return `${error?.symbol || 'unknown'}: ${error?.error || 'backtest failed'}${coverageDetail}`;
+    }).join('; ');
+    const experimentError = new Error(`Backtest experiment failed closed: ${details}`);
+    experimentError.errors = errors;
+    throw experimentError;
   }
 
   // 按档位汇总

@@ -4,13 +4,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { CONFIG } from '../src/config.js';
-import { fetchHistoricalCandles } from '../src/backtest/historicalData.js';
+import { loadBacktestHistory } from '../src/backtest/history.js';
 import { precomputeIndicatorSeries } from '../src/backtest/indicatorSeries.js';
 import { runOptimizationGrid } from '../src/backtest/optimizer.js';
 import { buildOptimizationMarkdown } from '../src/backtest/report.js';
 
 const days = parseInt(process.argv[2], 10) || 30;
 const generatedAt = new Date().toISOString();
+const asOf = Date.parse(generatedAt);
+const warmup = 100;
 const stamp = generatedAt.replace(/[:.]/g, '-');
 const outDir = path.join(process.cwd(), 'reports', 'backtests');
 
@@ -27,41 +29,57 @@ async function main() {
   console.log(`Running optimization grid for ${days} days...`);
   console.log(`Scenarios: ${Object.values(candidates).reduce((total, values) => total * values.length, 1)}`);
 
-  const candlesNeeded = days * 24 + 100;
   const candlesBySymbol = {};
   const indicatorsBySymbol = {};
+  const coverageBySymbol = {};
   const dataErrors = [];
 
-  console.log(`Prefetching ${candlesNeeded} candles for ${CONFIG.BINANCE_SYMBOLS.length} symbols...`);
+  console.log(`Loading strict ${days}-day coverage for ${CONFIG.BINANCE_SYMBOLS.length} symbols...`);
   for (const symbol of CONFIG.BINANCE_SYMBOLS) {
     try {
-      candlesBySymbol[symbol] = await fetchHistoricalCandles({
-        symbol,
-        interval: '1h',
-        candlesNeeded,
+      const history = await loadBacktestHistory(symbol, days, {
+        timeframe: '1h',
+        asOf,
+        warmup,
+        strictCoverage: true,
       });
+      candlesBySymbol[symbol] = history.candles;
+      coverageBySymbol[symbol] = history.coverage;
       indicatorsBySymbol[symbol] = precomputeIndicatorSeries(candlesBySymbol[symbol]);
-      console.log(`  ${symbol}: ${candlesBySymbol[symbol].length} candles, indicators precomputed`);
+      console.log(`  ${symbol}: ${history.coverage.coverage_percent}% coverage, ${candlesBySymbol[symbol].length} candles`);
     } catch (err) {
       dataErrors.push({ symbol, error: err.message });
       console.log(`  ${symbol}: ERROR ${err.message}`);
     }
   }
 
-  if (Object.keys(candlesBySymbol).length === 0) {
-    throw new Error(`No usable historical data. Errors: ${JSON.stringify(dataErrors)}`);
+  if (dataErrors.length > 0 || Object.keys(candlesBySymbol).length !== CONFIG.BINANCE_SYMBOLS.length) {
+    throw new Error(`Optimization requires complete data for every symbol. Errors: ${JSON.stringify(dataErrors)}`);
   }
 
-  const ranked = await runOptimizationGrid({
+  const analysis = await runOptimizationGrid({
     days,
     candidates,
-    baseOptions: { candlesBySymbol, indicatorsBySymbol },
+    baseOptions: {
+      candlesBySymbol,
+      indicatorsBySymbol,
+      asOf,
+      warmup,
+      strictCoverage: true,
+      trailingStop: true,
+    },
+    returnAnalysis: true,
+    failOnNoOp: true,
   });
+  const ranked = analysis.ranked;
   const payload = {
     title: 'Crypto Alerts Optimization Report',
     generatedAt,
     days,
     ranked,
+    coverageBySymbol,
+    parameterEffect: analysis.parameterEffect,
+    noOp: analysis.noOp,
     errors: dataErrors,
   };
 

@@ -21,6 +21,28 @@ CREATE TABLE IF NOT EXISTS crypto_signals (
   target_price      DOUBLE PRECISION,
   risk_reward_ratio TEXT,
   indicators        JSONB,
+  direction         TEXT,
+  raw_score         DOUBLE PRECISION,
+  entry_reference   DOUBLE PRECISION,
+  model_version     TEXT,
+  commit_sha        TEXT,
+  config_hash       TEXT,
+  signal_engine_version TEXT,
+  generated_at      TIMESTAMPTZ,
+  signal_timestamp  TIMESTAMPTZ,
+  candle_open_time  TIMESTAMPTZ,
+  candle_close_time TIMESTAMPTZ,
+  timeframe         TEXT,
+  regime            TEXT,
+  volatility_regime TEXT,
+  raw_features      JSONB,
+  contributing_evidence JSONB,
+  rejected_evidence JSONB,
+  filter_reasons    JSONB,
+  signal_status     TEXT NOT NULL DEFAULT 'persisted',
+  delivered_at      TIMESTAMPTZ,
+  delivery_status   TEXT NOT NULL DEFAULT 'pending',
+  delivery_error    TEXT,
   email_sent_at     TIMESTAMPTZ,                  -- alert email send timestamp
   tracking_status   TEXT NOT NULL DEFAULT 'ignored' CHECK (tracking_status IN ('open', 'watch_only', 'closed', 'ignored')),
   created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -33,6 +55,28 @@ ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS priority_label TEXT;
 ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS priority_action TEXT NOT NULL DEFAULT 'ignore' CHECK (priority_action IN ('trade_candidate', 'watch_only', 'ignore'));
 ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS email_sent_at TIMESTAMPTZ;
 ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS tracking_status TEXT NOT NULL DEFAULT 'ignored' CHECK (tracking_status IN ('open', 'watch_only', 'closed', 'ignored'));
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS direction TEXT;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS raw_score DOUBLE PRECISION;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS entry_reference DOUBLE PRECISION;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS model_version TEXT;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS commit_sha TEXT;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS config_hash TEXT;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS signal_engine_version TEXT;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS generated_at TIMESTAMPTZ;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS signal_timestamp TIMESTAMPTZ;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS candle_open_time TIMESTAMPTZ;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS candle_close_time TIMESTAMPTZ;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS timeframe TEXT;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS regime TEXT;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS volatility_regime TEXT;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS raw_features JSONB;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS contributing_evidence JSONB;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS rejected_evidence JSONB;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS filter_reasons JSONB;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS signal_status TEXT DEFAULT 'persisted';
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMPTZ;
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS delivery_status TEXT DEFAULT 'pending';
+ALTER TABLE crypto_signals ADD COLUMN IF NOT EXISTS delivery_error TEXT;
 
 -- Dedupe lookup.
 CREATE INDEX IF NOT EXISTS idx_signals_dedupe_time
@@ -53,6 +97,9 @@ CREATE INDEX IF NOT EXISTS idx_signals_priority_time
 CREATE INDEX IF NOT EXISTS idx_signals_tracking_status
   ON crypto_signals (tracking_status, created_at DESC);
 
+CREATE INDEX IF NOT EXISTS idx_signals_status
+  ON crypto_signals (signal_status, delivery_status, created_at DESC);
+
 -- ============================================================
 -- 2. Row level security
 -- ============================================================
@@ -71,18 +118,28 @@ CREATE POLICY "Allow service role full access"
   USING (true)
   WITH CHECK (true);
 
--- ============================================================
--- 3. Cleanup helper
--- ============================================================
-CREATE OR REPLACE FUNCTION clean_old_signals()
-RETURNS void AS $$
-BEGIN
-  DELETE FROM crypto_signals WHERE created_at < NOW() - INTERVAL '30 days';
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+-- Data API access requires both table grants and RLS policies.
+REVOKE ALL PRIVILEGES ON TABLE public.crypto_signals FROM anon, authenticated, service_role;
+GRANT SELECT ON TABLE public.crypto_signals TO anon;
+GRANT SELECT, INSERT, UPDATE ON TABLE public.crypto_signals TO service_role;
 
--- Optional pg_cron schedule:
--- SELECT cron.schedule('clean-old-signals', '0 3 * * *', 'SELECT clean_old_signals()');
+DO $$
+DECLARE
+  signal_id_sequence TEXT;
+BEGIN
+  signal_id_sequence := pg_get_serial_sequence('public.crypto_signals', 'id');
+  IF signal_id_sequence IS NOT NULL THEN
+    EXECUTE format(
+      'REVOKE ALL PRIVILEGES ON SEQUENCE %s FROM anon, authenticated, service_role',
+      signal_id_sequence
+    );
+    EXECUTE format(
+      'GRANT USAGE, SELECT ON SEQUENCE %s TO service_role',
+      signal_id_sequence
+    );
+  END IF;
+END;
+$$;
 
 -- Verification:
 -- SELECT * FROM crypto_signals LIMIT 5;

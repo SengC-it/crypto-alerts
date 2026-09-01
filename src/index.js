@@ -3,10 +3,10 @@
 
 import { CONFIG } from './config.js';
 import { wsClient } from './websocket/binance.js';
-import { computeAllIndicators } from './indicators/index.js';
-import { runStrategies, filterSignals, applyProfitFilter } from './strategies/manager.js';
+import { SignalEngine } from './signal/engine.js';
 import { signalStore } from './db/signalStore.js';
 import { sendSignalEmail, sendStartupEmail, verifyEmailConfig } from './email/notifier.js';
+import { persistAndNotify } from './delivery.js';
 
 const LOG_LEVELS = { error: 0, warn: 1, info: 2, debug: 3 };
 const currentLevel = LOG_LEVELS[CONFIG.LOG_LEVEL] ?? LOG_LEVELS.info;
@@ -18,57 +18,41 @@ function log(level, ...args) {
   }
 }
 
+const signalEngine = new SignalEngine({ config: CONFIG });
+
 /**
  * 处理K线收盘事件 - 核心分析流程
  */
 async function onCandleClosed(symbol, candle, allCandles) {
   log('debug', `[${symbol}] Candle closed: close=${candle.close}`);
+  const processingTime = Date.now();
 
-  // 1. 计算所有技术指标
-  const indicators = computeAllIndicators(allCandles);
-  if (!indicators || indicators.currentPrice === undefined) {
-    log('warn', `[${symbol}] Insufficient data for indicators`);
+  // Live, serverless and backtest all use the same closed-candle engine.
+  const evaluation = signalEngine.evaluate({
+    symbol,
+    timeframe: candle.timeframe || '1h',
+    candles: allCandles,
+    now: processingTime,
+    requireClosed: true,
+    generatedAt: new Date(processingTime).toISOString(),
+  });
+  if (!evaluation.eligible) {
+    log('debug', `[${symbol}] Signal evaluation skipped: ${evaluation.reason}`);
     return;
   }
 
-  // 2. 获取策略配置，传入策略运行器
-  const strategyConfigs = {};
-  for (const [key, defaults] of Object.entries(CONFIG.DEFAULT_STRATEGIES)) {
-    if (!defaults.enabled) continue;
-    strategyConfigs[key] = {
-      enabled: true,
-      params: { ...defaults },  // 包含 period, oversold 等参数
-    };
-  }
-
-  // 3. 运行所有启用的策略
-  const rawSignals = runStrategies(symbol, indicators, strategyConfigs);
-
-  if (rawSignals.length === 0) {
+  if (evaluation.rawSignals.length === 0) {
     log('debug', `[${symbol}] No signals generated`);
     return;
   }
 
-  // 3b. 信号质量过滤
-  const qualitySignals = filterSignals(rawSignals, {
-    minConfidence: CONFIG.SIGNAL_FILTER?.minConfidence || 40,
-    filterConflicts: CONFIG.SIGNAL_FILTER?.filterConflicts !== false,
-    boostResonance: CONFIG.SIGNAL_FILTER?.boostResonance !== false,
-    buyRequiresTrendConfirm: CONFIG.SIGNAL_FILTER?.buyRequiresTrendConfirm !== false,
-    trendIndicators: { sma_50: indicators.sma_50, currentPrice: indicators.currentPrice },
-  });
-  const signals = applyProfitFilter(qualitySignals, {
-    ...CONFIG.PROFIT_FILTER,
-    roundTripCostPercent: CONFIG.TRADING_COSTS.roundTripPercent,
-  });
-
-  if (signals.length === 0) {
+  if (evaluation.signals.length === 0) {
     log('debug', `[${symbol}] All signals filtered out`);
     return;
   }
 
   // 4. 处理每个信号（去重 + 存储 + 通知）
-  for (const signal of signals) {
+  for (const signal of evaluation.signals) {
     log('info', `[${signal.symbol}] ${signal.signal} signal from ${signal.name} (confidence: ${signal.confidence}%)`);
 
     // 去重检查
@@ -78,18 +62,20 @@ async function onCandleClosed(symbol, candle, allCandles) {
       continue;
     }
 
-    // 存储信号
-    await signalStore.save(signal);
-
-    // 发送邮件通知
-    const sent = await sendSignalEmail(signal);
-    if (sent) {
+    const result = await persistAndNotify({
+      signal,
+      signalStore,
+      sendEmail: sendSignalEmail,
+    });
+    if (result.sent) {
       log('info', `[${signal.symbol}] Email notification sent for ${signal.strategy}`);
     } else {
       log('warn', `[${signal.symbol}] Email notification failed for ${signal.strategy}`);
     }
   }
 }
+
+export { onCandleClosed };
 
 /**
  * 主启动函数

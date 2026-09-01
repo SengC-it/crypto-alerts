@@ -114,7 +114,7 @@ describe('Signal Store - Persistence Enrichment', () => {
     assert.equal(row.priority_label, 'High priority');
     assert.equal(row.priority_action, 'trade_candidate');
     assert.equal(row.score, 82.5);
-    assert.equal(row.email_sent_at, now);
+    assert.equal(row.email_sent_at, null);
     assert.equal(row.tracking_status, 'open');
     assert.equal(row.signal_direction, 'SELL');
   });
