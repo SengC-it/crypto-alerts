@@ -3,9 +3,10 @@
 
 import WebSocket from 'ws';
 import https from 'node:https';
-import { CONFIG } from '../config.js';
+import { CONFIG, getIndicatorLookback } from '../config.js';
 import { getCandles } from './rest.js';
 import { getProxyUrl, connectViaProxy } from './proxy.js';
+import { filterClosedCandles, normalizeCandle } from '../market/candle.js';
 
 const { BINANCE } = CONFIG;
 
@@ -16,8 +17,8 @@ const { BINANCE } = CONFIG;
 function buildCombinedStreamUrl() {
   const streams = [];
   for (const [tierKey, tier] of Object.entries(CONFIG.MONITOR_TIERS)) {
-    // Tier1 使用 15m K线以匹配其 15 分钟检查间隔，其余使用 1h
-    const interval = tierKey === 'tier1' ? '15m' : '1h';
+    // SignalEngine uses one canonical timeframe across live and backtest paths.
+    const interval = '1h';
     for (const symbol of tier.symbols) {
       streams.push(`${symbol.toLowerCase()}@kline_${interval}`);
     }
@@ -121,29 +122,41 @@ class BinanceFuturesWS {
       const symbol = msg.s;
       const kline = msg.k;
 
-      if (kline.x) {  // Closed candle - trigger analysis
-        const candle = {
-          open: parseFloat(kline.o),
-          high: parseFloat(kline.h),
-          low: parseFloat(kline.l),
-          close: parseFloat(kline.c),
-          volume: parseFloat(kline.v),
-          timestamp: kline.T,
-        };
+      const candle = normalizeCandle({
+        open: kline.o,
+        high: kline.h,
+        low: kline.l,
+        close: kline.c,
+        volume: kline.v,
+        open_time: kline.t,
+        close_time: kline.T,
+        is_closed: kline.x,
+        symbol,
+      }, { symbol, timeframe: '1h', isClosed: kline.x });
+
+      if (candle.is_closed) {
+        const indicatorLookbackCandles = getIndicatorLookback(CONFIG);
 
         // Update cached candles
         if (!this.cachedCandles.has(symbol)) {
           this.cachedCandles.set(symbol, []);
         }
         const candles = this.cachedCandles.get(symbol);
-        candles.push(candle);
-        if (candles.length > 100) candles.shift();  // Keep last 100
+        const existingIndex = candles.findIndex(item => item.open_time === candle.open_time);
+        if (existingIndex >= 0) {
+          candles[existingIndex] = candle;
+        } else {
+          candles.push(candle);
+        }
+        candles.sort((a, b) => a.open_time - b.open_time);
+        const canonicalCandles = candles.slice(-indicatorLookbackCandles);
+        this.cachedCandles.set(symbol, canonicalCandles);
 
         // Notify listeners
         const listeners = this.klineListeners.get(symbol);
         if (listeners) {
           for (const fn of listeners) {
-            fn(candle, candles);
+            fn(candle, canonicalCandles);
           }
         }
       }
@@ -176,10 +189,10 @@ class BinanceFuturesWS {
   async warmUpCache() {
     console.log('[WS] Warming up candle cache...');
 
-    // 收集每个币种对应的 K 线间隔
+    // 收集每个币种对应的 canonical K 线间隔
     const symbolIntervals = new Map();  // symbol -> interval
-    for (const [tierKey, tier] of Object.entries(CONFIG.MONITOR_TIERS)) {
-      const interval = tierKey === 'tier1' ? '15m' : '1h';
+    for (const tier of Object.values(CONFIG.MONITOR_TIERS)) {
+      const interval = '1h';
       for (const symbol of tier.symbols) {
         if (!symbolIntervals.has(symbol)) {
           symbolIntervals.set(symbol, interval);
@@ -195,15 +208,13 @@ class BinanceFuturesWS {
       const results = await Promise.allSettled(
         batch.map(async (symbol) => {
           const interval = symbolIntervals.get(symbol);
-          const candles = await getCandles(symbol, interval, 100);
-          const parsed = candles.map((c) => ({
-            open: parseFloat(c[1]),
-            high: parseFloat(c[2]),
-            low: parseFloat(c[3]),
-            close: parseFloat(c[4]),
-            volume: parseFloat(c[5]),
-            timestamp: c[6],
-          }));
+          const indicatorLookbackCandles = getIndicatorLookback(CONFIG);
+          const candles = await getCandles(symbol, interval, indicatorLookbackCandles + 2);
+          const parsed = filterClosedCandles(candles, {
+            symbol,
+            timeframe: interval,
+            now: Date.now(),
+          }).slice(-indicatorLookbackCandles);
           this.cachedCandles.set(symbol, parsed);
           console.log('[WS] Cached', parsed.length, `${interval} candles for`, symbol);
         })

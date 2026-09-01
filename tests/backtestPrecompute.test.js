@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { backtestSymbol } from '../src/backtest/engine.js';
+import { precomputeIndicatorSeries } from '../src/backtest/indicatorSeries.js';
 
 function candle(index, close = 100) {
   return {
@@ -36,7 +37,12 @@ function neutralIndicators(price) {
 describe('Backtest precomputed indicators', () => {
   it('uses provided indicator series instead of recomputing indicators', async () => {
     const candles = Array.from({ length: 220 }, (_, i) => candle(i, 100 + Math.sin(i / 10)));
-    const indicatorSeries = candles.map(c => neutralIndicators(c.close));
+    const indicatorSeries = precomputeIndicatorSeries(candles, {
+      symbol: 'BTCUSDT',
+      timeframe: '1h',
+      indicatorLookbackCandles: 100,
+      computeFn: slice => neutralIndicators(slice.at(-1).close),
+    });
     let computeCalls = 0;
 
     const result = await backtestSymbol('BTCUSDT', 1, {

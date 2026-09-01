@@ -121,8 +121,40 @@ try {
   const profitable = result.results.filter(r => (r.totalPnlPercent || 0) > 0).length;
   console.log(`盈利币种: ${profitable}/${result.totalSymbols}`);
 
+  console.log('\n====== 数据覆盖率 ======\n');
+  for (const row of result.results) {
+    const coverage = row.coverage;
+    if (!coverage) continue;
+    console.log(
+      row.symbol + ': requested=' + coverage.requested_start +
+      ' actual=' + coverage.actual_start + ' → ' + coverage.actual_end +
+      ' loaded=' + coverage.candles_loaded + '/' + coverage.candles_expected +
+      ' missing=' + coverage.missing_candles +
+      ' coverage=' + coverage.coverage_percent + '%',
+    );
+  }
+  for (const error of result.errors) {
+    if (error.coverage) {
+      console.log(
+        (error.symbol || 'Unknown') + ': coverage gate FAILED ' +
+        error.coverage.candles_loaded + '/' + error.coverage.candles_expected +
+        ' (' + error.coverage.coverage_percent + '%)',
+      );
+    }
+  }
+
   console.log('\n====== 回测完成 ======\n');
 } catch (err) {
+  for (const failure of err.errors || []) {
+    if (!failure.coverage) continue;
+    console.error(
+      `${failure.symbol}: requested=${failure.coverage.requested_start}` +
+      ` actual=${failure.coverage.actual_start} → ${failure.coverage.actual_end}` +
+      ` loaded=${failure.coverage.candles_loaded}/${failure.coverage.candles_expected}` +
+      ` missing=${failure.coverage.missing_candles}` +
+      ` coverage=${failure.coverage.coverage_percent}%`,
+    );
+  }
   console.error('回测执行失败:', err);
   process.exit(1);
 }

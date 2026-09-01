@@ -150,13 +150,15 @@ export function atr(ohlcs, period = 14) {
 }
 
 /**
- * Calculate Donchian Channel
- * Returns: { upper, middle, lower }
+ * Calculate Donchian Channel from the previous N closed candles.
+ * The current candle is intentionally excluded so a candle cannot "break"
+ * a channel that was calculated using its own high/low.
  */
-export function donchianChannel(ohlcs, period = 20) {
-  if (ohlcs.length < period) return null;
+export function donchianChannel(ohlcs, period = 20, includeCurrent = false) {
+  const end = includeCurrent ? ohlcs.length : ohlcs.length - 1;
+  if (end < period) return null;
 
-  const slice = ohlcs.slice(-period);
+  const slice = ohlcs.slice(end - period, end);
   const highestHigh = Math.max(...slice.map(c => parseFloat(c.high)));
   const lowestLow = Math.min(...slice.map(c => parseFloat(c.low)));
 

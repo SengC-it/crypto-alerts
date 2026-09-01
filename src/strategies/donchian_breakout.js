@@ -17,6 +17,12 @@ export function donchianBreakout(params, indicators) {
 
   const currentPrice = indicators.currentPrice;
   const channelWidth = dc.upper - dc.lower;
+  const configuredThreshold = Number(params?.channel_position_threshold ?? 0.90);
+  const upperThreshold = configuredThreshold >= 0.5 && configuredThreshold < 1
+    ? configuredThreshold
+    : 0.90;
+  const lowerThreshold = 1 - upperThreshold;
+  const edgeWidth = 1 - upperThreshold;
 
   let signal = 'HOLD';
   let confidence = 0;
@@ -35,16 +41,16 @@ export function donchianBreakout(params, indicators) {
     signal = 'SELL';
     confidence = 80;
     reason = `价格跌破唐奇安通道下轨 ($${dc.lower.toFixed(2)}) - N日新低`;
-  } else if (channelPosition >= 0.90) {
+  } else if (channelPosition >= upperThreshold) {
     // 接近上轨突破
     signal = 'BUY';
-    confidence = Math.round((channelPosition - 0.90) / 0.10 * 50 + 30);
+    confidence = Math.round((channelPosition - upperThreshold) / edgeWidth * 50 + 30);
     confidence = Math.min(confidence, 70);
     reason = `价格接近唐奇安通道上轨 (位置=${(channelPosition * 100).toFixed(0)}%, 上轨=$${dc.upper.toFixed(2)})`;
-  } else if (channelPosition <= 0.10) {
+  } else if (channelPosition <= lowerThreshold) {
     // 接近下轨跌破
     signal = 'SELL';
-    confidence = Math.round((0.10 - channelPosition) / 0.10 * 50 + 30);
+    confidence = Math.round((lowerThreshold - channelPosition) / edgeWidth * 50 + 30);
     confidence = Math.min(confidence, 70);
     reason = `价格接近唐奇安通道下轨 (位置=${(channelPosition * 100).toFixed(0)}%, 下轨=$${dc.lower.toFixed(2)})`;
   }
@@ -64,6 +70,7 @@ export function donchianBreakout(params, indicators) {
       middle: dc.middle.toFixed(2),
       lower: dc.lower.toFixed(2),
       period: params.period,
+      channel_position_threshold: upperThreshold,
     },
     suggestedEntry: currentPrice,
     stopLoss: signal === 'BUY' ? currentPrice - atr * 1.5 : currentPrice + atr * 1.5,

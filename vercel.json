@@ -13,11 +13,11 @@
     },
     {
       "path": "/api/check?tier=2",
-      "schedule": "0 0 * * *"
+      "schedule": "0 1 * * *"
     },
     {
       "path": "/api/check?tier=3",
-      "schedule": "0 0 * * *"
+      "schedule": "0 2 * * *"
     }
   ]
 }
