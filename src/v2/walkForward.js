@@ -359,6 +359,7 @@ export function buildPurgedWalkForwardPlan(samples = [], options = {}) {
     if (testEndIndex >= wfoDevelopment.length) break;
   }
 
+  const includeFinalHoldoutOutcomeInHash = options.includeFinalHoldoutOutcomeInHash !== false;
   const finalHoldoutHash = finalHoldout.length
     ? hashConfig(finalHoldout.map(item => ({
       timestamp: item.timestamp,
@@ -367,7 +368,7 @@ export function buildPurgedWalkForwardPlan(samples = [], options = {}) {
       direction: direction(item.sample),
       setup_family: item.sample?.setup_family ?? null,
       raw_score: scoreValue(item.sample, 'raw_score'),
-      outcome: outcomeValue(item.sample),
+      ...(includeFinalHoldoutOutcomeInHash ? { outcome: outcomeValue(item.sample) } : {}),
     })))
     : null;
   const boundary = {
@@ -406,6 +407,7 @@ export function buildPurgedWalkForwardPlan(samples = [], options = {}) {
       purgeHours,
       embargoHours,
       labelHorizonHours,
+      includeFinalHoldoutOutcomeInHash,
     },
   };
 }

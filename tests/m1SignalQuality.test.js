@@ -1,7 +1,11 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SignalEvaluator } from '../src/evaluation/signalEvaluator.js';
-import { archiveAsOf, parseArchiveCsv } from '../src/backtest/binanceArchive.js';
+import {
+  archiveAsOf,
+  loadBinanceVisionCandlesLongRange,
+  parseArchiveCsv,
+} from '../src/backtest/binanceArchive.js';
 import { buildResearchBarriers } from '../src/v2/barriers.js';
 import {
   aggregateClosedCandlesTo4h,
@@ -150,6 +154,25 @@ describe('M1 public archive fallback', () => {
     assert.equal(rows[0].quote_volume, 101000);
     assert.equal(rows[0].is_closed, true);
     assert.equal(archiveAsOf(Date.UTC(2026, 8, 1, 12)), Date.UTC(2026, 8, 1) - 1);
+  });
+
+  it('clips monthly daily fallback requests to the requested range', async () => {
+    const urls = [];
+    const result = await loadBinanceVisionCandlesLongRange({
+      symbol: 'BTCUSDT',
+      timeframe: '1h',
+      startTime: Date.UTC(2026, 7, 10),
+      endTime: Date.UTC(2026, 7, 12, 23, 59, 59, 999),
+      fetchImpl: async url => {
+        urls.push(url);
+        return { status: 404, ok: false };
+      },
+    });
+    assert.deepEqual(result.archive_months, ['2026-08']);
+    assert.deepEqual(result.daily_fallback_dates, ['2026-08-10', '2026-08-11', '2026-08-12']);
+    assert.equal(result.missing_archive_dates.length, 3);
+    assert.equal(urls.length, 4);
+    assert.equal(result.candles.length, 0);
   });
 });
 
