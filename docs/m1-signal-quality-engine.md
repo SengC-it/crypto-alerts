@@ -7,110 +7,129 @@ authorize promotion, deployment, or automatic trading.
 
 - Experiment ID: `m1-public_binance_futures_archive-2026-08-31`
 - Model version: `m1-v2-quality-0.1.0`
+- Source commit: `c9160c1`
+- Config hash: `dc6d18ab7391e607462017b9e4ed286ec96440b9ce6b026c30039deb0a35219d`
 - Reproduction command: `npm run m1:experiment -- --archive --days=60 --out=reports/m1-final.json`
-- Data source: Binance public Futures daily archives (`data.binance.vision`)
+- Data source: public Binance Futures archives (`data.binance.vision`)
 - Historical range: `2026-06-28T20:00:00.000Z` through `2026-08-31T23:59:59.999Z`
-- Symbols: 18 configured symbols, each with 1,540 closed 1h candles and 100% coverage
-- Trigger: closed 1h candle; context: closed 4h candle aggregated only from four complete aligned 1h candles
+- Symbols: 18 configured symbols, 1,540 closed 1h candles per symbol, 100% coverage
+- Trigger/context: closed 1h candle with context from closed 4h candles
 - Horizons: 1h, 4h, 8h, 12h, 24h, 48h
 - Round-trip fee and slippage assumption: `0.14%`
 
-## Safety and data contract
+## Safety and benchmark contract
 
-- `V1_UNCHANGED=true`
-- `V2_SHADOW_ONLY=true`
-- `AUTO_TRADING=false`
-- Every V2 candidate remains externally `SHADOW`; ranking buckets do not change that status.
-- Indicators use the M0 exact closed-candle window and preserve M0 provenance/lineage.
-- V2 never reads future candles. Breakout structure excludes the current trigger candle.
-- V1 and V2 use the same symbols, candles, horizons, fees, slippage, event window, and OOS date windows for comparison.
-- `raw_score` and `edge_score` are ranking scores, never probabilities. Calibration failure blocks promotion.
-- The optional derivatives evidence interface accepts public funding, open interest, quote volume, and spread only; this run used candle archive data and no private exchange API.
+- `V1_UNCHANGED=true`, `V2_SHADOW_ONLY=true`, `AUTO_TRADING=false`.
+- Every V2 candidate remains externally `SHADOW`; selection status is research
+  metadata only.
+- Indicators use the M0 canonical closed-candle window. No future candle is
+  read; breakout structure excludes the trigger candle.
+- V1 and V2 use the same symbols, closed candles, horizons, costs, market-event
+  definition, and OOS time windows.
+- `raw_score` and `edge_score` are ranking scores, not probabilities.
 
-## Purged walk-forward
+## OOS selection and purged walk-forward
 
-- Status: `PASS`
-- OOS windows: 11
-- Positive OOS windows: 1
-- Purge: 48h label-overlap rule
-- Embargo: 24h
-- Final holdout: 2,131 samples, isolated and untouched during tuning: `true`
-- No threshold, symbol whitelist, direction deletion, or final-holdout tuning was used.
+The trained score/volatility eligibility rule is applied first. Then only the
+configured top-N candidate per independent `market_event_id` and direction
+enters the primary V2 metrics. Remaining OOS rows stay in the audit lane as
+`SCORE_INELIGIBLE`/`SHADOW` or `SCORE_ELIGIBLE_NOT_SELECTED`/`WATCH`.
 
-## V2 OOS result
+| OOS lane | Count |
+|---|---:|
+| All candidates | 4,770 |
+| Score-eligible candidates | 1,711 |
+| Cluster-selected candidates | 261 |
+| Independent market events | 171 |
+
+- WFO status: `PASS`; 10 OOS windows; 1 positive window.
+- Purge: 48h label-overlap rule; embargo: 24h.
+- Final holdout: requested 2,131, actual 2,140 samples. The boundary was
+  moved to keep all cross-sectional rows and events on one side.
+- Development max timestamp `<` final-holdout min timestamp; event intersection
+  is zero; `final_holdout_untouched=true`.
+- Final-holdout hash:
+  `6a25ed58059cbd5cced28b69ff85c59f8e177a84e7724605853730630595b7fe`.
+
+## V2 primary OOS result
+
+The following metrics use the 261 cluster-selected OOS records only.
 
 | Metric | Value |
 |---|---:|
-| Evaluated signals | 2,845 |
-| Independent market clusters | 180 |
-| Net profit factor | 0.6498 |
-| Net expectancy | -0.105590%/signal |
-| Gross expectancy | 0.034410%/signal |
-| Hit rate | 33.6731% |
-| False-positive rate | 66.3269% |
-| Average MFE | 4.237336% |
-| Average MAE | -2.702581% |
-| Signal decay, 48h minus 1h | 1.071593% |
-| TP-first / SL-first | 0 / 0 |
-
-Forward net expectancy by horizon was `-0.105590%`, `0.012687%`,
-`0.092738%`, `0.127310%`, `0.474081%`, and `0.966003%` for 1h, 4h, 8h,
-12h, 24h, and 48h respectively.
+| Evaluated signals | 261 |
+| Independent market clusters | 164 |
+| Net profit factor | 0.4533 |
+| Net expectancy | -0.202178%/signal |
+| Gross expectancy | -0.062178%/signal |
+| Hit rate | 20.3065% |
+| False-positive rate | 79.6935% |
+| Average MFE | 3.338136% |
+| Average MAE | -2.587405% |
+| Signal decay, 48h minus 1h | 0.644696% |
 
 ### Direction breadth
 
 | Direction | Samples | Net expectancy | PF | Hit rate |
 |---|---:|---:|---:|---:|
-| BUY | 1,243 | -0.082304% | 0.7365 | 36.6854% |
-| SELL | 1,602 | -0.123658% | 0.5781 | 31.3358% |
+| BUY | 111 | -0.273061% | 0.3179 | 18.9189% |
+| SELL | 150 | -0.149725% | 0.5688 | 21.3333% |
 
-BUY was retained and evaluated independently; it was not removed from the
-engine.
-
-### Regime breadth
+### Trend regime breadth
 
 | Regime | Samples | Net expectancy | PF | Hit rate |
 |---|---:|---:|---:|---:|
-| Bull | 1,243 | -0.082304% | 0.7365 | 36.6854% |
-| Bear | 1,602 | -0.123658% | 0.5781 | 31.3358% |
+| Bull | 111 | -0.273061% | 0.3179 | 18.9189% |
+| Bear | 150 | -0.149725% | 0.5688 | 21.3333% |
 | Sideways | 0 | N/A | 0 | N/A |
 
 ### Volatility breadth
 
 | Volatility | Samples | Net expectancy | PF | Hit rate |
 |---|---:|---:|---:|---:|
-| Low | 1,042 | -0.104705% | 0.5819 | 30.1344% |
-| Normal | 964 | -0.104439% | 0.6444 | 34.5436% |
-| High | 539 | -0.157847% | 0.5733 | 34.8794% |
-| Extreme | 300 | -0.018476% | 0.9516 | 41.0000% |
+| Low | 120 | -0.202942% | 0.3998 | 16.6667% |
+| Normal | 124 | -0.170717% | 0.5475 | 24.1935% |
+| High | 11 | -0.286060% | 0.3061 | 18.1818% |
+| Extreme | 6 | -0.683316% | 0.1153 | 16.6667% |
 
-## Calibration and promotion gate
+Volatility eligibility is selected separately from training data in each WFO
+window. There is no hard-coded `Extreme = bad` rule. A gate is applied only
+when the training evidence is sufficient; each policy records its version,
+baseline, per-regime evidence, and selected regimes. The final holdout is not
+used to fit any policy.
 
-- Calibration: `CALIBRATION_FAIL`
-- Five score bins had enough samples, but OOS expectancy was not monotonic.
-- Fixed promotion thresholds were unchanged: clusters `>=100`, net PF `>=1.25`, net expectancy `>=+0.15%/signal`, OOS windows `>=6`, positive windows `>=4/6`, symbol breadth `>=8`.
-- Observed: 180 clusters, PF 0.6498, net expectancy -0.105590%/signal, 11 windows, 1 positive window, symbol breadth 18.
-- Recommendation: `REJECT`
-- Failed gates: net PF, net expectancy, positive windows, calibration.
+## Research TP/SL barriers
 
-## V1 comparator
+V2 uses the versioned, config-hashed research-only NATR barrier rule
+`m1-research-natr-barriers-0.1.0`, derived from the canonical closed window.
+It is not an execution or account-PnL rule. Barrier results are conservative
+when both levels are touched in the same candle and ordering is unknowable.
 
-The V1 comparator uses the same Purged-WFO OOS time windows and benchmark
-contract:
+| Outcome | Count |
+|---|---:|
+| TP-first | 81 |
+| SL-first | 179 |
+| Neither | 1 |
+| Ambiguous same-candle | 0 |
+| Conservative SL-first | 179 |
 
-| Metric | V1 | V2 |
-|---|---:|---:|
-| OOS samples | 153 | 2,845 |
-| Net PF | 0.2748 | 0.6498 |
-| Net expectancy | -0.271226%/signal | -0.105590%/signal |
+## Calibration, comparator, and promotion
 
-V2 minus V1 was `+0.165636%/signal` net expectancy and `+0.3750` net PF.
-This relative improvement does not override the absolute promotion gates.
+- Calibration: `CALIBRATION_FAIL`; ranking scores are not probabilities and
+  OOS expectancy is not monotonic across the five bins.
+- V1: 130 OOS signals, 69 independent clusters, net PF `0.3000`, net
+  expectancy `-0.263297%/signal`.
+- V2: 261 selected OOS signals, 164 independent clusters, net PF `0.4533`,
+  net expectancy `-0.202178%/signal`.
+- V2 minus V1: `+0.061119%/signal` net expectancy and `+0.1533` PF under the
+  same benchmark contract.
+- Signal/cluster reduction: V2 all → selected `94.5283%`; eligible → selected
+  `84.7458%`. The artifact also records V1 signals and clusters and all V2
+  candidate/eligible/selected counts.
+- Promotion recommendation: `REJECT`. Fixed promotion thresholds were not
+  reduced; V2 was not merged, deployed, or wired to automatic trading.
 
-## Known limitations
-
-- This is signal-level forward evaluation, not account PnL or execution simulation.
-- TP/SL fields remain null in the shadow lane, so TP-first and SL-first counts are zero; MFE/MAE and fixed-cost forward returns remain reported.
-- The result covers a 60-day public archive range and should not be treated as a general profitability claim.
-- Optional public funding/open-interest/spread evidence was not included in this run.
-- No V2 production wiring, deployment, merge, or automatic order path is included.
+The machine-readable artifact is [reports/m1-final.json](/D:/Codex/crypto-alerts/reports/m1-final.json).
+It contains the exact benchmark, coverage, WFO boundaries, holdout hash,
+per-window policies and metrics, selected-lane metrics, calibration, V1
+comparator, and promotion result without raw candle payloads.
