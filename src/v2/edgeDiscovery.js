@@ -54,6 +54,7 @@ function finite(value) {
 }
 
 function round(value, digits = 6) {
+  if (value === null || value === undefined || value === '') return null;
   return Number.isFinite(Number(value)) ? +Number(value).toFixed(digits) : null;
 }
 
