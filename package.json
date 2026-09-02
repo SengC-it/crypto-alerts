@@ -10,7 +10,8 @@
     "test": "node --test tests/*.js",
     "check": "node scripts/check-syntax.js",
     "lint": "node scripts/check-syntax.js",
-    "m1:experiment": "node scripts/run-m1-experiment.js"
+    "m1:experiment": "node scripts/run-m1-experiment.js",
+    "m1.1:experiment": "node scripts/run-m1-1-experiment.js"
   },
   "dependencies": {
     "ws": "^8.18.0",

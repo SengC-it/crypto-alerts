@@ -21,6 +21,9 @@ import {
 export const M1_HORIZONS_HOURS = Object.freeze([...DEFAULT_HORIZONS_HOURS]);
 
 const HOUR = 60 * 60 * 1000;
+const RESEARCH_TREND_REGIMES = Object.freeze(['Bull', 'Bear', 'Sideways']);
+const RESEARCH_VOLATILITY_REGIMES = Object.freeze(['Low', 'Normal', 'High', 'Extreme']);
+const RESEARCH_SETUP_FAMILIES = Object.freeze(['Trend Continuation', 'Mean Reversion', 'Breakout']);
 
 function finite(value) {
   return Number.isFinite(Number(value)) ? Number(value) : null;
@@ -52,8 +55,8 @@ function coverageForCandles(candles, { symbol, dataSource }) {
   };
 }
 
-function attachV1MarketEvents(signals) {
-  const events = groupMarketEvents(signals);
+function attachV1MarketEvents(signals, options = {}) {
+  const events = groupMarketEvents(signals, options);
   const byIndex = new Map();
   for (const event of events) {
     for (const member of event.members) {
@@ -67,7 +70,14 @@ function attachV1MarketEvents(signals) {
   return signals.map((signal, index) => ({ ...signal, ...(byIndex.get(index) || {}) }));
 }
 
-function buildBenchmark({ symbols, candlesBySymbol, asOf, roundTripCostPercent, dataSource }) {
+function buildBenchmark({
+  symbols,
+  candlesBySymbol,
+  asOf,
+  roundTripCostPercent,
+  dataSource,
+  marketEventOptions = {},
+}) {
   const allCandles = Object.values(candlesBySymbol).flat();
   const sorted = allCandles.sort((a, b) => a.open_time - b.open_time);
   return {
@@ -80,7 +90,7 @@ function buildBenchmark({ symbols, candlesBySymbol, asOf, roundTripCostPercent, 
     evaluation_horizons: [...M1_HORIZONS_HOURS],
     fees: { round_trip_percent: roundTripCostPercent },
     slippage: { included_in_round_trip_cost: true },
-    market_event_window_hours: 4,
+    market_event_window_hours: (Number(marketEventOptions.eventWindowMs) || 4 * HOUR) / HOUR,
     date_range: {
       start: sorted[0]?.open_time ?? null,
       end: sorted.at(-1)?.close_time ?? null,
@@ -206,6 +216,12 @@ function compactHistoricalCandidate(candidate) {
     edge_score: candidate.edge_score,
     score_semantics: candidate.score_semantics,
     evidence_group_count: candidate.evidence_group_count,
+    evidence_groups: candidate.evidence_groups || [],
+    evidence_by_group: (candidate.contributing_evidence || []).map(entry => ({
+      group: entry.group,
+      strength: entry.strength,
+      directional: entry.directional,
+    })),
     indicator_lookback_candles: candidate.indicator_lookback_candles,
     indicator_window_start: candidate.indicator_window_start,
     indicator_window_end: candidate.indicator_window_end,
@@ -230,6 +246,87 @@ function compactHistoricalCandidate(candidate) {
     V1_UNCHANGED: candidate.V1_UNCHANGED,
     V2_SHADOW_ONLY: candidate.V2_SHADOW_ONLY,
     AUTO_TRADING: candidate.AUTO_TRADING,
+  };
+}
+
+function compactHistoricalSignal(signal) {
+  return {
+    symbol: signal.symbol,
+    strategy: signal.strategy,
+    direction: signal.direction,
+    signal: signal.signal,
+    confidence: signal.confidence,
+    raw_score: signal.raw_score,
+    reason: signal.reason,
+    timeframe: signal.timeframe,
+    signal_timestamp: signal.signal_timestamp,
+    candle_open_time: signal.candle_open_time,
+    candle_close_time: signal.candle_close_time,
+    generated_at: signal.generated_at,
+    suggestedEntry: signal.suggestedEntry,
+    entry_reference: signal.entry_reference,
+    targetPrice: signal.targetPrice,
+    stopLoss: signal.stopLoss,
+    label_end_time: signal.label_end_time,
+    signal_index: signal.signal_index,
+    model_version: signal.model_version,
+    commit_sha: signal.commit_sha,
+    config_hash: signal.config_hash,
+  };
+}
+
+function emptyGenerationDiagnostics(symbol) {
+  return {
+    symbol,
+    trigger_windows: 0,
+    trend_regime_triggers: Object.fromEntries(RESEARCH_TREND_REGIMES.map(regime => [regime, 0])),
+    volatility_regime_triggers: Object.fromEntries(RESEARCH_VOLATILITY_REGIMES.map(regime => [regime, 0])),
+    eligible_setup_candidates_by_trend: Object.fromEntries(RESEARCH_TREND_REGIMES.map(trend => [
+      trend,
+      Object.fromEntries(RESEARCH_SETUP_FAMILIES.map(setup => [setup, 0])),
+    ])),
+  };
+}
+
+function compactResearchRecord(record, index) {
+  const signal = record.signal || {};
+  const evaluation = record.evaluation || {};
+  return {
+    record_index: index,
+    symbol: record.symbol ?? signal.symbol ?? null,
+    direction: record.direction ?? signal.direction ?? signal.signal ?? null,
+    setup_family: record.setup_family ?? signal.setup_family ?? null,
+    trend_regime: record.trend_regime ?? signal.trend_regime ?? signal.regime?.trend_regime ?? null,
+    volatility_regime: record.volatility_regime ?? signal.volatility_regime ?? signal.regime?.volatility_regime ?? null,
+    market_event_id: record.market_event_id ?? signal.market_event_id ?? null,
+    cluster_rank: record.cluster_rank ?? signal.cluster_rank ?? null,
+    ranking_bucket: record.ranking_bucket ?? signal.ranking_bucket ?? null,
+    timestamp: record.trigger_time ?? signal.trigger_time ?? evaluation.signal_timestamp ?? null,
+    label_end_time: record.label_end_time ?? signal.label_end_time ?? null,
+    raw_score: record.raw_score ?? signal.raw_score ?? null,
+    edge_score: record.edge_score ?? signal.edge_score ?? null,
+    evidence_groups: signal.evidence_groups || [],
+    evidence_by_group: signal.evidence_by_group || (signal.contributing_evidence || []).map(entry => ({
+      group: entry.group,
+      strength: entry.strength,
+      directional: entry.directional,
+    })),
+    forward_returns: evaluation.forward_returns || {},
+    net_forward_returns: evaluation.net_forward_returns || {},
+    mfe_percent: evaluation.mfe_percent ?? null,
+    mae_percent: evaluation.mae_percent ?? null,
+    signal_decay: evaluation.signal_decay ?? null,
+    tp_first: evaluation.tp_first === true,
+    sl_first: evaluation.sl_first === true,
+    neither: evaluation.neither === true,
+    ambiguous: evaluation.ambiguous === true,
+    ambiguous_same_candle_hit: evaluation.ambiguous_same_candle_hit === true,
+    barrier_outcome: evaluation.barrier_outcome ?? null,
+    conservative_barrier_outcome: evaluation.conservative_barrier_outcome ?? null,
+    barrier_version: record.barrier_version ?? signal.barrier_version ?? evaluation.barrier_version ?? null,
+    barrier_config_hash: record.barrier_config_hash ?? signal.barrier_config_hash ?? null,
+    target_price: evaluation.target_price ?? signal.targetPrice ?? null,
+    stop_loss: evaluation.stop_loss ?? signal.stopLoss ?? null,
   };
 }
 
@@ -265,16 +362,25 @@ function generateSignalsForSymbol(symbol, candles, {
   barrierOptions,
   lineageOptions,
   retainArtifacts = true,
+  generationHistoryCandles = null,
 } = {}) {
   const closed = filterClosedCandles(candles, { symbol, timeframe: '1h', now: asOf });
   const v2Candidates = [];
   const v1Signals = [];
+  const generationDiagnostics = emptyGenerationDiagnostics(symbol);
   const v1Engine = new SignalEngine({ config });
   const minimum = lookbackCandles;
   for (let index = minimum - 1; index < closed.length; index++) {
     const current = closed[index];
     const currentAsOf = current.close_time + 1;
-    const prefix = closed.slice(0, index + 1);
+    // The canonical indicator window is still resolved from the last exact N
+    // closed candles. M1.1 may bound older regime history to keep a long run
+    // tractable; the bound remains strictly prior-only and does not alter the
+    // indicator window or V1 signal projection.
+    const historyStart = generationHistoryCandles
+      ? Math.max(0, index + 1 - Math.max(lookbackCandles, Math.floor(generationHistoryCandles)))
+      : 0;
+    const prefix = closed.slice(historyStart, index + 1);
     const v2 = buildV2ShadowSignal({
       symbol,
       triggerCandles: prefix,
@@ -290,6 +396,20 @@ function generateSignalsForSymbol(symbol, candles, {
         generatedAt: new Date(currentAsOf).toISOString(),
       },
     });
+    const trendRegime = v2.regime?.trend_regime;
+    const volatilityRegime = v2.regime?.volatility_regime;
+    if (trendRegime && generationDiagnostics.trend_regime_triggers[trendRegime] !== undefined) {
+      generationDiagnostics.trigger_windows += 1;
+      generationDiagnostics.trend_regime_triggers[trendRegime] += 1;
+      if (volatilityRegime && generationDiagnostics.volatility_regime_triggers[volatilityRegime] !== undefined) {
+        generationDiagnostics.volatility_regime_triggers[volatilityRegime] += 1;
+      }
+      for (const setup of v2.setups || []) {
+        if (generationDiagnostics.eligible_setup_candidates_by_trend[trendRegime]?.[setup.setup_family] !== undefined) {
+          generationDiagnostics.eligible_setup_candidates_by_trend[trendRegime][setup.setup_family] += 1;
+        }
+      }
+    }
     v2Candidates.push(...v2.candidates.map(candidate => ({
       ...candidate,
       signal_index: index,
@@ -300,6 +420,8 @@ function generateSignalsForSymbol(symbol, candles, {
       symbol,
       timeframe: '1h',
       candles: prefix,
+      indicators: v2.indicators,
+      indicatorLookbackCandles: lookbackCandles,
       now: currentAsOf,
       generatedAt: new Date(currentAsOf).toISOString(),
     });
@@ -307,9 +429,9 @@ function generateSignalsForSymbol(symbol, candles, {
       ...signal,
       signal_index: index,
       label_end_time: current.close_time + 48 * HOUR,
-    })));
+    })).map(signal => retainArtifacts ? signal : compactHistoricalSignal(signal)));
   }
-  return { closed, v2Candidates, v1Signals };
+  return { closed, v2Candidates, v1Signals, generationDiagnostics };
 }
 
 export function runM1Experiment({
@@ -325,59 +447,33 @@ export function runM1Experiment({
   barrierOptions = {},
   walkForwardOptions = {},
   lineageOptions = {},
+  marketEventOptions = {},
   includeArtifacts = true,
 } = {}) {
-  const symbols = Object.keys(candlesBySymbol).sort();
-  const lookbackCandles = getIndicatorLookback(config);
-  const normalizedBySymbol = Object.fromEntries(symbols.map(symbol => [
-    symbol,
-    filterClosedCandles(candlesBySymbol[symbol], { symbol, timeframe: '1h', now: asOf }),
-  ]));
-  const coverage = symbols.map(symbol => coverageForCandles(normalizedBySymbol[symbol], { symbol, dataSource }));
-  const benchmark = buildBenchmark({
-    symbols,
-    candlesBySymbol: normalizedBySymbol,
+  const generated = generateHistoricalResearchRecords({
+    candlesBySymbol,
+    contextBySymbol,
+    config,
     asOf,
-    roundTripCostPercent,
     dataSource,
-  });
-
-  const allV2Candidates = [];
-  const allV1Signals = [];
-  for (const symbol of symbols) {
-    const generated = generateSignalsForSymbol(symbol, normalizedBySymbol[symbol], {
-      config,
-      contextCandles: contextBySymbol[symbol],
-      asOf,
-      lookbackCandles,
-      regimeOptions,
-      setupOptions,
-      barrierOptions,
-      lineageOptions,
-      retainArtifacts: includeArtifacts,
-    });
-    allV2Candidates.push(...generated.v2Candidates);
-    allV1Signals.push(...generated.v1Signals);
-  }
-
-  const rankedV2 = rankV2ShadowCandidates(allV2Candidates);
-  const v1WithEvents = attachV1MarketEvents(allV1Signals);
-  const evaluator = new SignalEvaluator({
     roundTripCostPercent,
-    horizons: M1_HORIZONS_HOURS,
+    regimeOptions,
+    setupOptions,
+    barrierOptions,
+    lineageOptions,
+    marketEventOptions,
+    includeArtifacts,
   });
-  const v2Records = [];
-  for (const candidate of rankedV2) {
-    const candles = normalizedBySymbol[candidate.symbol] || [];
-    const evaluation = evaluator.evaluate(candidate, candles, { signalIndex: candidate.signal_index });
-    v2Records.push(toEvaluationRecord(candidate, evaluation));
-  }
-  const v1Records = [];
-  for (const signal of v1WithEvents) {
-    const candles = normalizedBySymbol[signal.symbol] || [];
-    const evaluation = evaluator.evaluate(signal, candles, { signalIndex: signal.signal_index });
-    v1Records.push(toEvaluationRecord(signal, evaluation));
-  }
+  const {
+    symbols,
+    lookbackCandles,
+    normalizedBySymbol,
+    coverage,
+    benchmark,
+    rankedV2,
+    v2Records,
+    v1Records,
+  } = generated;
 
   const walkForwardSeed = buildOosSamples(v2Records, walkForwardOptions);
   const walkForwardPlanOptions = chooseWalkForwardOptions(walkForwardSeed.length, walkForwardOptions);
@@ -506,6 +602,7 @@ export function runM1Experiment({
     oos_score_eligible_count: oosScoreEligibleRecords.length,
     oos_cluster_selected_count: oosRecords.length,
     v2_records: includeArtifacts ? v2Records : [],
+    v2_research_records: includeArtifacts ? generated.v2_research_records : [],
     v1_records: includeArtifacts ? v1Records : [],
     oos_records: includeArtifacts ? oosRecords : [],
     walk_forward: includeArtifacts
@@ -523,5 +620,97 @@ export function runM1Experiment({
     calibration,
     promotion,
     research_artifact: researchArtifact,
+  };
+}
+
+/**
+ * Generate and evaluate historical V1/V2 records without fitting a model or
+ * constructing a walk-forward split. M1.1 uses this data-only path after
+ * filtering the frozen M1 boundary, so the old holdout outcomes never enter
+ * its training/tuning path.
+ */
+export function generateHistoricalResearchRecords({
+  candlesBySymbol = {},
+  contextBySymbol = {},
+  config = CONFIG,
+  asOf = Date.now(),
+  dataSource = 'provided_historical_data',
+  roundTripCostPercent = config.TRADING_COSTS?.roundTripPercent ?? 0.14,
+  regimeOptions = {},
+  setupOptions = {},
+  barrierOptions = {},
+  lineageOptions = {},
+  marketEventOptions = {},
+  generationHistoryCandles = null,
+  includeArtifacts = false,
+} = {}) {
+  const symbols = Object.keys(candlesBySymbol).sort();
+  const lookbackCandles = getIndicatorLookback(config);
+  const normalizedBySymbol = Object.fromEntries(symbols.map(symbol => [
+    symbol,
+    filterClosedCandles(candlesBySymbol[symbol], { symbol, timeframe: '1h', now: asOf }),
+  ]));
+  const coverage = symbols.map(symbol => coverageForCandles(normalizedBySymbol[symbol], { symbol, dataSource }));
+  const benchmark = buildBenchmark({
+    symbols,
+    candlesBySymbol: normalizedBySymbol,
+    asOf,
+    roundTripCostPercent,
+    dataSource,
+    marketEventOptions,
+  });
+
+  const allV2Candidates = [];
+  const allV1Signals = [];
+  const generationDiagnostics = [];
+  for (const symbol of symbols) {
+    const generated = generateSignalsForSymbol(symbol, normalizedBySymbol[symbol], {
+      config,
+      contextCandles: contextBySymbol[symbol],
+      asOf,
+      lookbackCandles,
+      regimeOptions,
+      setupOptions,
+      barrierOptions,
+      lineageOptions,
+      retainArtifacts: includeArtifacts,
+      generationHistoryCandles,
+    });
+    allV2Candidates.push(...generated.v2Candidates);
+    allV1Signals.push(...generated.v1Signals);
+    generationDiagnostics.push(generated.generationDiagnostics);
+  }
+
+  const rankedV2 = rankV2ShadowCandidates(allV2Candidates, marketEventOptions);
+  const v1WithEvents = attachV1MarketEvents(allV1Signals, marketEventOptions);
+  const evaluator = new SignalEvaluator({
+    roundTripCostPercent,
+    horizons: M1_HORIZONS_HOURS,
+  });
+  const v2Records = rankedV2.map(candidate => {
+    const candles = normalizedBySymbol[candidate.symbol] || [];
+    return toEvaluationRecord(candidate, evaluator.evaluate(candidate, candles, {
+      signalIndex: candidate.signal_index,
+    }));
+  });
+  const v1Records = v1WithEvents.map(signal => {
+    const candles = normalizedBySymbol[signal.symbol] || [];
+    return toEvaluationRecord(signal, evaluator.evaluate(signal, candles, {
+      signalIndex: signal.signal_index,
+    }));
+  });
+
+  return {
+    symbols,
+    lookbackCandles,
+    normalizedBySymbol,
+    coverage,
+    benchmark,
+    rankedV2,
+    v2Records,
+    v1Records,
+    v2_research_records: v2Records.map(compactResearchRecord),
+    v1_research_records: v1Records.map(compactResearchRecord),
+    generation_diagnostics: generationDiagnostics,
   };
 }

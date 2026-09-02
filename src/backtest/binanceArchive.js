@@ -6,6 +6,7 @@ import { inflateRawSync } from 'node:zlib';
 import { intervalToMs, normalizeCandle } from '../market/candle.js';
 
 export const BINANCE_PUBLIC_ARCHIVE_BASE = 'https://data.binance.vision/data/futures/um/daily/klines';
+export const BINANCE_PUBLIC_MONTHLY_ARCHIVE_BASE = 'https://data.binance.vision/data/futures/um/monthly/klines';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -15,6 +16,10 @@ function finite(value) {
 
 function datePart(timestamp) {
   return new Date(timestamp).toISOString().slice(0, 10);
+}
+
+function monthPart(timestamp) {
+  return new Date(timestamp).toISOString().slice(0, 7);
 }
 
 function readArchiveEntry(zipBytes) {
@@ -89,6 +94,20 @@ async function fetchDailyArchive(symbol, timeframe, date, fetchImpl) {
   };
 }
 
+async function fetchMonthlyArchive(symbol, timeframe, month, fetchImpl) {
+  const file = `${symbol}-${timeframe}-${month}.zip`;
+  const url = `${BINANCE_PUBLIC_MONTHLY_ARCHIVE_BASE}/${symbol}/${timeframe}/${file}`;
+  const response = await fetchImpl(url);
+  if (response.status === 404) return { month, candles: [], missing: true };
+  if (!response.ok) throw new Error(`Binance public monthly archive request failed: ${response.status} ${url}`);
+  const bytes = await response.arrayBuffer();
+  return {
+    month,
+    candles: parseArchiveCsv(readArchiveEntry(bytes), symbol, timeframe),
+    missing: false,
+  };
+}
+
 async function mapWithConcurrency(items, concurrency, worker) {
   const results = Array(items.length);
   let next = 0;
@@ -147,6 +166,73 @@ export async function loadBinanceVisionCandles({
     requested_end: end,
     archive_dates: dates,
     missing_archive_dates: pages.filter(page => page.missing).map(page => page.date),
+  };
+}
+
+/**
+ * Load long Binance Futures ranges with monthly archives where available and
+ * daily archives as a point-in-time fallback for incomplete/unpublished
+ * months. Strict coverage remains the caller's responsibility.
+ */
+export async function loadBinanceVisionCandlesLongRange({
+  symbol,
+  timeframe = '1h',
+  startTime,
+  endTime,
+  concurrency = 8,
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  if (typeof fetchImpl !== 'function') throw new Error('A fetch implementation is required');
+  const step = intervalToMs(timeframe);
+  const start = finite(startTime);
+  const end = finite(endTime);
+  if (!symbol || start === null || end === null || end < start) {
+    throw new Error('Binance archive requires symbol, startTime and endTime');
+  }
+
+  const firstMonth = Date.UTC(new Date(start).getUTCFullYear(), new Date(start).getUTCMonth(), 1);
+  const lastMonth = Date.UTC(new Date(end).getUTCFullYear(), new Date(end).getUTCMonth(), 1);
+  const months = [];
+  for (let timestamp = firstMonth; timestamp <= lastMonth;) {
+    months.push(monthPart(timestamp));
+    const date = new Date(timestamp);
+    timestamp = Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1);
+  }
+
+  const normalizedSymbol = symbol.toUpperCase();
+  const monthlyPages = await mapWithConcurrency(months, concurrency, month => (
+    fetchMonthlyArchive(normalizedSymbol, timeframe, month, fetchImpl)
+  ));
+  const fallbackMonths = monthlyPages.filter(page => page.missing).map(page => page.month);
+  const fallbackDates = fallbackMonths.flatMap(month => {
+    const [year, monthNumber] = month.split('-').map(Number);
+    const monthStart = Date.UTC(year, monthNumber - 1, 1);
+    const monthEnd = Date.UTC(year, monthNumber, 0);
+    const firstDate = Math.max(monthStart, Math.floor(start / DAY) * DAY);
+    const lastDate = Math.min(monthEnd, Math.floor(end / DAY) * DAY);
+    const dates = [];
+    for (let timestamp = firstDate; timestamp <= lastDate; timestamp += DAY) {
+      dates.push(datePart(timestamp));
+    }
+    return dates;
+  });
+  const dailyPages = await mapWithConcurrency(fallbackDates, concurrency, date => (
+    fetchDailyArchive(normalizedSymbol, timeframe, date, fetchImpl)
+  ));
+  const candles = [
+    ...monthlyPages.filter(page => !page.missing).flatMap(page => page.candles),
+    ...dailyPages.flatMap(page => page.candles),
+  ]
+    .filter(candle => candle.open_time >= start - step && candle.open_time <= end)
+    .sort((left, right) => left.open_time - right.open_time);
+  return {
+    candles,
+    requested_start: start,
+    requested_end: end,
+    archive_months: months,
+    monthly_archive_months: monthlyPages.filter(page => !page.missing).map(page => page.month),
+    daily_fallback_dates: fallbackDates,
+    missing_archive_dates: dailyPages.filter(page => page.missing).map(page => page.date),
   };
 }
 
