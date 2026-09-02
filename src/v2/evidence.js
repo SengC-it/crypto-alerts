@@ -185,10 +185,13 @@ export function buildIndependentEvidence({
     {
       group: 'Volatility',
       source: 'empirical-volatility-regime',
-      strength: regime.volatility_regime === 'Extreme' ? -0.25 : 0.5,
+      // Regime labels are descriptive. Profitability eligibility is selected
+      // from training data inside each walk-forward window, never here.
+      strength: 0,
       directional: false,
+      weight: 0,
       value: regime.natr_percent,
-      reason: 'Empirical prior-history volatility band; hypothesis only',
+      reason: 'Empirical prior-history volatility band; no profitability prior',
     },
     {
       group: 'Market Structure',

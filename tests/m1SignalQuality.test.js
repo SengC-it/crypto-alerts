@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SignalEvaluator } from '../src/evaluation/signalEvaluator.js';
 import { archiveAsOf, parseArchiveCsv } from '../src/backtest/binanceArchive.js';
+import { buildResearchBarriers } from '../src/v2/barriers.js';
 import {
   aggregateClosedCandlesTo4h,
   canonicalClosedWindow,
@@ -17,7 +18,14 @@ import { RegimeEngine } from '../src/v2/regime.js';
 import { scoreCandidate, buildScoreCalibration } from '../src/v2/scoring.js';
 import { breakoutSetup, evaluateSetupFamilies } from '../src/v2/setups.js';
 import { buildV2ShadowSignal } from '../src/v2/shadow.js';
-import { runPurgedWalkForward } from '../src/v2/walkForward.js';
+import {
+  assertHoldoutIsolation,
+  buildPurgedWalkForwardPlan,
+  fitClusterSelectionPolicy,
+  predictClusterSelections,
+  runPurgedWalkForward,
+  selectTrainingVolatilityPolicy,
+} from '../src/v2/walkForward.js';
 
 const HOUR = 60 * 60 * 1000;
 const FOUR_HOURS = 4 * HOUR;
@@ -235,7 +243,7 @@ describe('M1 evidence, ranking and market events', () => {
 
 describe('M1 purged walk-forward and comparator', () => {
   it('applies purge and embargo while isolating final holdout', () => {
-    const samples = Array.from({ length: 240 }, (_, index) => ({
+    const samples = Array.from({ length: 300 }, (_, index) => ({
       timestamp: START + index * HOUR,
       label_end_time: START + (index + 48) * HOUR,
       raw_score: 50 + (index % 10),
@@ -257,10 +265,12 @@ describe('M1 purged walk-forward and comparator', () => {
       predict: test => test.map(sample => ({ sample, selected: true })),
     });
     assert.equal(result.status, 'PASS');
-    assert.equal(result.window_count, 6);
+    assert.ok(result.window_count >= 6);
     assert.equal(result.final_holdout_untouched, true);
     assert.ok(largestFitTimestamp < samples.at(-20).timestamp);
     assert.ok(result.windows.every(window => window.purged_count > 0 && window.embargoed_count > 0));
+    assert.ok(result.final_holdout_boundary.development_max_timestamp < result.final_holdout_boundary.final_holdout_min_timestamp);
+    assert.equal(result.final_holdout_boundary.assertions.event_intersection_count, 0);
   });
 
   it('uses identical benchmark fields for V1 and V2 comparison', () => {
@@ -286,6 +296,130 @@ describe('M1 purged walk-forward and comparator', () => {
       v1Records: [v1Record],
       v2Records: [v2Record],
     }), /benchmark mismatch: fees/);
+  });
+});
+
+describe('M1 research-validity remediation', () => {
+  it('selects only top-N score-eligible candidates within each OOS event and direction', () => {
+    const samples = [
+      { market_event_id: 'event-1', symbol: 'BTCUSDT', direction: 'BUY', setup_family: 'Breakout', timestamp: START, raw_score: 90, edge_score: 90 },
+      { market_event_id: 'event-1', symbol: 'ETHUSDT', direction: 'BUY', setup_family: 'Breakout', timestamp: START + HOUR, raw_score: 80, edge_score: 80 },
+      { market_event_id: 'event-1', symbol: 'SOLUSDT', direction: 'SELL', setup_family: 'Breakout', timestamp: START + HOUR, raw_score: 95, edge_score: 95 },
+    ];
+    const predictions = predictClusterSelections(samples, {
+      threshold: 75,
+      cluster_top_n: 1,
+      volatility_policy: { gate_applied: false },
+    });
+    assert.equal(predictions.length, 3);
+    assert.equal(predictions.filter(item => item.score_eligible).length, 3);
+    assert.equal(predictions.filter(item => item.selected).length, 2);
+    assert.equal(predictions.find(item => item.sample.symbol === 'BTCUSDT').oos_cluster_rank, 1);
+    assert.equal(predictions.find(item => item.sample.symbol === 'ETHUSDT').selection_status, 'SCORE_ELIGIBLE_NOT_SELECTED');
+  });
+
+  it('splits final holdout by timestamp and event boundaries for cross-sectional rows', () => {
+    const samples = Array.from({ length: 12 }, (_, timestampIndex) => (
+      ['BTCUSDT', 'ETHUSDT'].map(symbol => ({
+        timestamp: START + timestampIndex * HOUR,
+        symbol,
+        direction: 'BUY',
+        market_event_id: `event-${timestampIndex}`,
+        raw_score: 50,
+        outcome: 0.1,
+      }))
+    )).flat();
+    const plan = buildPurgedWalkForwardPlan(samples, {
+      trainSize: 8,
+      testSize: 2,
+      step: 2,
+      finalHoldoutCount: 3,
+      labelHorizonHours: 0,
+      embargoHours: 0,
+      minimumTrainSamples: 1,
+    });
+    assert.equal(plan.final_holdout_count, 4);
+    assert.ok(plan.final_holdout_boundary.development_max_timestamp < plan.final_holdout_boundary.final_holdout_min_timestamp);
+    assert.equal(plan.final_holdout_boundary.assertions.event_intersection_count, 0);
+    assert.equal(plan.final_holdout_untouched, true);
+    assert.doesNotThrow(() => assertHoldoutIsolation(
+      plan.development_indices.map(index => ({ timestamp: samples[index].timestamp, market_event_id: samples[index].market_event_id })),
+      plan.final_holdout_indices.map(index => ({ timestamp: samples[index].timestamp, market_event_id: samples[index].market_event_id })),
+    ));
+  });
+
+  it('selects volatility eligibility from training outcomes and does not penalize Extreme by label', () => {
+    const train = [
+      ...Array.from({ length: 20 }, (_, index) => ({ volatility_regime: 'Low', outcome: -1, raw_score: 80, timestamp: START + index * HOUR })),
+      ...Array.from({ length: 20 }, (_, index) => ({ volatility_regime: 'Normal', outcome: -0.2, raw_score: 80, timestamp: START + (20 + index) * HOUR })),
+      ...Array.from({ length: 20 }, (_, index) => ({ volatility_regime: 'High', outcome: -0.5, raw_score: 80, timestamp: START + (40 + index) * HOUR })),
+      ...Array.from({ length: 20 }, (_, index) => ({ volatility_regime: 'Extreme', outcome: 1, raw_score: 80, timestamp: START + (60 + index) * HOUR })),
+    ];
+    const policy = selectTrainingVolatilityPolicy(train);
+    assert.equal(policy.training_only, true);
+    assert.equal(policy.gate_applied, true);
+    assert.deepEqual(policy.selected_regimes, ['Extreme']);
+    const model = fitClusterSelectionPolicy(train, { clusterTopN: 1 });
+    const predictions = predictClusterSelections([
+      { market_event_id: 'event-extreme', direction: 'BUY', volatility_regime: 'Extreme', raw_score: 80, edge_score: 80 },
+      { market_event_id: 'event-low', direction: 'BUY', volatility_regime: 'Low', raw_score: 80, edge_score: 80 },
+    ], model);
+    assert.equal(predictions.find(item => item.sample.volatility_regime === 'Extreme').score_eligible, true);
+    assert.equal(predictions.find(item => item.sample.volatility_regime === 'Low').score_eligible, false);
+  });
+
+  it('derives versioned research barriers from the closed canonical window', () => {
+    const candles = trendCandles(40);
+    const first = buildResearchBarriers({
+      direction: 'BUY',
+      entryPrice: candles.at(-1).close,
+      candles,
+    });
+    const second = buildResearchBarriers({
+      direction: 'BUY',
+      entryPrice: candles.at(-1).close,
+      candles,
+    });
+    assert.equal(first.status, 'READY');
+    assert.ok(first.targetPrice > first.entry_price && first.entry_price > first.stopLoss);
+    assert.equal(first.barrier_version, 'm1-research-natr-barriers-0.1.0');
+    assert.equal(first.barrier_config_hash, second.barrier_config_hash);
+
+    const signal = {
+      symbol: 'BTCUSDT',
+      direction: 'BUY',
+      targetPrice: first.targetPrice,
+      stopLoss: first.stopLoss,
+      barrier: first,
+    };
+    const evaluateFuture = future => new SignalEvaluator({ horizons: [1] }).evaluate(
+      signal,
+      [...candles, future],
+      { signalIndex: candles.length - 1 },
+    );
+    const tpFirst = evaluateFuture(candle(40, first.entry_price, {
+      high: first.targetPrice + 1,
+      low: first.entry_price,
+    }));
+    assert.equal(tpFirst.barrier_outcome, 'tp_first');
+    const slFirst = evaluateFuture(candle(40, first.entry_price, {
+      high: first.entry_price,
+      low: first.stopLoss - 1,
+    }));
+    assert.equal(slFirst.barrier_outcome, 'sl_first');
+    const neither = evaluateFuture(candle(40, first.entry_price, {
+      high: first.entry_price,
+      low: first.entry_price,
+    }));
+    assert.equal(neither.barrier_outcome, 'neither');
+    const future = candle(40, first.entry_price, {
+      high: first.targetPrice + 1,
+      low: first.stopLoss - 1,
+    });
+    const evaluation = evaluateFuture(future);
+    assert.equal(evaluation.barrier_outcome, 'ambiguous_same_candle');
+    assert.equal(evaluation.ambiguous, true);
+    assert.equal(evaluation.conservative_barrier_outcome, 'sl_first');
   });
 });
 

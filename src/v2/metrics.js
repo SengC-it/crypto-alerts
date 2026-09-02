@@ -33,6 +33,10 @@ function primaryOutcome(record) {
     ?? record?.net_forward_returns?.['1h']);
 }
 
+function barrierValue(record, field) {
+  return record?.evaluation?.[field] ?? record?.[field] ?? null;
+}
+
 function normalizeRecord(record) {
   if (record?.evaluation) {
     return {
@@ -68,6 +72,15 @@ export function toEvaluationRecord(signal, evaluation) {
     trend_regime: signal?.trend_regime ?? signal?.regime?.trend_regime ?? null,
     volatility_regime: signal?.volatility_regime ?? signal?.regime?.volatility_regime ?? null,
     market_event_id: signal?.market_event_id ?? null,
+    cluster_rank: signal?.cluster_rank ?? null,
+    ranking_bucket: signal?.ranking_bucket ?? null,
+    trigger_time: signal?.trigger_time ?? signal?.signal_timestamp ?? null,
+    label_end_time: signal?.label_end_time ?? null,
+    targetPrice: signal?.targetPrice ?? null,
+    stopLoss: signal?.stopLoss ?? null,
+    barrier: signal?.barrier ?? null,
+    barrier_version: signal?.barrier_version ?? signal?.barrier?.barrier_version ?? null,
+    barrier_config_hash: signal?.barrier_config_hash ?? signal?.barrier?.barrier_config_hash ?? null,
     raw_score: finite(signal?.raw_score),
     edge_score: finite(signal?.edge_score),
   };
@@ -127,6 +140,12 @@ export function summarizeEvaluations(records = [], {
     avg_mae_percent: round(average(mae)),
     tp_first_count: normalized.filter(record => (record.evaluation?.tp_first ?? record.tp_first) === true).length,
     sl_first_count: normalized.filter(record => (record.evaluation?.sl_first ?? record.sl_first) === true).length,
+    neither_count: normalized.filter(record => barrierValue(record, 'neither') === true
+      || barrierValue(record, 'barrier_outcome') === 'neither').length,
+    ambiguous_count: normalized.filter(record => barrierValue(record, 'ambiguous') === true
+      || barrierValue(record, 'barrier_outcome') === 'ambiguous_same_candle').length,
+    conservative_sl_first_count: normalized.filter(record => barrierValue(record, 'conservative_barrier_outcome') === 'sl_first').length,
+    barrier_evaluated_count: normalized.filter(record => barrierValue(record, 'barrier_outcome') !== null).length,
     signal_decay_percent: round(average(decays)),
     independent_market_clusters: eventIds.size,
     symbol_breadth: symbols.size,

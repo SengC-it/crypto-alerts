@@ -12,6 +12,7 @@ import {
   canonicalIndicators,
 } from './canonical.js';
 import { buildIndependentEvidence } from './evidence.js';
+import { buildResearchBarriers } from './barriers.js';
 import { groupMarketEvents, rankShadowCandidates, SHADOW_STATUS } from './marketEvents.js';
 import { RegimeEngine } from './regime.js';
 import { scoreCandidate } from './scoring.js';
@@ -35,6 +36,7 @@ function shadowConfig(config, options) {
     mode: V2_MODE,
     regime: options.regime || {},
     setups: options.setups || {},
+    barriers: options.barriers || {},
     evidence_groups: options.evidenceGroups || [],
   };
 }
@@ -52,6 +54,7 @@ export function buildV2ShadowSignal({
   lookbackCandles,
   regimeOptions = {},
   setupOptions = {},
+  barrierOptions = {},
   publicData = {},
   calibration = null,
   lineageOptions = {},
@@ -95,6 +98,7 @@ export function buildV2ShadowSignal({
     ...lineageOptions,
     regime: regimeOptions,
     setups: setupOptions,
+    barriers: barrierOptions,
     evidenceGroups: ['Trend', 'Momentum', 'Participation', 'Volatility', 'Market Structure', 'Higher Timeframe'],
     indicatorLookbackCandles: window.lookbackCandles,
   });
@@ -115,6 +119,12 @@ export function buildV2ShadowSignal({
       publicData,
     });
     const score = scoreCandidate({ evidence, calibration });
+    const barrier = buildResearchBarriers({
+      direction: setup.direction,
+      entryPrice: setup.entry_reference,
+      candles: window.indicatorCandles,
+      options: barrierOptions,
+    });
     return {
       ...setup,
       ...lineage,
@@ -145,8 +155,11 @@ export function buildV2ShadowSignal({
       decision: SHADOW_STATUS,
       entry_reference: setup.entry_reference,
       direction: setup.direction,
-      targetPrice: null,
-      stopLoss: null,
+      barrier,
+      barrier_version: barrier.barrier_version,
+      barrier_config_hash: barrier.barrier_config_hash,
+      targetPrice: barrier.targetPrice,
+      stopLoss: barrier.stopLoss,
       score_calibration_status: calibration?.status || 'CALIBRATION_PENDING',
       public_data_only: true,
       ...V2_FLAGS,

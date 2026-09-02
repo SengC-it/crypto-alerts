@@ -6,7 +6,9 @@ ALL_PROXY.env
 *.log
 .vercel/
 .temp/
-reports/
+reports/*
+!reports/
+!reports/m1-final.json
 %SystemDrive%/
 
 .vercel

@@ -4,6 +4,7 @@
 import { CONFIG, getIndicatorLookback } from '../config.js';
 import { SignalEngine } from '../signal/engine.js';
 import { SignalEvaluator, DEFAULT_HORIZONS_HOURS } from '../evaluation/signalEvaluator.js';
+import { getCommitSha, hashConfig } from '../lineage.js';
 import { filterClosedCandles } from '../market/candle.js';
 import { groupMarketEvents } from './marketEvents.js';
 import { compareV1V2 } from './comparator.js';
@@ -11,7 +12,11 @@ import { summarizeEvaluations, toEvaluationRecord } from './metrics.js';
 import { evaluatePromotionGate } from './promotion.js';
 import { rankV2ShadowCandidates, buildV2ShadowSignal } from './shadow.js';
 import { buildScoreCalibration } from './scoring.js';
-import { runPurgedWalkForward } from './walkForward.js';
+import {
+  fitClusterSelectionPolicy,
+  predictClusterSelections,
+  runPurgedWalkForward,
+} from './walkForward.js';
 
 export const M1_HORIZONS_HOURS = Object.freeze([...DEFAULT_HORIZONS_HOURS]);
 
@@ -107,13 +112,23 @@ function chooseWalkForwardOptions(sampleCount, requested = {}) {
 
 function buildOosSamples(records, options = {}) {
   const samples = records.map((record, index) => {
+    const signal = record.signal || {};
     const signalTime = finite(record.signal?.trigger_time ?? record.evaluation?.signal_timestamp);
     const outcome = finite(record.evaluation?.net_forward_returns?.['1h']);
     return {
       record_index: index,
       timestamp: signalTime,
       label_end_time: signalTime === null ? null : signalTime + (options.labelHorizonHours ?? 48) * HOUR,
-      raw_score: record.raw_score,
+      market_event_id: record.market_event_id ?? signal.market_event_id ?? null,
+      symbol: record.symbol ?? signal.symbol ?? null,
+      direction: record.direction ?? signal.direction ?? signal.signal ?? null,
+      setup_family: record.setup_family ?? signal.setup_family ?? null,
+      cluster_rank: signal.cluster_rank ?? record.cluster_rank ?? null,
+      ranking_bucket: signal.ranking_bucket ?? record.ranking_bucket ?? null,
+      raw_score: record.raw_score ?? signal.raw_score,
+      edge_score: record.edge_score ?? signal.edge_score,
+      volatility_regime: record.volatility_regime ?? signal.volatility_regime ?? null,
+      trend_regime: record.trend_regime ?? signal.trend_regime ?? null,
       outcome,
       gross_return_percent: finite(record.evaluation?.forward_returns?.['1h']),
       mfe_percent: finite(record.evaluation?.mfe_percent),
@@ -147,11 +162,21 @@ function recordsWithinWalkForwardWindows(records, walkForward) {
   });
 }
 
-function selectedOosRecords(records, walkForward) {
+function oosRecordsBySelection(records, walkForward, predicate = () => true) {
+  const seen = new Set();
   return (walkForward.oos_samples || [])
-    .filter(item => item.selected)
-    .map(item => records[item.sample?.record_index ?? item.sample_index])
-    .filter(Boolean);
+    .filter(predicate)
+    .map(item => records[item.record_index ?? item.sample?.record_index ?? item.sample_index])
+    .filter(record => {
+      const index = records.indexOf(record);
+      if (!record || seen.has(index)) return false;
+      seen.add(index);
+      return true;
+    });
+}
+
+function selectedOosRecords(records, walkForward) {
+  return oosRecordsBySelection(records, walkForward, item => item.selected === true);
 }
 
 function compactHistoricalCandidate(candidate) {
@@ -194,6 +219,9 @@ function compactHistoricalCandidate(candidate) {
     shadow_status: candidate.shadow_status,
     decision: candidate.decision,
     entry_reference: candidate.entry_reference,
+    barrier: candidate.barrier,
+    barrier_version: candidate.barrier_version,
+    barrier_config_hash: candidate.barrier_config_hash,
     targetPrice: candidate.targetPrice,
     stopLoss: candidate.stopLoss,
     model_version: candidate.model_version,
@@ -205,6 +233,28 @@ function compactHistoricalCandidate(candidate) {
   };
 }
 
+function compactOosSelection(item) {
+  return {
+    market_event_id: item.market_event_id,
+    symbol: item.symbol,
+    direction: item.direction,
+    setup_family: item.setup_family,
+    cluster_rank: item.cluster_rank,
+    ranking_bucket: item.ranking_bucket,
+    raw_score: item.raw_score,
+    edge_score: item.edge_score,
+    timestamp: item.timestamp,
+    outcome: item.outcome,
+    raw_score_eligible: item.raw_score_eligible ?? null,
+    score_eligible: item.score_eligible ?? null,
+    volatility_eligible: item.volatility_eligible ?? null,
+    oos_cluster_rank: item.oos_cluster_rank ?? null,
+    selection_status: item.selection_status ?? null,
+    selected: item.selected === true,
+    window_index: item.window_index ?? null,
+  };
+}
+
 function generateSignalsForSymbol(symbol, candles, {
   config,
   contextCandles,
@@ -212,6 +262,7 @@ function generateSignalsForSymbol(symbol, candles, {
   lookbackCandles,
   regimeOptions,
   setupOptions,
+  barrierOptions,
   lineageOptions,
   retainArtifacts = true,
 } = {}) {
@@ -233,6 +284,7 @@ function generateSignalsForSymbol(symbol, candles, {
       lookbackCandles,
       regimeOptions,
       setupOptions,
+      barrierOptions,
       lineageOptions: {
         ...lineageOptions,
         generatedAt: new Date(currentAsOf).toISOString(),
@@ -270,6 +322,7 @@ export function runM1Experiment({
   roundTripCostPercent = config.TRADING_COSTS?.roundTripPercent ?? 0.14,
   regimeOptions = {},
   setupOptions = {},
+  barrierOptions = {},
   walkForwardOptions = {},
   lineageOptions = {},
   includeArtifacts = true,
@@ -299,6 +352,7 @@ export function runM1Experiment({
       lookbackCandles,
       regimeOptions,
       setupOptions,
+      barrierOptions,
       lineageOptions,
       retainArtifacts: includeArtifacts,
     });
@@ -326,15 +380,46 @@ export function runM1Experiment({
   }
 
   const walkForwardSeed = buildOosSamples(v2Records, walkForwardOptions);
-  const walkForward = runPurgedWalkForward(walkForwardSeed, chooseWalkForwardOptions(walkForwardSeed.length, walkForwardOptions));
+  const walkForwardPlanOptions = chooseWalkForwardOptions(walkForwardSeed.length, walkForwardOptions);
+  const walkForward = runPurgedWalkForward(walkForwardSeed, {
+    ...walkForwardPlanOptions,
+    ...walkForwardOptions,
+    fit: trainSamples => fitClusterSelectionPolicy(trainSamples, {
+      ...walkForwardOptions,
+      clusterTopN: walkForwardOptions.clusterTopN ?? 1,
+    }),
+    predict: (testSamples, model) => predictClusterSelections(testSamples, model, {
+      clusterTopN: model.cluster_top_n,
+    }),
+  });
+  const oosAllRecords = oosRecordsBySelection(v2Records, walkForward);
+  const oosScoreEligibleRecords = oosRecordsBySelection(
+    v2Records,
+    walkForward,
+    item => item.score_eligible === true,
+  );
   const oosRecords = selectedOosRecords(v2Records, walkForward);
   const v2Metrics = summarizeEvaluations(oosRecords, { horizons: M1_HORIZONS_HOURS });
   const v1OosRecords = recordsWithinWalkForwardWindows(v1Records, walkForward);
   const v1Metrics = summarizeEvaluations(v1OosRecords, { horizons: M1_HORIZONS_HOURS });
+  const oosEventIds = new Set(oosAllRecords.map(record => record.market_event_id).filter(Boolean));
+  const selection = {
+    all_candidates: rankedV2.length,
+    score_eligible_candidates: oosScoreEligibleRecords.length,
+    cluster_selected_candidates: oosRecords.length,
+    independent_market_events: oosEventIds.size,
+    oos: {
+      all_candidates: oosAllRecords.length,
+      score_eligible_candidates: oosScoreEligibleRecords.length,
+      cluster_selected_candidates: oosRecords.length,
+      independent_market_events: oosEventIds.size,
+    },
+  };
   const comparison = compareV1V2({
     benchmark,
     v1Records: v1OosRecords,
     v2Records: oosRecords,
+    selection,
   });
   const calibration = buildScoreCalibration(
     oosRecords.map(record => ({
@@ -352,10 +437,50 @@ export function runM1Experiment({
     dataSource,
   });
   const defaultId = `m1-${new Date(benchmark.date_range.start || asOf).toISOString().slice(0, 10)}-${lookbackCandles}`;
+  const commitSha = lineageOptions.commitSha || getCommitSha();
+  const configHash = hashConfig({
+    config,
+    model_version: lineageOptions.modelVersion || 'm1-v2-quality-0.1.0',
+    regime_options: regimeOptions,
+    setup_options: setupOptions,
+    barrier_options: barrierOptions,
+    walk_forward_options: walkForwardPlanOptions,
+  });
+  const researchArtifact = {
+    experiment_id: experimentId || defaultId,
+    model_version: lineageOptions.modelVersion || 'm1-v2-quality-0.1.0',
+    commit_sha: commitSha,
+    config_hash: configHash,
+    data_source: benchmark.data_source,
+    exact_date_range: benchmark.date_range,
+    symbols: benchmark.symbols,
+    coverage,
+    cost_assumptions: {
+      fees: benchmark.fees,
+      slippage: benchmark.slippage,
+    },
+    wfo: {
+      options: walkForward.options,
+      window_boundaries: walkForward.windows.map(window => ({
+        index: window.index,
+        train_start: window.train_start,
+        train_end: window.train_end,
+        test_start: window.test_start,
+        test_end: window.test_end,
+        purge_hours: window.purge_hours,
+        embargo_hours: window.embargo_hours,
+      })),
+      final_holdout_boundary: walkForward.final_holdout_boundary,
+      final_holdout_hash: walkForward.final_holdout_hash,
+      per_window_trained_policy_summary: walkForward.trained_policy_summary,
+    },
+  };
 
   return {
     experiment_id: experimentId || defaultId,
     model_version: lineageOptions.modelVersion || 'm1-v2-quality-0.1.0',
+    commit_sha: commitSha,
+    config_hash: configHash,
     mode: 'SHADOW_ONLY',
     flags: {
       V1_UNCHANGED: true,
@@ -369,12 +494,16 @@ export function runM1Experiment({
       minimum_coverage_percent: coverage.length ? Math.min(...coverage.map(item => item.coverage_percent)) : 0,
     },
     candidate_count: rankedV2.length,
+    selection,
     candidates: includeArtifacts ? rankedV2 : [],
     market_events: [...new Set(rankedV2.map(candidate => candidate.market_event_id).filter(Boolean))].length,
     v2_record_count: v2Records.length,
     v1_record_count: v1OosRecords.length,
     v1_full_record_count: v1Records.length,
     oos_record_count: oosRecords.length,
+    oos_all_record_count: oosAllRecords.length,
+    oos_score_eligible_count: oosScoreEligibleRecords.length,
+    oos_cluster_selected_count: oosRecords.length,
     v2_records: includeArtifacts ? v2Records : [],
     v1_records: includeArtifacts ? v1Records : [],
     oos_records: includeArtifacts ? oosRecords : [],
@@ -383,7 +512,7 @@ export function runM1Experiment({
       : {
         ...walkForward,
         windows: walkForward.windows.map(({ train, test, ...window }) => window),
-        oos_samples: [],
+        oos_samples: walkForward.oos_samples.map(compactOosSelection),
       },
     metrics: {
       v2: v2Metrics,
@@ -392,5 +521,6 @@ export function runM1Experiment({
     comparison,
     calibration,
     promotion,
+    research_artifact: researchArtifact,
   };
 }

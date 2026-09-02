@@ -44,6 +44,24 @@ function makeFixture(symbol, count = 900, phase = 0) {
 
 function compactResult(result) {
   if (process.argv.includes('--full')) return result;
+  const oosSelectionAudit = (result.walk_forward?.oos_samples || []).map(sample => ({
+    market_event_id: sample.market_event_id,
+    symbol: sample.symbol,
+    direction: sample.direction,
+    setup_family: sample.setup_family,
+    cluster_rank: sample.cluster_rank,
+    ranking_bucket: sample.ranking_bucket,
+    raw_score: sample.raw_score,
+    edge_score: sample.edge_score,
+    timestamp: sample.timestamp,
+    outcome: sample.outcome,
+    raw_score_eligible: sample.raw_score_eligible ?? null,
+    score_eligible: sample.score_eligible ?? null,
+    volatility_eligible: sample.volatility_eligible ?? null,
+    oos_cluster_rank: sample.oos_cluster_rank ?? null,
+    selection_status: sample.selection_status ?? null,
+    selected: sample.selected === true,
+  }));
   const compactWalkForward = result.walk_forward
     ? {
       ...result.walk_forward,
@@ -54,6 +72,7 @@ function compactResult(result) {
     : result.walk_forward;
   return {
     ...result,
+    oos_selection_audit: oosSelectionAudit,
     candidates: undefined,
     candidate_count: result.candidate_count ?? (result.candidates?.length || 0),
     v1_records: undefined,
@@ -108,6 +127,11 @@ const requestedAsOf = argument('as-of');
 const parsedAsOf = requestedAsOf ? Date.parse(requestedAsOf) : null;
 if (requestedAsOf && !Number.isFinite(parsedAsOf)) throw new Error(`Invalid --as-of value: ${requestedAsOf}`);
 const asOf = parsedAsOf ?? (archive ? archiveAsOf(Date.now()) : Date.now());
+const commitSha = argument('commit-sha')
+  || process.env.GITHUB_SHA
+  || process.env.VERCEL_GIT_COMMIT_SHA
+  || process.env.COMMIT_SHA
+  || 'unknown';
 const dataSource = archive
   ? 'public_binance_futures_archive'
   : live ? 'public_binance_futures' : 'deterministic_fixture';
@@ -121,6 +145,7 @@ const result = runM1Experiment({
   dataSource,
   includeArtifacts: process.argv.includes('--full'),
   experimentId: argument('experiment', `m1-${dataSource}-${new Date(asOf).toISOString().slice(0, 10)}`),
+  lineageOptions: { commitSha },
 });
 
 const outputPath = argument('out');
@@ -139,6 +164,7 @@ console.log(JSON.stringify({
   historical_coverage: result.historical_coverage,
   mode: result.mode,
   candidate_count: result.candidate_count ?? result.candidates.length,
+  selection: result.selection,
   walk_forward: {
     status: result.walk_forward.status,
     windows: result.walk_forward.window_count,
@@ -150,4 +176,5 @@ console.log(JSON.stringify({
   comparison: result.comparison,
   calibration: result.calibration,
   promotion: result.promotion,
+  research_artifact: result.research_artifact,
 }, null, 2));

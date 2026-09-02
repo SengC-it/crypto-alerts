@@ -1,4 +1,5 @@
 export * from './canonical.js';
+export * from './barriers.js';
 export * from './comparator.js';
 export * from './evidence.js';
 export * from './experiment.js';
