@@ -68,6 +68,7 @@ export class SignalEvaluator {
   evaluate(signal, candles, { signalIndex, entryPrice = signal?.suggestedEntry } = {}) {
     const series = normalizeCandles(candles);
     const signalTimeValue = signal?.signal_timestamp
+      ?? signal?.trigger_time
       ?? signal?.generated_at
       ?? signal?.candle_close_time
       ?? signal?.candle_open_time;
@@ -99,8 +100,19 @@ export class SignalEvaluator {
       mae_percent: null,
       time_to_mfe_hours: null,
       time_to_mae_hours: null,
-      tp_first: null,
-      sl_first: null,
+      tp_first: false,
+      sl_first: false,
+      neither: null,
+      ambiguous: null,
+      ambiguous_same_candle_hit: null,
+      conservative_barrier_outcome: null,
+      barrier_outcome: null,
+      barriers_defined: false,
+      target_price: null,
+      stop_loss: null,
+      barrier_version: signal?.barrier?.barrier_version
+        ?? signal?.barrier_version
+        ?? null,
       tp_sl_outcome: 'insufficient_horizon',
       signal_decay: null,
     };
@@ -115,8 +127,12 @@ export class SignalEvaluator {
     let tpIndex = null;
     let slIndex = null;
     let observedFuture = false;
-    const target = optionalNumber(signal.targetPrice);
-    const stop = optionalNumber(signal.stopLoss);
+    const target = optionalNumber(signal.targetPrice ?? signal.target_price);
+    const stop = optionalNumber(signal.stopLoss ?? signal.stop_loss);
+    const barriersDefined = target !== null && stop !== null;
+    result.barriers_defined = barriersDefined;
+    result.target_price = target;
+    result.stop_loss = stop;
     const finiteHorizons = this.horizons.filter(Number.isFinite);
     const maxHorizonHours = finiteHorizons.length ? Math.max(...finiteHorizons) : 0;
     const excursionDeadline = entryTime === null
@@ -157,15 +173,34 @@ export class SignalEvaluator {
     result.time_to_mae_hours = maeCandle && entryTime !== null && timeAt(maeCandle) !== null
       ? +(((timeAt(maeCandle) - entryTime) / (60 * 60 * 1000)).toFixed(6))
       : null;
-    if (observedFuture) {
+    if (observedFuture && barriersDefined) {
       result.tp_first = tpIndex !== null && (slIndex === null || tpIndex < slIndex);
       result.sl_first = slIndex !== null && (tpIndex === null || slIndex < tpIndex);
-      if (result.tp_first) result.tp_sl_outcome = 'tp_first';
-      else if (result.sl_first) result.tp_sl_outcome = 'sl_first';
-      else if (tpIndex !== null && slIndex !== null) result.tp_sl_outcome = 'same_candle_or_tied';
-      else if (tpIndex !== null) result.tp_sl_outcome = 'tp_only';
-      else if (slIndex !== null) result.tp_sl_outcome = 'sl_only';
-      else result.tp_sl_outcome = 'neither';
+      result.neither = tpIndex === null && slIndex === null;
+      result.ambiguous_same_candle_hit = tpIndex !== null && slIndex !== null && tpIndex === slIndex;
+      result.ambiguous = result.ambiguous_same_candle_hit;
+      if (result.ambiguous_same_candle_hit) {
+        result.barrier_outcome = 'ambiguous_same_candle';
+        result.conservative_barrier_outcome = 'sl_first';
+        result.tp_sl_outcome = 'ambiguous_same_candle';
+      } else if (result.tp_first) {
+        result.barrier_outcome = 'tp_first';
+        result.conservative_barrier_outcome = 'tp_first';
+        result.tp_sl_outcome = 'tp_first';
+      } else if (result.sl_first) {
+        result.barrier_outcome = 'sl_first';
+        result.conservative_barrier_outcome = 'sl_first';
+        result.tp_sl_outcome = 'sl_first';
+      } else if (result.neither) {
+        result.barrier_outcome = 'neither';
+        result.conservative_barrier_outcome = 'neither';
+        result.tp_sl_outcome = 'neither';
+      }
+    } else if (observedFuture && !barriersDefined) {
+      // Preserve the legacy evaluator label for V1 signals without research
+      // barriers; the explicit barriers_defined flag prevents it being counted
+      // as a V2 barrier outcome.
+      result.tp_sl_outcome = 'neither';
     }
 
     for (const horizon of this.horizons) {

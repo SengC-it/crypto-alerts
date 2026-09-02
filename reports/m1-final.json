@@ -1,0 +1,3457 @@
+{
+  "experiment_id": "m1-public_binance_futures_archive-2026-08-31",
+  "model_version": "m1-v2-quality-0.1.0",
+  "commit_sha": "c9160c1",
+  "config_hash": "dc6d18ab7391e607462017b9e4ed286ec96440b9ce6b026c30039deb0a35219d",
+  "mode": "SHADOW_ONLY",
+  "flags": {
+    "V1_UNCHANGED": true,
+    "V2_SHADOW_ONLY": true,
+    "AUTO_TRADING": false,
+    "V2_PRODUCTION_ENABLED": false
+  },
+  "benchmark": {
+    "symbols": [
+      "AAVEUSDT",
+      "ADAUSDT",
+      "APTUSDT",
+      "ARBUSDT",
+      "ATOMUSDT",
+      "AVAXUSDT",
+      "BNBUSDT",
+      "BTCUSDT",
+      "DOTUSDT",
+      "ETHUSDT",
+      "IMXUSDT",
+      "LINKUSDT",
+      "LTCUSDT",
+      "NEARUSDT",
+      "SOLUSDT",
+      "STXUSDT",
+      "UNIUSDT",
+      "XRPUSDT"
+    ],
+    "candles": {
+      "timeframe": "1h",
+      "closed_only": true,
+      "per_symbol_count": {
+        "AAVEUSDT": 1540,
+        "ADAUSDT": 1540,
+        "APTUSDT": 1540,
+        "ARBUSDT": 1540,
+        "ATOMUSDT": 1540,
+        "AVAXUSDT": 1540,
+        "BNBUSDT": 1540,
+        "BTCUSDT": 1540,
+        "DOTUSDT": 1540,
+        "ETHUSDT": 1540,
+        "IMXUSDT": 1540,
+        "LINKUSDT": 1540,
+        "LTCUSDT": 1540,
+        "NEARUSDT": 1540,
+        "SOLUSDT": 1540,
+        "STXUSDT": 1540,
+        "UNIUSDT": 1540,
+        "XRPUSDT": 1540
+      }
+    },
+    "evaluation_horizons": [
+      1,
+      4,
+      8,
+      12,
+      24,
+      48
+    ],
+    "fees": {
+      "round_trip_percent": 0.14
+    },
+    "slippage": {
+      "included_in_round_trip_cost": true
+    },
+    "market_event_window_hours": 4,
+    "date_range": {
+      "start": 1782676800000,
+      "end": 1788220799999,
+      "as_of": 1788220799999
+    },
+    "data_source": "public_binance_futures_archive",
+    "account_return_claim": false
+  },
+  "historical_coverage": {
+    "complete": true,
+    "per_symbol": [
+      {
+        "symbol": "AAVEUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "ADAUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "APTUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "ARBUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "ATOMUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "AVAXUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "BNBUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "BTCUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "DOTUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "ETHUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "IMXUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "LINKUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "LTCUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "NEARUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "SOLUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "STXUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "UNIUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "XRPUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      }
+    ],
+    "minimum_coverage_percent": 100
+  },
+  "candidate_count": 10656,
+  "selection": {
+    "all_candidates": 10656,
+    "score_eligible_candidates": 1711,
+    "cluster_selected_candidates": 261,
+    "independent_market_events": 171,
+    "oos": {
+      "all_candidates": 4770,
+      "score_eligible_candidates": 1711,
+      "cluster_selected_candidates": 261,
+      "independent_market_events": 171
+    }
+  },
+  "candidates": [],
+  "market_events": 361,
+  "v2_record_count": 10656,
+  "v1_record_count": 130,
+  "v1_full_record_count": 286,
+  "oos_record_count": 261,
+  "oos_all_record_count": 4770,
+  "oos_score_eligible_count": 1711,
+  "oos_cluster_selected_count": 261,
+  "v2_records": [],
+  "v1_records": [],
+  "oos_records": [],
+  "walk_forward": {
+    "windows": [
+      {
+        "index": 0,
+        "train_start": 1783036799999,
+        "train_end": 1784375999999,
+        "raw_test_start": 1784548799999,
+        "test_start": 1784635199999,
+        "test_end": 1784897999999,
+        "purge_hours": 48,
+        "embargo_hours": 24,
+        "purged_count": 298,
+        "embargoed_count": 220,
+        "metrics": {
+          "candidate_count": 511,
+          "score_eligible_count": 127,
+          "cluster_selected_count": 27,
+          "selected_count": 27,
+          "independent_market_events": 18,
+          "expectancy": 0.05153562962962971,
+          "positive": true
+        },
+        "model_summary": {
+          "version": "m1-oos-selection-policy-0.1.0",
+          "score_field": "raw_score",
+          "score_threshold": 86.175,
+          "cluster_top_n": 1,
+          "volatility_policy": {
+            "version": "m1-training-volatility-policy-0.1.0",
+            "training_only": true,
+            "gate_applied": true,
+            "selected_regimes": [
+              "Low",
+              "High"
+            ],
+            "evidence_sufficient": true,
+            "minimum_samples_per_regime": 20,
+            "minimum_regimes": 2,
+            "minimum_improvement_percent": 0,
+            "training_baseline_expectancy_percent": -0.15059230986964628,
+            "per_regime": {
+              "Low": {
+                "sample_count": 952,
+                "net_expectancy_percent": -0.11022063970588232,
+                "sufficiently_sampled": true
+              },
+              "Normal": {
+                "sample_count": 814,
+                "net_expectancy_percent": -0.18769785012284998,
+                "sufficiently_sampled": true
+              },
+              "High": {
+                "sample_count": 635,
+                "net_expectancy_percent": -0.1475749196850394,
+                "sufficiently_sampled": true
+              },
+              "Extreme": {
+                "sample_count": 284,
+                "net_expectancy_percent": -0.18631753169014104,
+                "sufficiently_sampled": true
+              }
+            },
+            "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+            "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+          }
+        }
+      },
+      {
+        "index": 1,
+        "train_start": 1783249199999,
+        "train_end": 1784624399999,
+        "raw_test_start": 1784797199999,
+        "test_start": 1784883599999,
+        "test_end": 1785128399999,
+        "purge_hours": 48,
+        "embargo_hours": 24,
+        "purged_count": 307,
+        "embargoed_count": 175,
+        "metrics": {
+          "candidate_count": 511,
+          "score_eligible_count": 131,
+          "cluster_selected_count": 20,
+          "selected_count": 20,
+          "independent_market_events": 17,
+          "expectancy": -0.3069628,
+          "positive": false
+        },
+        "model_summary": {
+          "version": "m1-oos-selection-policy-0.1.0",
+          "score_field": "raw_score",
+          "score_threshold": 85.7664,
+          "cluster_top_n": 1,
+          "volatility_policy": {
+            "version": "m1-training-volatility-policy-0.1.0",
+            "training_only": true,
+            "gate_applied": true,
+            "selected_regimes": [
+              "Low"
+            ],
+            "evidence_sufficient": true,
+            "minimum_samples_per_regime": 20,
+            "minimum_regimes": 2,
+            "minimum_improvement_percent": 0,
+            "training_baseline_expectancy_percent": -0.17737069506726447,
+            "per_regime": {
+              "Low": {
+                "sample_count": 892,
+                "net_expectancy_percent": -0.15552422085201786,
+                "sufficiently_sampled": true
+              },
+              "Normal": {
+                "sample_count": 817,
+                "net_expectancy_percent": -0.184066205630355,
+                "sufficiently_sampled": true
+              },
+              "High": {
+                "sample_count": 667,
+                "net_expectancy_percent": -0.17763823388305844,
+                "sufficiently_sampled": true
+              },
+              "Extreme": {
+                "sample_count": 300,
+                "net_expectancy_percent": -0.22349861000000018,
+                "sufficiently_sampled": true
+              }
+            },
+            "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+            "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+          }
+        }
+      },
+      {
+        "index": 2,
+        "train_start": 1783490399999,
+        "train_end": 1784854799999,
+        "raw_test_start": 1785027599999,
+        "test_start": 1785113999999,
+        "test_end": 1785358799999,
+        "purge_hours": 48,
+        "embargo_hours": 24,
+        "purged_count": 379,
+        "embargoed_count": 154,
+        "metrics": {
+          "candidate_count": 511,
+          "score_eligible_count": 105,
+          "cluster_selected_count": 20,
+          "selected_count": 20,
+          "independent_market_events": 14,
+          "expectancy": -0.23753839999999998,
+          "positive": false
+        },
+        "model_summary": {
+          "version": "m1-oos-selection-policy-0.1.0",
+          "score_field": "raw_score",
+          "score_threshold": 85.38225,
+          "cluster_top_n": 1,
+          "volatility_policy": {
+            "version": "m1-training-volatility-policy-0.1.0",
+            "training_only": true,
+            "gate_applied": true,
+            "selected_regimes": [
+              "Low",
+              "Normal"
+            ],
+            "evidence_sufficient": true,
+            "minimum_samples_per_regime": 20,
+            "minimum_regimes": 2,
+            "minimum_improvement_percent": 0,
+            "training_baseline_expectancy_percent": -0.19125974193548367,
+            "per_regime": {
+              "Low": {
+                "sample_count": 1004,
+                "net_expectancy_percent": -0.17806369820717113,
+                "sufficiently_sampled": true
+              },
+              "Normal": {
+                "sample_count": 866,
+                "net_expectancy_percent": -0.1832363533487299,
+                "sufficiently_sampled": true
+              },
+              "High": {
+                "sample_count": 532,
+                "net_expectancy_percent": -0.21920653007518798,
+                "sufficiently_sampled": true
+              },
+              "Extreme": {
+                "sample_count": 202,
+                "net_expectancy_percent": -0.21764286633663354,
+                "sufficiently_sampled": true
+              }
+            },
+            "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+            "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+          }
+        }
+      },
+      {
+        "index": 3,
+        "train_start": 1783767599999,
+        "train_end": 1785113999999,
+        "raw_test_start": 1785286799999,
+        "test_start": 1785373199999,
+        "test_end": 1785635999999,
+        "purge_hours": 48,
+        "embargo_hours": 24,
+        "purged_count": 354,
+        "embargoed_count": 178,
+        "metrics": {
+          "candidate_count": 511,
+          "score_eligible_count": 184,
+          "cluster_selected_count": 29,
+          "selected_count": 29,
+          "independent_market_events": 18,
+          "expectancy": -0.32758434482758614,
+          "positive": false
+        },
+        "model_summary": {
+          "version": "m1-oos-selection-policy-0.1.0",
+          "score_field": "raw_score",
+          "score_threshold": 85.5995,
+          "cluster_top_n": 1,
+          "volatility_policy": {
+            "version": "m1-training-volatility-policy-0.1.0",
+            "training_only": true,
+            "gate_applied": true,
+            "selected_regimes": [
+              "Low",
+              "Normal",
+              "Extreme"
+            ],
+            "evidence_sufficient": true,
+            "minimum_samples_per_regime": 20,
+            "minimum_regimes": 2,
+            "minimum_improvement_percent": 0,
+            "training_baseline_expectancy_percent": -0.16423028375808255,
+            "per_regime": {
+              "Low": {
+                "sample_count": 1136,
+                "net_expectancy_percent": -0.13280643397887312,
+                "sufficiently_sampled": true
+              },
+              "Normal": {
+                "sample_count": 869,
+                "net_expectancy_percent": -0.162121902186421,
+                "sufficiently_sampled": true
+              },
+              "High": {
+                "sample_count": 474,
+                "net_expectancy_percent": -0.24644075527426146,
+                "sufficiently_sampled": true
+              },
+              "Extreme": {
+                "sample_count": 150,
+                "net_expectancy_percent": -0.15464303999999998,
+                "sufficiently_sampled": true
+              }
+            },
+            "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+            "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+          }
+        }
+      },
+      {
+        "index": 4,
+        "train_start": 1784015999999,
+        "train_end": 1785373199999,
+        "raw_test_start": 1785545999999,
+        "test_start": 1785632399999,
+        "test_end": 1785884399999,
+        "purge_hours": 48,
+        "embargo_hours": 24,
+        "purged_count": 324,
+        "embargoed_count": 167,
+        "metrics": {
+          "candidate_count": 511,
+          "score_eligible_count": 209,
+          "cluster_selected_count": 31,
+          "selected_count": 31,
+          "independent_market_events": 18,
+          "expectancy": -0.02598970967741935,
+          "positive": false
+        },
+        "model_summary": {
+          "version": "m1-oos-selection-policy-0.1.0",
+          "score_field": "raw_score",
+          "score_threshold": 85.581,
+          "cluster_top_n": 1,
+          "volatility_policy": {
+            "version": "m1-training-volatility-policy-0.1.0",
+            "training_only": true,
+            "gate_applied": true,
+            "selected_regimes": [
+              "Low",
+              "Normal"
+            ],
+            "evidence_sufficient": true,
+            "minimum_samples_per_regime": 20,
+            "minimum_regimes": 2,
+            "minimum_improvement_percent": 0,
+            "training_baseline_expectancy_percent": -0.17269239450921414,
+            "per_regime": {
+              "Low": {
+                "sample_count": 991,
+                "net_expectancy_percent": -0.13333452976791127,
+                "sufficiently_sampled": true
+              },
+              "Normal": {
+                "sample_count": 839,
+                "net_expectancy_percent": -0.15134340762812884,
+                "sufficiently_sampled": true
+              },
+              "High": {
+                "sample_count": 594,
+                "net_expectancy_percent": -0.23846262962962983,
+                "sufficiently_sampled": true
+              },
+              "Extreme": {
+                "sample_count": 235,
+                "net_expectancy_percent": -0.24864100851063828,
+                "sufficiently_sampled": true
+              }
+            },
+            "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+            "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+          }
+        }
+      },
+      {
+        "index": 5,
+        "train_start": 1784293199999,
+        "train_end": 1785614399999,
+        "raw_test_start": 1785787199999,
+        "test_start": 1785873599999,
+        "test_end": 1786132799999,
+        "purge_hours": 48,
+        "embargo_hours": 24,
+        "purged_count": 367,
+        "embargoed_count": 142,
+        "metrics": {
+          "candidate_count": 511,
+          "score_eligible_count": 210,
+          "cluster_selected_count": 36,
+          "selected_count": 36,
+          "independent_market_events": 19,
+          "expectancy": -0.23614527777777783,
+          "positive": false
+        },
+        "model_summary": {
+          "version": "m1-oos-selection-policy-0.1.0",
+          "score_field": "raw_score",
+          "score_threshold": 85.97925000000001,
+          "cluster_top_n": 1,
+          "volatility_policy": {
+            "version": "m1-training-volatility-policy-0.1.0",
+            "training_only": true,
+            "gate_applied": true,
+            "selected_regimes": [
+              "Low",
+              "Normal"
+            ],
+            "evidence_sufficient": true,
+            "minimum_samples_per_regime": 20,
+            "minimum_regimes": 2,
+            "minimum_improvement_percent": 0,
+            "training_baseline_expectancy_percent": -0.15715041169724797,
+            "per_regime": {
+              "Low": {
+                "sample_count": 999,
+                "net_expectancy_percent": -0.12018896896896895,
+                "sufficiently_sampled": true
+              },
+              "Normal": {
+                "sample_count": 787,
+                "net_expectancy_percent": -0.13465336594663285,
+                "sufficiently_sampled": true
+              },
+              "High": {
+                "sample_count": 563,
+                "net_expectancy_percent": -0.22093678685612805,
+                "sufficiently_sampled": true
+              },
+              "Extreme": {
+                "sample_count": 267,
+                "net_expectancy_percent": -0.22725500749063668,
+                "sufficiently_sampled": true
+              }
+            },
+            "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+            "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+          }
+        }
+      },
+      {
+        "index": 6,
+        "train_start": 1784584799999,
+        "train_end": 1785887999999,
+        "raw_test_start": 1786060799999,
+        "test_start": 1786147199999,
+        "test_end": 1786399199999,
+        "purge_hours": 48,
+        "embargo_hours": 24,
+        "purged_count": 334,
+        "embargoed_count": 153,
+        "metrics": {
+          "candidate_count": 511,
+          "score_eligible_count": 209,
+          "cluster_selected_count": 30,
+          "selected_count": 30,
+          "independent_market_events": 19,
+          "expectancy": -0.32387796666666663,
+          "positive": false
+        },
+        "model_summary": {
+          "version": "m1-oos-selection-policy-0.1.0",
+          "score_field": "raw_score",
+          "score_threshold": 86.3812,
+          "cluster_top_n": 1,
+          "volatility_policy": {
+            "version": "m1-training-volatility-policy-0.1.0",
+            "training_only": true,
+            "gate_applied": true,
+            "selected_regimes": [
+              "Low",
+              "Normal"
+            ],
+            "evidence_sufficient": true,
+            "minimum_samples_per_regime": 20,
+            "minimum_regimes": 2,
+            "minimum_improvement_percent": 0,
+            "training_baseline_expectancy_percent": -0.15368748546621383,
+            "per_regime": {
+              "Low": {
+                "sample_count": 893,
+                "net_expectancy_percent": -0.11221092385218374,
+                "sufficiently_sampled": true
+              },
+              "Normal": {
+                "sample_count": 900,
+                "net_expectancy_percent": -0.1382045344444446,
+                "sufficiently_sampled": true
+              },
+              "High": {
+                "sample_count": 561,
+                "net_expectancy_percent": -0.20795297504456367,
+                "sufficiently_sampled": true
+              },
+              "Extreme": {
+                "sample_count": 295,
+                "net_expectancy_percent": -0.2232816745762713,
+                "sufficiently_sampled": true
+              }
+            },
+            "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+            "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+          }
+        }
+      },
+      {
+        "index": 7,
+        "train_start": 1784833199999,
+        "train_end": 1786147199999,
+        "raw_test_start": 1786319999999,
+        "test_start": 1786406399999,
+        "test_end": 1786665599999,
+        "purge_hours": 48,
+        "embargo_hours": 24,
+        "purged_count": 352,
+        "embargoed_count": 158,
+        "metrics": {
+          "candidate_count": 511,
+          "score_eligible_count": 225,
+          "cluster_selected_count": 27,
+          "selected_count": 27,
+          "independent_market_events": 18,
+          "expectancy": -0.15666696296296292,
+          "positive": false
+        },
+        "model_summary": {
+          "version": "m1-oos-selection-policy-0.1.0",
+          "score_field": "raw_score",
+          "score_threshold": 86.5738,
+          "cluster_top_n": 1,
+          "volatility_policy": {
+            "version": "m1-training-volatility-policy-0.1.0",
+            "training_only": true,
+            "gate_applied": true,
+            "selected_regimes": [
+              "Low",
+              "Normal"
+            ],
+            "evidence_sufficient": true,
+            "minimum_samples_per_regime": 20,
+            "minimum_regimes": 2,
+            "minimum_improvement_percent": 0,
+            "training_baseline_expectancy_percent": -0.15609882022044858,
+            "per_regime": {
+              "Low": {
+                "sample_count": 868,
+                "net_expectancy_percent": -0.108339737327189,
+                "sufficiently_sampled": true
+              },
+              "Normal": {
+                "sample_count": 901,
+                "net_expectancy_percent": -0.14678555493895684,
+                "sufficiently_sampled": true
+              },
+              "High": {
+                "sample_count": 560,
+                "net_expectancy_percent": -0.20844080357142877,
+                "sufficiently_sampled": true
+              },
+              "Extreme": {
+                "sample_count": 302,
+                "net_expectancy_percent": -0.22409426821192066,
+                "sufficiently_sampled": true
+              }
+            },
+            "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+            "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+          }
+        }
+      },
+      {
+        "index": 8,
+        "train_start": 1785081599999,
+        "train_end": 1786402799999,
+        "raw_test_start": 1786575599999,
+        "test_start": 1786661999999,
+        "test_end": 1786917599999,
+        "purge_hours": 48,
+        "embargo_hours": 24,
+        "purged_count": 353,
+        "embargoed_count": 151,
+        "metrics": {
+          "candidate_count": 511,
+          "score_eligible_count": 246,
+          "cluster_selected_count": 27,
+          "selected_count": 27,
+          "independent_market_events": 19,
+          "expectancy": -0.38388196296296295,
+          "positive": false
+        },
+        "model_summary": {
+          "version": "m1-oos-selection-policy-0.1.0",
+          "score_field": "raw_score",
+          "score_threshold": 86.64455,
+          "cluster_top_n": 1,
+          "volatility_policy": {
+            "version": "m1-training-volatility-policy-0.1.0",
+            "training_only": true,
+            "gate_applied": true,
+            "selected_regimes": [
+              "Low",
+              "Normal"
+            ],
+            "evidence_sufficient": true,
+            "minimum_samples_per_regime": 20,
+            "minimum_regimes": 2,
+            "minimum_improvement_percent": 0,
+            "training_baseline_expectancy_percent": -0.17211024866920158,
+            "per_regime": {
+              "Low": {
+                "sample_count": 902,
+                "net_expectancy_percent": -0.15272022949002223,
+                "sufficiently_sampled": true
+              },
+              "Normal": {
+                "sample_count": 912,
+                "net_expectancy_percent": -0.15004313157894736,
+                "sufficiently_sampled": true
+              },
+              "High": {
+                "sample_count": 546,
+                "net_expectancy_percent": -0.20599884249084263,
+                "sufficiently_sampled": true
+              },
+              "Extreme": {
+                "sample_count": 270,
+                "net_expectancy_percent": -0.24289482592592615,
+                "sufficiently_sampled": true
+              }
+            },
+            "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+            "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+          }
+        }
+      },
+      {
+        "index": 9,
+        "train_start": 1785326399999,
+        "train_end": 1786669199999,
+        "raw_test_start": 1786841999999,
+        "test_start": 1786928399999,
+        "test_end": 1787072399999,
+        "purge_hours": 48,
+        "embargo_hours": 24,
+        "purged_count": 347,
+        "embargoed_count": 167,
+        "metrics": {
+          "candidate_count": 280,
+          "score_eligible_count": 110,
+          "cluster_selected_count": 19,
+          "selected_count": 19,
+          "independent_market_events": 11,
+          "expectancy": -0.07395142105263157,
+          "positive": false
+        },
+        "model_summary": {
+          "version": "m1-oos-selection-policy-0.1.0",
+          "score_field": "raw_score",
+          "score_threshold": 87.2251,
+          "cluster_top_n": 1,
+          "volatility_policy": {
+            "version": "m1-training-volatility-policy-0.1.0",
+            "training_only": true,
+            "gate_applied": true,
+            "selected_regimes": [
+              "Low",
+              "Normal"
+            ],
+            "evidence_sufficient": true,
+            "minimum_samples_per_regime": 20,
+            "minimum_regimes": 2,
+            "minimum_improvement_percent": 0,
+            "training_baseline_expectancy_percent": -0.16342230804248822,
+            "per_regime": {
+              "Low": {
+                "sample_count": 996,
+                "net_expectancy_percent": -0.145426799196787,
+                "sufficiently_sampled": true
+              },
+              "Normal": {
+                "sample_count": 977,
+                "net_expectancy_percent": -0.15462508802456493,
+                "sufficiently_sampled": true
+              },
+              "High": {
+                "sample_count": 470,
+                "net_expectancy_percent": -0.18609698723404272,
+                "sufficiently_sampled": true
+              },
+              "Extreme": {
+                "sample_count": 193,
+                "net_expectancy_percent": -0.2456052694300519,
+                "sufficiently_sampled": true
+              }
+            },
+            "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+            "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+          }
+        }
+      }
+    ],
+    "final_holdout_count": 2140,
+    "final_holdout_start": 1787245199999,
+    "final_holdout_hash": "6a25ed58059cbd5cced28b69ff85c59f8e177a84e7724605853730630595b7fe",
+    "final_holdout_boundary": {
+      "requested_count": 2131,
+      "actual_count": 2140,
+      "boundary_timestamp": 1787245199999,
+      "development_max_timestamp": 1787241599999,
+      "final_holdout_min_timestamp": 1787245199999,
+      "final_holdout_max_timestamp": 1788220799999,
+      "all_boundary_timestamps_single_side": true,
+      "purge_hours": 48,
+      "embargo_hours": 24,
+      "purged_development_count": 487,
+      "embargoed_development_count": 270,
+      "excluded_development_count": 487,
+      "wfo_development_max_timestamp": 1787072399999,
+      "final_holdout_hash": "6a25ed58059cbd5cced28b69ff85c59f8e177a84e7724605853730630595b7fe",
+      "assertions": {
+        "passed": true,
+        "development_max_timestamp": 1787241599999,
+        "final_holdout_min_timestamp": 1787245199999,
+        "event_intersection_count": 0,
+        "event_intersection": []
+      }
+    },
+    "final_holdout_untouched": true,
+    "options": {
+      "trainSize": 2983,
+      "testSize": 511,
+      "step": 511,
+      "purgeHours": 48,
+      "embargoHours": 24,
+      "labelHorizonHours": 48
+    },
+    "window_count": 10,
+    "positive_windows": 1,
+    "oos_candidate_counts": {
+      "all_candidates": 4879,
+      "score_eligible_candidates": 1756,
+      "cluster_selected_candidates": 266,
+      "independent_market_events": 171
+    },
+    "trained_policy_summary": [
+      {
+        "window_index": 0,
+        "test_start": 1784635199999,
+        "test_end": 1784897999999,
+        "model_summary": {
+          "version": "m1-oos-selection-policy-0.1.0",
+          "score_field": "raw_score",
+          "score_threshold": 86.175,
+          "cluster_top_n": 1,
+          "volatility_policy": {
+            "version": "m1-training-volatility-policy-0.1.0",
+            "training_only": true,
+            "gate_applied": true,
+            "selected_regimes": [
+              "Low",
+              "High"
+            ],
+            "evidence_sufficient": true,
+            "minimum_samples_per_regime": 20,
+            "minimum_regimes": 2,
+            "minimum_improvement_percent": 0,
+            "training_baseline_expectancy_percent": -0.15059230986964628,
+            "per_regime": {
+              "Low": {
+                "sample_count": 952,
+                "net_expectancy_percent": -0.11022063970588232,
+                "sufficiently_sampled": true
+              },
+              "Normal": {
+                "sample_count": 814,
+                "net_expectancy_percent": -0.18769785012284998,
+                "sufficiently_sampled": true
+              },
+              "High": {
+                "sample_count": 635,
+                "net_expectancy_percent": -0.1475749196850394,
+                "sufficiently_sampled": true
+              },
+              "Extreme": {
+                "sample_count": 284,
+                "net_expectancy_percent": -0.18631753169014104,
+                "sufficiently_sampled": true
+              }
+            },
+            "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+            "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+          }
+        }
+      },
+      {
+        "window_index": 1,
+        "test_start": 1784883599999,
+        "test_end": 1785128399999,
+        "model_summary": {
+          "version": "m1-oos-selection-policy-0.1.0",
+          "score_field": "raw_score",
+          "score_threshold": 85.7664,
+          "cluster_top_n": 1,
+          "volatility_policy": {
+            "version": "m1-training-volatility-policy-0.1.0",
+            "training_only": true,
+            "gate_applied": true,
+            "selected_regimes": [
+              "Low"
+            ],
+            "evidence_sufficient": true,
+            "minimum_samples_per_regime": 20,
+            "minimum_regimes": 2,
+            "minimum_improvement_percent": 0,
+            "training_baseline_expectancy_percent": -0.17737069506726447,
+            "per_regime": {
+              "Low": {
+                "sample_count": 892,
+                "net_expectancy_percent": -0.15552422085201786,
+                "sufficiently_sampled": true
+              },
+              "Normal": {
+                "sample_count": 817,
+                "net_expectancy_percent": -0.184066205630355,
+                "sufficiently_sampled": true
+              },
+              "High": {
+                "sample_count": 667,
+                "net_expectancy_percent": -0.17763823388305844,
+                "sufficiently_sampled": true
+              },
+              "Extreme": {
+                "sample_count": 300,
+                "net_expectancy_percent": -0.22349861000000018,
+                "sufficiently_sampled": true
+              }
+            },
+            "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+            "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+          }
+        }
+      },
+      {
+        "window_index": 2,
+        "test_start": 1785113999999,
+        "test_end": 1785358799999,
+        "model_summary": {
+          "version": "m1-oos-selection-policy-0.1.0",
+          "score_field": "raw_score",
+          "score_threshold": 85.38225,
+          "cluster_top_n": 1,
+          "volatility_policy": {
+            "version": "m1-training-volatility-policy-0.1.0",
+            "training_only": true,
+            "gate_applied": true,
+            "selected_regimes": [
+              "Low",
+              "Normal"
+            ],
+            "evidence_sufficient": true,
+            "minimum_samples_per_regime": 20,
+            "minimum_regimes": 2,
+            "minimum_improvement_percent": 0,
+            "training_baseline_expectancy_percent": -0.19125974193548367,
+            "per_regime": {
+              "Low": {
+                "sample_count": 1004,
+                "net_expectancy_percent": -0.17806369820717113,
+                "sufficiently_sampled": true
+              },
+              "Normal": {
+                "sample_count": 866,
+                "net_expectancy_percent": -0.1832363533487299,
+                "sufficiently_sampled": true
+              },
+              "High": {
+                "sample_count": 532,
+                "net_expectancy_percent": -0.21920653007518798,
+                "sufficiently_sampled": true
+              },
+              "Extreme": {
+                "sample_count": 202,
+                "net_expectancy_percent": -0.21764286633663354,
+                "sufficiently_sampled": true
+              }
+            },
+            "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+            "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+          }
+        }
+      },
+      {
+        "window_index": 3,
+        "test_start": 1785373199999,
+        "test_end": 1785635999999,
+        "model_summary": {
+          "version": "m1-oos-selection-policy-0.1.0",
+          "score_field": "raw_score",
+          "score_threshold": 85.5995,
+          "cluster_top_n": 1,
+          "volatility_policy": {
+            "version": "m1-training-volatility-policy-0.1.0",
+            "training_only": true,
+            "gate_applied": true,
+            "selected_regimes": [
+              "Low",
+              "Normal",
+              "Extreme"
+            ],
+            "evidence_sufficient": true,
+            "minimum_samples_per_regime": 20,
+            "minimum_regimes": 2,
+            "minimum_improvement_percent": 0,
+            "training_baseline_expectancy_percent": -0.16423028375808255,
+            "per_regime": {
+              "Low": {
+                "sample_count": 1136,
+                "net_expectancy_percent": -0.13280643397887312,
+                "sufficiently_sampled": true
+              },
+              "Normal": {
+                "sample_count": 869,
+                "net_expectancy_percent": -0.162121902186421,
+                "sufficiently_sampled": true
+              },
+              "High": {
+                "sample_count": 474,
+                "net_expectancy_percent": -0.24644075527426146,
+                "sufficiently_sampled": true
+              },
+              "Extreme": {
+                "sample_count": 150,
+                "net_expectancy_percent": -0.15464303999999998,
+                "sufficiently_sampled": true
+              }
+            },
+            "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+            "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+          }
+        }
+      },
+      {
+        "window_index": 4,
+        "test_start": 1785632399999,
+        "test_end": 1785884399999,
+        "model_summary": {
+          "version": "m1-oos-selection-policy-0.1.0",
+          "score_field": "raw_score",
+          "score_threshold": 85.581,
+          "cluster_top_n": 1,
+          "volatility_policy": {
+            "version": "m1-training-volatility-policy-0.1.0",
+            "training_only": true,
+            "gate_applied": true,
+            "selected_regimes": [
+              "Low",
+              "Normal"
+            ],
+            "evidence_sufficient": true,
+            "minimum_samples_per_regime": 20,
+            "minimum_regimes": 2,
+            "minimum_improvement_percent": 0,
+            "training_baseline_expectancy_percent": -0.17269239450921414,
+            "per_regime": {
+              "Low": {
+                "sample_count": 991,
+                "net_expectancy_percent": -0.13333452976791127,
+                "sufficiently_sampled": true
+              },
+              "Normal": {
+                "sample_count": 839,
+                "net_expectancy_percent": -0.15134340762812884,
+                "sufficiently_sampled": true
+              },
+              "High": {
+                "sample_count": 594,
+                "net_expectancy_percent": -0.23846262962962983,
+                "sufficiently_sampled": true
+              },
+              "Extreme": {
+                "sample_count": 235,
+                "net_expectancy_percent": -0.24864100851063828,
+                "sufficiently_sampled": true
+              }
+            },
+            "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+            "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+          }
+        }
+      },
+      {
+        "window_index": 5,
+        "test_start": 1785873599999,
+        "test_end": 1786132799999,
+        "model_summary": {
+          "version": "m1-oos-selection-policy-0.1.0",
+          "score_field": "raw_score",
+          "score_threshold": 85.97925000000001,
+          "cluster_top_n": 1,
+          "volatility_policy": {
+            "version": "m1-training-volatility-policy-0.1.0",
+            "training_only": true,
+            "gate_applied": true,
+            "selected_regimes": [
+              "Low",
+              "Normal"
+            ],
+            "evidence_sufficient": true,
+            "minimum_samples_per_regime": 20,
+            "minimum_regimes": 2,
+            "minimum_improvement_percent": 0,
+            "training_baseline_expectancy_percent": -0.15715041169724797,
+            "per_regime": {
+              "Low": {
+                "sample_count": 999,
+                "net_expectancy_percent": -0.12018896896896895,
+                "sufficiently_sampled": true
+              },
+              "Normal": {
+                "sample_count": 787,
+                "net_expectancy_percent": -0.13465336594663285,
+                "sufficiently_sampled": true
+              },
+              "High": {
+                "sample_count": 563,
+                "net_expectancy_percent": -0.22093678685612805,
+                "sufficiently_sampled": true
+              },
+              "Extreme": {
+                "sample_count": 267,
+                "net_expectancy_percent": -0.22725500749063668,
+                "sufficiently_sampled": true
+              }
+            },
+            "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+            "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+          }
+        }
+      },
+      {
+        "window_index": 6,
+        "test_start": 1786147199999,
+        "test_end": 1786399199999,
+        "model_summary": {
+          "version": "m1-oos-selection-policy-0.1.0",
+          "score_field": "raw_score",
+          "score_threshold": 86.3812,
+          "cluster_top_n": 1,
+          "volatility_policy": {
+            "version": "m1-training-volatility-policy-0.1.0",
+            "training_only": true,
+            "gate_applied": true,
+            "selected_regimes": [
+              "Low",
+              "Normal"
+            ],
+            "evidence_sufficient": true,
+            "minimum_samples_per_regime": 20,
+            "minimum_regimes": 2,
+            "minimum_improvement_percent": 0,
+            "training_baseline_expectancy_percent": -0.15368748546621383,
+            "per_regime": {
+              "Low": {
+                "sample_count": 893,
+                "net_expectancy_percent": -0.11221092385218374,
+                "sufficiently_sampled": true
+              },
+              "Normal": {
+                "sample_count": 900,
+                "net_expectancy_percent": -0.1382045344444446,
+                "sufficiently_sampled": true
+              },
+              "High": {
+                "sample_count": 561,
+                "net_expectancy_percent": -0.20795297504456367,
+                "sufficiently_sampled": true
+              },
+              "Extreme": {
+                "sample_count": 295,
+                "net_expectancy_percent": -0.2232816745762713,
+                "sufficiently_sampled": true
+              }
+            },
+            "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+            "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+          }
+        }
+      },
+      {
+        "window_index": 7,
+        "test_start": 1786406399999,
+        "test_end": 1786665599999,
+        "model_summary": {
+          "version": "m1-oos-selection-policy-0.1.0",
+          "score_field": "raw_score",
+          "score_threshold": 86.5738,
+          "cluster_top_n": 1,
+          "volatility_policy": {
+            "version": "m1-training-volatility-policy-0.1.0",
+            "training_only": true,
+            "gate_applied": true,
+            "selected_regimes": [
+              "Low",
+              "Normal"
+            ],
+            "evidence_sufficient": true,
+            "minimum_samples_per_regime": 20,
+            "minimum_regimes": 2,
+            "minimum_improvement_percent": 0,
+            "training_baseline_expectancy_percent": -0.15609882022044858,
+            "per_regime": {
+              "Low": {
+                "sample_count": 868,
+                "net_expectancy_percent": -0.108339737327189,
+                "sufficiently_sampled": true
+              },
+              "Normal": {
+                "sample_count": 901,
+                "net_expectancy_percent": -0.14678555493895684,
+                "sufficiently_sampled": true
+              },
+              "High": {
+                "sample_count": 560,
+                "net_expectancy_percent": -0.20844080357142877,
+                "sufficiently_sampled": true
+              },
+              "Extreme": {
+                "sample_count": 302,
+                "net_expectancy_percent": -0.22409426821192066,
+                "sufficiently_sampled": true
+              }
+            },
+            "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+            "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+          }
+        }
+      },
+      {
+        "window_index": 8,
+        "test_start": 1786661999999,
+        "test_end": 1786917599999,
+        "model_summary": {
+          "version": "m1-oos-selection-policy-0.1.0",
+          "score_field": "raw_score",
+          "score_threshold": 86.64455,
+          "cluster_top_n": 1,
+          "volatility_policy": {
+            "version": "m1-training-volatility-policy-0.1.0",
+            "training_only": true,
+            "gate_applied": true,
+            "selected_regimes": [
+              "Low",
+              "Normal"
+            ],
+            "evidence_sufficient": true,
+            "minimum_samples_per_regime": 20,
+            "minimum_regimes": 2,
+            "minimum_improvement_percent": 0,
+            "training_baseline_expectancy_percent": -0.17211024866920158,
+            "per_regime": {
+              "Low": {
+                "sample_count": 902,
+                "net_expectancy_percent": -0.15272022949002223,
+                "sufficiently_sampled": true
+              },
+              "Normal": {
+                "sample_count": 912,
+                "net_expectancy_percent": -0.15004313157894736,
+                "sufficiently_sampled": true
+              },
+              "High": {
+                "sample_count": 546,
+                "net_expectancy_percent": -0.20599884249084263,
+                "sufficiently_sampled": true
+              },
+              "Extreme": {
+                "sample_count": 270,
+                "net_expectancy_percent": -0.24289482592592615,
+                "sufficiently_sampled": true
+              }
+            },
+            "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+            "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+          }
+        }
+      },
+      {
+        "window_index": 9,
+        "test_start": 1786928399999,
+        "test_end": 1787072399999,
+        "model_summary": {
+          "version": "m1-oos-selection-policy-0.1.0",
+          "score_field": "raw_score",
+          "score_threshold": 87.2251,
+          "cluster_top_n": 1,
+          "volatility_policy": {
+            "version": "m1-training-volatility-policy-0.1.0",
+            "training_only": true,
+            "gate_applied": true,
+            "selected_regimes": [
+              "Low",
+              "Normal"
+            ],
+            "evidence_sufficient": true,
+            "minimum_samples_per_regime": 20,
+            "minimum_regimes": 2,
+            "minimum_improvement_percent": 0,
+            "training_baseline_expectancy_percent": -0.16342230804248822,
+            "per_regime": {
+              "Low": {
+                "sample_count": 996,
+                "net_expectancy_percent": -0.145426799196787,
+                "sufficiently_sampled": true
+              },
+              "Normal": {
+                "sample_count": 977,
+                "net_expectancy_percent": -0.15462508802456493,
+                "sufficiently_sampled": true
+              },
+              "High": {
+                "sample_count": 470,
+                "net_expectancy_percent": -0.18609698723404272,
+                "sufficiently_sampled": true
+              },
+              "Extreme": {
+                "sample_count": 193,
+                "net_expectancy_percent": -0.2456052694300519,
+                "sufficiently_sampled": true
+              }
+            },
+            "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+            "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+          }
+        }
+      }
+    ],
+    "status": "PASS",
+    "oos_samples_count": 4879,
+    "oos_selection_audit_counts": {
+      "CLUSTER_SELECTED": 266,
+      "SCORE_ELIGIBLE_NOT_SELECTED": 1490,
+      "SCORE_INELIGIBLE": 3123
+    }
+  },
+  "metrics": {
+    "v2": {
+      "sample_count": 261,
+      "evaluated_count": 261,
+      "forward_returns": {
+        "1h": {
+          "count": 261,
+          "gross_expectancy_percent": -0.062178,
+          "net_expectancy_percent": -0.202178,
+          "hit_rate_percent": 20.3065
+        },
+        "4h": {
+          "count": 261,
+          "gross_expectancy_percent": 0.010784,
+          "net_expectancy_percent": -0.129216,
+          "hit_rate_percent": 35.249
+        },
+        "8h": {
+          "count": 261,
+          "gross_expectancy_percent": -0.006726,
+          "net_expectancy_percent": -0.146726,
+          "hit_rate_percent": 35.6322
+        },
+        "12h": {
+          "count": 261,
+          "gross_expectancy_percent": -0.025114,
+          "net_expectancy_percent": -0.165114,
+          "hit_rate_percent": 37.931
+        },
+        "24h": {
+          "count": 261,
+          "gross_expectancy_percent": 0.259968,
+          "net_expectancy_percent": 0.119968,
+          "hit_rate_percent": 46.7433
+        },
+        "48h": {
+          "count": 261,
+          "gross_expectancy_percent": 0.582518,
+          "net_expectancy_percent": 0.442518,
+          "hit_rate_percent": 49.0421
+        }
+      },
+      "gross_expectancy_percent": -0.062178,
+      "net_expectancy_percent": -0.202178,
+      "net_profit_factor": 0.4533,
+      "hit_rate_percent": 20.3065,
+      "false_positive_rate_percent": 79.6935,
+      "avg_mfe_percent": 3.338136,
+      "avg_mae_percent": -2.587405,
+      "tp_first_count": 81,
+      "sl_first_count": 179,
+      "neither_count": 1,
+      "ambiguous_count": 0,
+      "conservative_sl_first_count": 179,
+      "barrier_evaluated_count": 261,
+      "signal_decay_percent": 0.644696,
+      "independent_market_clusters": 164,
+      "symbol_breadth": 18,
+      "direction_breadth": {
+        "BUY": {
+          "sample_count": 111,
+          "evaluated_count": 111,
+          "net_expectancy_percent": -0.273061,
+          "net_profit_factor": 0.3179,
+          "hit_rate_percent": 18.9189,
+          "false_positive_rate_percent": 81.0811
+        },
+        "SELL": {
+          "sample_count": 150,
+          "evaluated_count": 150,
+          "net_expectancy_percent": -0.149725,
+          "net_profit_factor": 0.5688,
+          "hit_rate_percent": 21.3333,
+          "false_positive_rate_percent": 78.6667
+        }
+      },
+      "regime_breadth": {
+        "Bull": {
+          "sample_count": 111,
+          "evaluated_count": 111,
+          "net_expectancy_percent": -0.273061,
+          "net_profit_factor": 0.3179,
+          "hit_rate_percent": 18.9189,
+          "false_positive_rate_percent": 81.0811
+        },
+        "Bear": {
+          "sample_count": 150,
+          "evaluated_count": 150,
+          "net_expectancy_percent": -0.149725,
+          "net_profit_factor": 0.5688,
+          "hit_rate_percent": 21.3333,
+          "false_positive_rate_percent": 78.6667
+        },
+        "Sideways": {
+          "sample_count": 0,
+          "evaluated_count": 0,
+          "net_expectancy_percent": null,
+          "net_profit_factor": 0,
+          "hit_rate_percent": null,
+          "false_positive_rate_percent": null
+        }
+      },
+      "volatility_breadth": {
+        "Low": {
+          "sample_count": 120,
+          "evaluated_count": 120,
+          "net_expectancy_percent": -0.202942,
+          "net_profit_factor": 0.3998,
+          "hit_rate_percent": 16.6667,
+          "false_positive_rate_percent": 83.3333
+        },
+        "Normal": {
+          "sample_count": 124,
+          "evaluated_count": 124,
+          "net_expectancy_percent": -0.170717,
+          "net_profit_factor": 0.5475,
+          "hit_rate_percent": 24.1935,
+          "false_positive_rate_percent": 75.8065
+        },
+        "High": {
+          "sample_count": 11,
+          "evaluated_count": 11,
+          "net_expectancy_percent": -0.28606,
+          "net_profit_factor": 0.3061,
+          "hit_rate_percent": 18.1818,
+          "false_positive_rate_percent": 81.8182
+        },
+        "Extreme": {
+          "sample_count": 6,
+          "evaluated_count": 6,
+          "net_expectancy_percent": -0.683316,
+          "net_profit_factor": 0.1153,
+          "hit_rate_percent": 16.6667,
+          "false_positive_rate_percent": 83.3333
+        }
+      },
+      "score_calibration": {
+        "status": "CALIBRATION_FAIL",
+        "score_semantics": "ranking_score_not_probability",
+        "no_probability_claim": true,
+        "sample_count": 261,
+        "bin_count": 5,
+        "minimum_samples_per_bin": 5,
+        "monotonic_oos_expectancy": false,
+        "enough_samples": true,
+        "bins": [
+          {
+            "index": 0,
+            "lower": 85.6537,
+            "upper": 93.8651,
+            "count": 52,
+            "hit_rate_percent": 19.2308,
+            "gross_expectancy_percent": -0.143225,
+            "net_expectancy_percent": -0.283225,
+            "profit_factor": 0.1868,
+            "mfe_percent": 3.606351,
+            "mae_percent": -2.773364
+          },
+          {
+            "index": 1,
+            "lower": 94.056,
+            "upper": 95.1832,
+            "count": 52,
+            "hit_rate_percent": 13.4615,
+            "gross_expectancy_percent": -0.260479,
+            "net_expectancy_percent": -0.400479,
+            "profit_factor": 0.13,
+            "mfe_percent": 3.633937,
+            "mae_percent": -2.410618
+          },
+          {
+            "index": 2,
+            "lower": 95.2284,
+            "upper": 95.934,
+            "count": 52,
+            "hit_rate_percent": 23.0769,
+            "gross_expectancy_percent": -0.002978,
+            "net_expectancy_percent": -0.142978,
+            "profit_factor": 0.587,
+            "mfe_percent": 3.694235,
+            "mae_percent": -2.554076
+          },
+          {
+            "index": 3,
+            "lower": 95.9396,
+            "upper": 96.6383,
+            "count": 52,
+            "hit_rate_percent": 23.0769,
+            "gross_expectancy_percent": -0.128449,
+            "net_expectancy_percent": -0.268449,
+            "profit_factor": 0.2467,
+            "mfe_percent": 2.892194,
+            "mae_percent": -2.402903
+          },
+          {
+            "index": 4,
+            "lower": 96.645,
+            "upper": 98.1802,
+            "count": 53,
+            "hit_rate_percent": 22.6415,
+            "gross_expectancy_percent": 0.218835,
+            "net_expectancy_percent": 0.078835,
+            "profit_factor": 1.2328,
+            "mfe_percent": 2.872909,
+            "mae_percent": -2.792126
+          }
+        ]
+      }
+    },
+    "v1": {
+      "sample_count": 130,
+      "evaluated_count": 130,
+      "forward_returns": {
+        "1h": {
+          "count": 130,
+          "gross_expectancy_percent": -0.123297,
+          "net_expectancy_percent": -0.263297,
+          "hit_rate_percent": 26.1538
+        },
+        "4h": {
+          "count": 130,
+          "gross_expectancy_percent": -0.113,
+          "net_expectancy_percent": -0.253,
+          "hit_rate_percent": 34.6154
+        },
+        "8h": {
+          "count": 130,
+          "gross_expectancy_percent": -0.225026,
+          "net_expectancy_percent": -0.365026,
+          "hit_rate_percent": 37.6923
+        },
+        "12h": {
+          "count": 130,
+          "gross_expectancy_percent": -0.068418,
+          "net_expectancy_percent": -0.208418,
+          "hit_rate_percent": 46.1538
+        },
+        "24h": {
+          "count": 130,
+          "gross_expectancy_percent": -0.058872,
+          "net_expectancy_percent": -0.198872,
+          "hit_rate_percent": 46.9231
+        },
+        "48h": {
+          "count": 130,
+          "gross_expectancy_percent": 0.378825,
+          "net_expectancy_percent": 0.238825,
+          "hit_rate_percent": 50.7692
+        }
+      },
+      "gross_expectancy_percent": -0.123297,
+      "net_expectancy_percent": -0.263297,
+      "net_profit_factor": 0.3,
+      "hit_rate_percent": 26.1538,
+      "false_positive_rate_percent": 73.8462,
+      "avg_mfe_percent": 3.00588,
+      "avg_mae_percent": -2.980062,
+      "tp_first_count": 39,
+      "sl_first_count": 88,
+      "neither_count": 3,
+      "ambiguous_count": 0,
+      "conservative_sl_first_count": 88,
+      "barrier_evaluated_count": 130,
+      "signal_decay_percent": 0.502122,
+      "independent_market_clusters": 69,
+      "symbol_breadth": 18,
+      "direction_breadth": {
+        "BUY": {
+          "sample_count": 0,
+          "evaluated_count": 0,
+          "net_expectancy_percent": null,
+          "net_profit_factor": 0,
+          "hit_rate_percent": null,
+          "false_positive_rate_percent": null
+        },
+        "SELL": {
+          "sample_count": 130,
+          "evaluated_count": 130,
+          "net_expectancy_percent": -0.263297,
+          "net_profit_factor": 0.3,
+          "hit_rate_percent": 26.1538,
+          "false_positive_rate_percent": 73.8462
+        }
+      },
+      "regime_breadth": {
+        "Bull": {
+          "sample_count": 0,
+          "evaluated_count": 0,
+          "net_expectancy_percent": null,
+          "net_profit_factor": 0,
+          "hit_rate_percent": null,
+          "false_positive_rate_percent": null
+        },
+        "Bear": {
+          "sample_count": 0,
+          "evaluated_count": 0,
+          "net_expectancy_percent": null,
+          "net_profit_factor": 0,
+          "hit_rate_percent": null,
+          "false_positive_rate_percent": null
+        },
+        "Sideways": {
+          "sample_count": 0,
+          "evaluated_count": 0,
+          "net_expectancy_percent": null,
+          "net_profit_factor": 0,
+          "hit_rate_percent": null,
+          "false_positive_rate_percent": null
+        }
+      },
+      "volatility_breadth": {
+        "Low": {
+          "sample_count": 0,
+          "evaluated_count": 0,
+          "net_expectancy_percent": null,
+          "net_profit_factor": 0,
+          "hit_rate_percent": null,
+          "false_positive_rate_percent": null
+        },
+        "Normal": {
+          "sample_count": 0,
+          "evaluated_count": 0,
+          "net_expectancy_percent": null,
+          "net_profit_factor": 0,
+          "hit_rate_percent": null,
+          "false_positive_rate_percent": null
+        },
+        "High": {
+          "sample_count": 0,
+          "evaluated_count": 0,
+          "net_expectancy_percent": null,
+          "net_profit_factor": 0,
+          "hit_rate_percent": null,
+          "false_positive_rate_percent": null
+        },
+        "Extreme": {
+          "sample_count": 0,
+          "evaluated_count": 0,
+          "net_expectancy_percent": null,
+          "net_profit_factor": 0,
+          "hit_rate_percent": null,
+          "false_positive_rate_percent": null
+        }
+      },
+      "score_calibration": {
+        "status": "CALIBRATION_FAIL",
+        "score_semantics": "ranking_score_not_probability",
+        "no_probability_claim": true,
+        "sample_count": 130,
+        "bin_count": 5,
+        "minimum_samples_per_bin": 5,
+        "monotonic_oos_expectancy": false,
+        "enough_samples": true,
+        "bins": [
+          {
+            "index": 0,
+            "lower": 75.3,
+            "upper": 80,
+            "count": 26,
+            "hit_rate_percent": 30.7692,
+            "gross_expectancy_percent": -0.067678,
+            "net_expectancy_percent": -0.207678,
+            "profit_factor": 0.2728,
+            "mfe_percent": 3.994713,
+            "mae_percent": -2.790017
+          },
+          {
+            "index": 1,
+            "lower": 80,
+            "upper": 80,
+            "count": 26,
+            "hit_rate_percent": 19.2308,
+            "gross_expectancy_percent": -0.066006,
+            "net_expectancy_percent": -0.206006,
+            "profit_factor": 0.4492,
+            "mfe_percent": 2.460899,
+            "mae_percent": -3.784945
+          },
+          {
+            "index": 2,
+            "lower": 80,
+            "upper": 80,
+            "count": 26,
+            "hit_rate_percent": 26.9231,
+            "gross_expectancy_percent": -0.017922,
+            "net_expectancy_percent": -0.157922,
+            "profit_factor": 0.4385,
+            "mfe_percent": 2.108349,
+            "mae_percent": -2.382475
+          },
+          {
+            "index": 3,
+            "lower": 80,
+            "upper": 80,
+            "count": 26,
+            "hit_rate_percent": 34.6154,
+            "gross_expectancy_percent": -0.024867,
+            "net_expectancy_percent": -0.164867,
+            "profit_factor": 0.4665,
+            "mfe_percent": 4.170607,
+            "mae_percent": -2.337475
+          },
+          {
+            "index": 4,
+            "lower": 80,
+            "upper": 98,
+            "count": 26,
+            "hit_rate_percent": 19.2308,
+            "gross_expectancy_percent": -0.440013,
+            "net_expectancy_percent": -0.580013,
+            "profit_factor": 0.0805,
+            "mfe_percent": 2.294834,
+            "mae_percent": -3.605399
+          }
+        ]
+      }
+    }
+  },
+  "comparison": {
+    "benchmark": {
+      "symbols": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "APTUSDT",
+        "ARBUSDT",
+        "ATOMUSDT",
+        "AVAXUSDT",
+        "BNBUSDT",
+        "BTCUSDT",
+        "DOTUSDT",
+        "ETHUSDT",
+        "IMXUSDT",
+        "LINKUSDT",
+        "LTCUSDT",
+        "NEARUSDT",
+        "SOLUSDT",
+        "STXUSDT",
+        "UNIUSDT",
+        "XRPUSDT"
+      ],
+      "candles": {
+        "timeframe": "1h",
+        "closed_only": true,
+        "per_symbol_count": {
+          "AAVEUSDT": 1540,
+          "ADAUSDT": 1540,
+          "APTUSDT": 1540,
+          "ARBUSDT": 1540,
+          "ATOMUSDT": 1540,
+          "AVAXUSDT": 1540,
+          "BNBUSDT": 1540,
+          "BTCUSDT": 1540,
+          "DOTUSDT": 1540,
+          "ETHUSDT": 1540,
+          "IMXUSDT": 1540,
+          "LINKUSDT": 1540,
+          "LTCUSDT": 1540,
+          "NEARUSDT": 1540,
+          "SOLUSDT": 1540,
+          "STXUSDT": 1540,
+          "UNIUSDT": 1540,
+          "XRPUSDT": 1540
+        }
+      },
+      "evaluation_horizons": [
+        1,
+        4,
+        8,
+        12,
+        24,
+        48
+      ],
+      "fees": {
+        "round_trip_percent": 0.14
+      },
+      "slippage": {
+        "included_in_round_trip_cost": true
+      },
+      "market_event_window_hours": 4,
+      "date_range": {
+        "start": 1782676800000,
+        "end": 1788220799999,
+        "as_of": 1788220799999
+      },
+      "data_source": "public_binance_futures_archive",
+      "account_return_claim": false
+    },
+    "v1": {
+      "sample_count": 130,
+      "evaluated_count": 130,
+      "forward_returns": {
+        "1h": {
+          "count": 130,
+          "gross_expectancy_percent": -0.123297,
+          "net_expectancy_percent": -0.263297,
+          "hit_rate_percent": 26.1538
+        },
+        "4h": {
+          "count": 130,
+          "gross_expectancy_percent": -0.113,
+          "net_expectancy_percent": -0.253,
+          "hit_rate_percent": 34.6154
+        },
+        "8h": {
+          "count": 130,
+          "gross_expectancy_percent": -0.225026,
+          "net_expectancy_percent": -0.365026,
+          "hit_rate_percent": 37.6923
+        },
+        "12h": {
+          "count": 130,
+          "gross_expectancy_percent": -0.068418,
+          "net_expectancy_percent": -0.208418,
+          "hit_rate_percent": 46.1538
+        },
+        "24h": {
+          "count": 130,
+          "gross_expectancy_percent": -0.058872,
+          "net_expectancy_percent": -0.198872,
+          "hit_rate_percent": 46.9231
+        },
+        "48h": {
+          "count": 130,
+          "gross_expectancy_percent": 0.378825,
+          "net_expectancy_percent": 0.238825,
+          "hit_rate_percent": 50.7692
+        }
+      },
+      "gross_expectancy_percent": -0.123297,
+      "net_expectancy_percent": -0.263297,
+      "net_profit_factor": 0.3,
+      "hit_rate_percent": 26.1538,
+      "false_positive_rate_percent": 73.8462,
+      "avg_mfe_percent": 3.00588,
+      "avg_mae_percent": -2.980062,
+      "tp_first_count": 39,
+      "sl_first_count": 88,
+      "neither_count": 3,
+      "ambiguous_count": 0,
+      "conservative_sl_first_count": 88,
+      "barrier_evaluated_count": 130,
+      "signal_decay_percent": 0.502122,
+      "independent_market_clusters": 69,
+      "symbol_breadth": 18,
+      "direction_breadth": {
+        "BUY": {
+          "sample_count": 0,
+          "evaluated_count": 0,
+          "net_expectancy_percent": null,
+          "net_profit_factor": 0,
+          "hit_rate_percent": null,
+          "false_positive_rate_percent": null
+        },
+        "SELL": {
+          "sample_count": 130,
+          "evaluated_count": 130,
+          "net_expectancy_percent": -0.263297,
+          "net_profit_factor": 0.3,
+          "hit_rate_percent": 26.1538,
+          "false_positive_rate_percent": 73.8462
+        }
+      },
+      "regime_breadth": {
+        "Bull": {
+          "sample_count": 0,
+          "evaluated_count": 0,
+          "net_expectancy_percent": null,
+          "net_profit_factor": 0,
+          "hit_rate_percent": null,
+          "false_positive_rate_percent": null
+        },
+        "Bear": {
+          "sample_count": 0,
+          "evaluated_count": 0,
+          "net_expectancy_percent": null,
+          "net_profit_factor": 0,
+          "hit_rate_percent": null,
+          "false_positive_rate_percent": null
+        },
+        "Sideways": {
+          "sample_count": 0,
+          "evaluated_count": 0,
+          "net_expectancy_percent": null,
+          "net_profit_factor": 0,
+          "hit_rate_percent": null,
+          "false_positive_rate_percent": null
+        }
+      },
+      "volatility_breadth": {
+        "Low": {
+          "sample_count": 0,
+          "evaluated_count": 0,
+          "net_expectancy_percent": null,
+          "net_profit_factor": 0,
+          "hit_rate_percent": null,
+          "false_positive_rate_percent": null
+        },
+        "Normal": {
+          "sample_count": 0,
+          "evaluated_count": 0,
+          "net_expectancy_percent": null,
+          "net_profit_factor": 0,
+          "hit_rate_percent": null,
+          "false_positive_rate_percent": null
+        },
+        "High": {
+          "sample_count": 0,
+          "evaluated_count": 0,
+          "net_expectancy_percent": null,
+          "net_profit_factor": 0,
+          "hit_rate_percent": null,
+          "false_positive_rate_percent": null
+        },
+        "Extreme": {
+          "sample_count": 0,
+          "evaluated_count": 0,
+          "net_expectancy_percent": null,
+          "net_profit_factor": 0,
+          "hit_rate_percent": null,
+          "false_positive_rate_percent": null
+        }
+      },
+      "score_calibration": {
+        "status": "CALIBRATION_FAIL",
+        "score_semantics": "ranking_score_not_probability",
+        "no_probability_claim": true,
+        "sample_count": 130,
+        "bin_count": 5,
+        "minimum_samples_per_bin": 5,
+        "monotonic_oos_expectancy": false,
+        "enough_samples": true,
+        "bins": [
+          {
+            "index": 0,
+            "lower": 75.3,
+            "upper": 80,
+            "count": 26,
+            "hit_rate_percent": 30.7692,
+            "gross_expectancy_percent": -0.067678,
+            "net_expectancy_percent": -0.207678,
+            "profit_factor": 0.2728,
+            "mfe_percent": 3.994713,
+            "mae_percent": -2.790017
+          },
+          {
+            "index": 1,
+            "lower": 80,
+            "upper": 80,
+            "count": 26,
+            "hit_rate_percent": 19.2308,
+            "gross_expectancy_percent": -0.066006,
+            "net_expectancy_percent": -0.206006,
+            "profit_factor": 0.4492,
+            "mfe_percent": 2.460899,
+            "mae_percent": -3.784945
+          },
+          {
+            "index": 2,
+            "lower": 80,
+            "upper": 80,
+            "count": 26,
+            "hit_rate_percent": 26.9231,
+            "gross_expectancy_percent": -0.017922,
+            "net_expectancy_percent": -0.157922,
+            "profit_factor": 0.4385,
+            "mfe_percent": 2.108349,
+            "mae_percent": -2.382475
+          },
+          {
+            "index": 3,
+            "lower": 80,
+            "upper": 80,
+            "count": 26,
+            "hit_rate_percent": 34.6154,
+            "gross_expectancy_percent": -0.024867,
+            "net_expectancy_percent": -0.164867,
+            "profit_factor": 0.4665,
+            "mfe_percent": 4.170607,
+            "mae_percent": -2.337475
+          },
+          {
+            "index": 4,
+            "lower": 80,
+            "upper": 98,
+            "count": 26,
+            "hit_rate_percent": 19.2308,
+            "gross_expectancy_percent": -0.440013,
+            "net_expectancy_percent": -0.580013,
+            "profit_factor": 0.0805,
+            "mfe_percent": 2.294834,
+            "mae_percent": -3.605399
+          }
+        ]
+      }
+    },
+    "v2": {
+      "sample_count": 261,
+      "evaluated_count": 261,
+      "forward_returns": {
+        "1h": {
+          "count": 261,
+          "gross_expectancy_percent": -0.062178,
+          "net_expectancy_percent": -0.202178,
+          "hit_rate_percent": 20.3065
+        },
+        "4h": {
+          "count": 261,
+          "gross_expectancy_percent": 0.010784,
+          "net_expectancy_percent": -0.129216,
+          "hit_rate_percent": 35.249
+        },
+        "8h": {
+          "count": 261,
+          "gross_expectancy_percent": -0.006726,
+          "net_expectancy_percent": -0.146726,
+          "hit_rate_percent": 35.6322
+        },
+        "12h": {
+          "count": 261,
+          "gross_expectancy_percent": -0.025114,
+          "net_expectancy_percent": -0.165114,
+          "hit_rate_percent": 37.931
+        },
+        "24h": {
+          "count": 261,
+          "gross_expectancy_percent": 0.259968,
+          "net_expectancy_percent": 0.119968,
+          "hit_rate_percent": 46.7433
+        },
+        "48h": {
+          "count": 261,
+          "gross_expectancy_percent": 0.582518,
+          "net_expectancy_percent": 0.442518,
+          "hit_rate_percent": 49.0421
+        }
+      },
+      "gross_expectancy_percent": -0.062178,
+      "net_expectancy_percent": -0.202178,
+      "net_profit_factor": 0.4533,
+      "hit_rate_percent": 20.3065,
+      "false_positive_rate_percent": 79.6935,
+      "avg_mfe_percent": 3.338136,
+      "avg_mae_percent": -2.587405,
+      "tp_first_count": 81,
+      "sl_first_count": 179,
+      "neither_count": 1,
+      "ambiguous_count": 0,
+      "conservative_sl_first_count": 179,
+      "barrier_evaluated_count": 261,
+      "signal_decay_percent": 0.644696,
+      "independent_market_clusters": 164,
+      "symbol_breadth": 18,
+      "direction_breadth": {
+        "BUY": {
+          "sample_count": 111,
+          "evaluated_count": 111,
+          "net_expectancy_percent": -0.273061,
+          "net_profit_factor": 0.3179,
+          "hit_rate_percent": 18.9189,
+          "false_positive_rate_percent": 81.0811
+        },
+        "SELL": {
+          "sample_count": 150,
+          "evaluated_count": 150,
+          "net_expectancy_percent": -0.149725,
+          "net_profit_factor": 0.5688,
+          "hit_rate_percent": 21.3333,
+          "false_positive_rate_percent": 78.6667
+        }
+      },
+      "regime_breadth": {
+        "Bull": {
+          "sample_count": 111,
+          "evaluated_count": 111,
+          "net_expectancy_percent": -0.273061,
+          "net_profit_factor": 0.3179,
+          "hit_rate_percent": 18.9189,
+          "false_positive_rate_percent": 81.0811
+        },
+        "Bear": {
+          "sample_count": 150,
+          "evaluated_count": 150,
+          "net_expectancy_percent": -0.149725,
+          "net_profit_factor": 0.5688,
+          "hit_rate_percent": 21.3333,
+          "false_positive_rate_percent": 78.6667
+        },
+        "Sideways": {
+          "sample_count": 0,
+          "evaluated_count": 0,
+          "net_expectancy_percent": null,
+          "net_profit_factor": 0,
+          "hit_rate_percent": null,
+          "false_positive_rate_percent": null
+        }
+      },
+      "volatility_breadth": {
+        "Low": {
+          "sample_count": 120,
+          "evaluated_count": 120,
+          "net_expectancy_percent": -0.202942,
+          "net_profit_factor": 0.3998,
+          "hit_rate_percent": 16.6667,
+          "false_positive_rate_percent": 83.3333
+        },
+        "Normal": {
+          "sample_count": 124,
+          "evaluated_count": 124,
+          "net_expectancy_percent": -0.170717,
+          "net_profit_factor": 0.5475,
+          "hit_rate_percent": 24.1935,
+          "false_positive_rate_percent": 75.8065
+        },
+        "High": {
+          "sample_count": 11,
+          "evaluated_count": 11,
+          "net_expectancy_percent": -0.28606,
+          "net_profit_factor": 0.3061,
+          "hit_rate_percent": 18.1818,
+          "false_positive_rate_percent": 81.8182
+        },
+        "Extreme": {
+          "sample_count": 6,
+          "evaluated_count": 6,
+          "net_expectancy_percent": -0.683316,
+          "net_profit_factor": 0.1153,
+          "hit_rate_percent": 16.6667,
+          "false_positive_rate_percent": 83.3333
+        }
+      },
+      "score_calibration": {
+        "status": "CALIBRATION_FAIL",
+        "score_semantics": "ranking_score_not_probability",
+        "no_probability_claim": true,
+        "sample_count": 261,
+        "bin_count": 5,
+        "minimum_samples_per_bin": 5,
+        "monotonic_oos_expectancy": false,
+        "enough_samples": true,
+        "bins": [
+          {
+            "index": 0,
+            "lower": 85.6537,
+            "upper": 93.8651,
+            "count": 52,
+            "hit_rate_percent": 19.2308,
+            "gross_expectancy_percent": -0.143225,
+            "net_expectancy_percent": -0.283225,
+            "profit_factor": 0.1868,
+            "mfe_percent": 3.606351,
+            "mae_percent": -2.773364
+          },
+          {
+            "index": 1,
+            "lower": 94.056,
+            "upper": 95.1832,
+            "count": 52,
+            "hit_rate_percent": 13.4615,
+            "gross_expectancy_percent": -0.260479,
+            "net_expectancy_percent": -0.400479,
+            "profit_factor": 0.13,
+            "mfe_percent": 3.633937,
+            "mae_percent": -2.410618
+          },
+          {
+            "index": 2,
+            "lower": 95.2284,
+            "upper": 95.934,
+            "count": 52,
+            "hit_rate_percent": 23.0769,
+            "gross_expectancy_percent": -0.002978,
+            "net_expectancy_percent": -0.142978,
+            "profit_factor": 0.587,
+            "mfe_percent": 3.694235,
+            "mae_percent": -2.554076
+          },
+          {
+            "index": 3,
+            "lower": 95.9396,
+            "upper": 96.6383,
+            "count": 52,
+            "hit_rate_percent": 23.0769,
+            "gross_expectancy_percent": -0.128449,
+            "net_expectancy_percent": -0.268449,
+            "profit_factor": 0.2467,
+            "mfe_percent": 2.892194,
+            "mae_percent": -2.402903
+          },
+          {
+            "index": 4,
+            "lower": 96.645,
+            "upper": 98.1802,
+            "count": 53,
+            "hit_rate_percent": 22.6415,
+            "gross_expectancy_percent": 0.218835,
+            "net_expectancy_percent": 0.078835,
+            "profit_factor": 1.2328,
+            "mfe_percent": 2.872909,
+            "mae_percent": -2.792126
+          }
+        ]
+      }
+    },
+    "counts": {
+      "v1_signals": 130,
+      "v1_independent_clusters": 69,
+      "v2_all_candidates": 4770,
+      "v2_eligible_candidates": 1711,
+      "v2_selected_candidates": 261,
+      "v2_selected_independent_clusters": 164,
+      "v2_all_to_selected_reduction_percent": 94.5283,
+      "v2_eligible_to_selected_reduction_percent": 84.7458
+    },
+    "delta": {
+      "net_expectancy_percent": 0.061119,
+      "net_profit_factor": 0.1533,
+      "evaluated_count": 131
+    },
+    "same_data_contract": true,
+    "same_market_event_definition": true
+  },
+  "calibration": {
+    "status": "CALIBRATION_FAIL",
+    "score_semantics": "ranking_score_not_probability",
+    "no_probability_claim": true,
+    "sample_count": 261,
+    "bin_count": 5,
+    "minimum_samples_per_bin": 5,
+    "monotonic_oos_expectancy": false,
+    "enough_samples": true,
+    "bins": [
+      {
+        "index": 0,
+        "lower": 85.6537,
+        "upper": 93.8651,
+        "count": 52,
+        "hit_rate_percent": 19.2308,
+        "gross_expectancy_percent": -0.143225,
+        "net_expectancy_percent": -0.283225,
+        "profit_factor": 0.1868,
+        "mfe_percent": 3.606351,
+        "mae_percent": -2.773364
+      },
+      {
+        "index": 1,
+        "lower": 94.056,
+        "upper": 95.1832,
+        "count": 52,
+        "hit_rate_percent": 13.4615,
+        "gross_expectancy_percent": -0.260479,
+        "net_expectancy_percent": -0.400479,
+        "profit_factor": 0.13,
+        "mfe_percent": 3.633937,
+        "mae_percent": -2.410618
+      },
+      {
+        "index": 2,
+        "lower": 95.2284,
+        "upper": 95.934,
+        "count": 52,
+        "hit_rate_percent": 23.0769,
+        "gross_expectancy_percent": -0.002978,
+        "net_expectancy_percent": -0.142978,
+        "profit_factor": 0.587,
+        "mfe_percent": 3.694235,
+        "mae_percent": -2.554076
+      },
+      {
+        "index": 3,
+        "lower": 95.9396,
+        "upper": 96.6383,
+        "count": 52,
+        "hit_rate_percent": 23.0769,
+        "gross_expectancy_percent": -0.128449,
+        "net_expectancy_percent": -0.268449,
+        "profit_factor": 0.2467,
+        "mfe_percent": 2.892194,
+        "mae_percent": -2.402903
+      },
+      {
+        "index": 4,
+        "lower": 96.645,
+        "upper": 98.1802,
+        "count": 53,
+        "hit_rate_percent": 22.6415,
+        "gross_expectancy_percent": 0.218835,
+        "net_expectancy_percent": 0.078835,
+        "profit_factor": 1.2328,
+        "mfe_percent": 2.872909,
+        "mae_percent": -2.792126
+      }
+    ]
+  },
+  "promotion": {
+    "recommendation": "REJECT",
+    "thresholds": {
+      "independentClusters": 100,
+      "netProfitFactor": 1.25,
+      "netExpectancyPercent": 0.15,
+      "oosWindows": 6,
+      "positiveWindows": 4,
+      "symbolBreadth": 8
+    },
+    "observed": {
+      "independent_clusters": 164,
+      "net_profit_factor": 0.4533,
+      "net_expectancy_percent": -0.202178,
+      "oos_windows": 10,
+      "positive_windows": 1,
+      "symbol_breadth": 18
+    },
+    "failures": [
+      "net_profit_factor",
+      "net_expectancy_percent",
+      "positive_windows",
+      "calibration"
+    ],
+    "calibration_status": "CALIBRATION_FAIL",
+    "data_source": "public_binance_futures_archive",
+    "no_threshold_reduction": true
+  },
+  "research_artifact": {
+    "experiment_id": "m1-public_binance_futures_archive-2026-08-31",
+    "model_version": "m1-v2-quality-0.1.0",
+    "commit_sha": "c9160c1",
+    "config_hash": "dc6d18ab7391e607462017b9e4ed286ec96440b9ce6b026c30039deb0a35219d",
+    "data_source": "public_binance_futures_archive",
+    "exact_date_range": {
+      "start": 1782676800000,
+      "end": 1788220799999,
+      "as_of": 1788220799999
+    },
+    "symbols": [
+      "AAVEUSDT",
+      "ADAUSDT",
+      "APTUSDT",
+      "ARBUSDT",
+      "ATOMUSDT",
+      "AVAXUSDT",
+      "BNBUSDT",
+      "BTCUSDT",
+      "DOTUSDT",
+      "ETHUSDT",
+      "IMXUSDT",
+      "LINKUSDT",
+      "LTCUSDT",
+      "NEARUSDT",
+      "SOLUSDT",
+      "STXUSDT",
+      "UNIUSDT",
+      "XRPUSDT"
+    ],
+    "coverage": [
+      {
+        "symbol": "AAVEUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "ADAUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "APTUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "ARBUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "ATOMUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "AVAXUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "BNBUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "BTCUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "DOTUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "ETHUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "IMXUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "LINKUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "LTCUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "NEARUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "SOLUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "STXUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "UNIUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      },
+      {
+        "symbol": "XRPUSDT",
+        "data_source": "public_binance_futures_archive",
+        "timeframe": "1h",
+        "requested_start": 1782676800000,
+        "requested_end": 1788217200000,
+        "actual_start": 1782676800000,
+        "actual_end": 1788220799999,
+        "candles_expected": 1540,
+        "candles_loaded": 1540,
+        "missing_candles": 0,
+        "coverage_percent": 100
+      }
+    ],
+    "cost_assumptions": {
+      "fees": {
+        "round_trip_percent": 0.14
+      },
+      "slippage": {
+        "included_in_round_trip_cost": true
+      }
+    },
+    "wfo": {
+      "options": {
+        "trainSize": 2983,
+        "testSize": 511,
+        "step": 511,
+        "purgeHours": 48,
+        "embargoHours": 24,
+        "labelHorizonHours": 48
+      },
+      "window_boundaries": [
+        {
+          "index": 0,
+          "train_start": 1783036799999,
+          "train_end": 1784375999999,
+          "test_start": 1784635199999,
+          "test_end": 1784897999999,
+          "purge_hours": 48,
+          "embargo_hours": 24
+        },
+        {
+          "index": 1,
+          "train_start": 1783249199999,
+          "train_end": 1784624399999,
+          "test_start": 1784883599999,
+          "test_end": 1785128399999,
+          "purge_hours": 48,
+          "embargo_hours": 24
+        },
+        {
+          "index": 2,
+          "train_start": 1783490399999,
+          "train_end": 1784854799999,
+          "test_start": 1785113999999,
+          "test_end": 1785358799999,
+          "purge_hours": 48,
+          "embargo_hours": 24
+        },
+        {
+          "index": 3,
+          "train_start": 1783767599999,
+          "train_end": 1785113999999,
+          "test_start": 1785373199999,
+          "test_end": 1785635999999,
+          "purge_hours": 48,
+          "embargo_hours": 24
+        },
+        {
+          "index": 4,
+          "train_start": 1784015999999,
+          "train_end": 1785373199999,
+          "test_start": 1785632399999,
+          "test_end": 1785884399999,
+          "purge_hours": 48,
+          "embargo_hours": 24
+        },
+        {
+          "index": 5,
+          "train_start": 1784293199999,
+          "train_end": 1785614399999,
+          "test_start": 1785873599999,
+          "test_end": 1786132799999,
+          "purge_hours": 48,
+          "embargo_hours": 24
+        },
+        {
+          "index": 6,
+          "train_start": 1784584799999,
+          "train_end": 1785887999999,
+          "test_start": 1786147199999,
+          "test_end": 1786399199999,
+          "purge_hours": 48,
+          "embargo_hours": 24
+        },
+        {
+          "index": 7,
+          "train_start": 1784833199999,
+          "train_end": 1786147199999,
+          "test_start": 1786406399999,
+          "test_end": 1786665599999,
+          "purge_hours": 48,
+          "embargo_hours": 24
+        },
+        {
+          "index": 8,
+          "train_start": 1785081599999,
+          "train_end": 1786402799999,
+          "test_start": 1786661999999,
+          "test_end": 1786917599999,
+          "purge_hours": 48,
+          "embargo_hours": 24
+        },
+        {
+          "index": 9,
+          "train_start": 1785326399999,
+          "train_end": 1786669199999,
+          "test_start": 1786928399999,
+          "test_end": 1787072399999,
+          "purge_hours": 48,
+          "embargo_hours": 24
+        }
+      ],
+      "final_holdout_boundary": {
+        "requested_count": 2131,
+        "actual_count": 2140,
+        "boundary_timestamp": 1787245199999,
+        "development_max_timestamp": 1787241599999,
+        "final_holdout_min_timestamp": 1787245199999,
+        "final_holdout_max_timestamp": 1788220799999,
+        "all_boundary_timestamps_single_side": true,
+        "purge_hours": 48,
+        "embargo_hours": 24,
+        "purged_development_count": 487,
+        "embargoed_development_count": 270,
+        "excluded_development_count": 487,
+        "wfo_development_max_timestamp": 1787072399999,
+        "final_holdout_hash": "6a25ed58059cbd5cced28b69ff85c59f8e177a84e7724605853730630595b7fe",
+        "assertions": {
+          "passed": true,
+          "development_max_timestamp": 1787241599999,
+          "final_holdout_min_timestamp": 1787245199999,
+          "event_intersection_count": 0,
+          "event_intersection": []
+        }
+      },
+      "final_holdout_hash": "6a25ed58059cbd5cced28b69ff85c59f8e177a84e7724605853730630595b7fe",
+      "per_window_trained_policy_summary": [
+        {
+          "window_index": 0,
+          "test_start": 1784635199999,
+          "test_end": 1784897999999,
+          "model_summary": {
+            "version": "m1-oos-selection-policy-0.1.0",
+            "score_field": "raw_score",
+            "score_threshold": 86.175,
+            "cluster_top_n": 1,
+            "volatility_policy": {
+              "version": "m1-training-volatility-policy-0.1.0",
+              "training_only": true,
+              "gate_applied": true,
+              "selected_regimes": [
+                "Low",
+                "High"
+              ],
+              "evidence_sufficient": true,
+              "minimum_samples_per_regime": 20,
+              "minimum_regimes": 2,
+              "minimum_improvement_percent": 0,
+              "training_baseline_expectancy_percent": -0.15059230986964628,
+              "per_regime": {
+                "Low": {
+                  "sample_count": 952,
+                  "net_expectancy_percent": -0.11022063970588232,
+                  "sufficiently_sampled": true
+                },
+                "Normal": {
+                  "sample_count": 814,
+                  "net_expectancy_percent": -0.18769785012284998,
+                  "sufficiently_sampled": true
+                },
+                "High": {
+                  "sample_count": 635,
+                  "net_expectancy_percent": -0.1475749196850394,
+                  "sufficiently_sampled": true
+                },
+                "Extreme": {
+                  "sample_count": 284,
+                  "net_expectancy_percent": -0.18631753169014104,
+                  "sufficiently_sampled": true
+                }
+              },
+              "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+              "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+            }
+          }
+        },
+        {
+          "window_index": 1,
+          "test_start": 1784883599999,
+          "test_end": 1785128399999,
+          "model_summary": {
+            "version": "m1-oos-selection-policy-0.1.0",
+            "score_field": "raw_score",
+            "score_threshold": 85.7664,
+            "cluster_top_n": 1,
+            "volatility_policy": {
+              "version": "m1-training-volatility-policy-0.1.0",
+              "training_only": true,
+              "gate_applied": true,
+              "selected_regimes": [
+                "Low"
+              ],
+              "evidence_sufficient": true,
+              "minimum_samples_per_regime": 20,
+              "minimum_regimes": 2,
+              "minimum_improvement_percent": 0,
+              "training_baseline_expectancy_percent": -0.17737069506726447,
+              "per_regime": {
+                "Low": {
+                  "sample_count": 892,
+                  "net_expectancy_percent": -0.15552422085201786,
+                  "sufficiently_sampled": true
+                },
+                "Normal": {
+                  "sample_count": 817,
+                  "net_expectancy_percent": -0.184066205630355,
+                  "sufficiently_sampled": true
+                },
+                "High": {
+                  "sample_count": 667,
+                  "net_expectancy_percent": -0.17763823388305844,
+                  "sufficiently_sampled": true
+                },
+                "Extreme": {
+                  "sample_count": 300,
+                  "net_expectancy_percent": -0.22349861000000018,
+                  "sufficiently_sampled": true
+                }
+              },
+              "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+              "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+            }
+          }
+        },
+        {
+          "window_index": 2,
+          "test_start": 1785113999999,
+          "test_end": 1785358799999,
+          "model_summary": {
+            "version": "m1-oos-selection-policy-0.1.0",
+            "score_field": "raw_score",
+            "score_threshold": 85.38225,
+            "cluster_top_n": 1,
+            "volatility_policy": {
+              "version": "m1-training-volatility-policy-0.1.0",
+              "training_only": true,
+              "gate_applied": true,
+              "selected_regimes": [
+                "Low",
+                "Normal"
+              ],
+              "evidence_sufficient": true,
+              "minimum_samples_per_regime": 20,
+              "minimum_regimes": 2,
+              "minimum_improvement_percent": 0,
+              "training_baseline_expectancy_percent": -0.19125974193548367,
+              "per_regime": {
+                "Low": {
+                  "sample_count": 1004,
+                  "net_expectancy_percent": -0.17806369820717113,
+                  "sufficiently_sampled": true
+                },
+                "Normal": {
+                  "sample_count": 866,
+                  "net_expectancy_percent": -0.1832363533487299,
+                  "sufficiently_sampled": true
+                },
+                "High": {
+                  "sample_count": 532,
+                  "net_expectancy_percent": -0.21920653007518798,
+                  "sufficiently_sampled": true
+                },
+                "Extreme": {
+                  "sample_count": 202,
+                  "net_expectancy_percent": -0.21764286633663354,
+                  "sufficiently_sampled": true
+                }
+              },
+              "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+              "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+            }
+          }
+        },
+        {
+          "window_index": 3,
+          "test_start": 1785373199999,
+          "test_end": 1785635999999,
+          "model_summary": {
+            "version": "m1-oos-selection-policy-0.1.0",
+            "score_field": "raw_score",
+            "score_threshold": 85.5995,
+            "cluster_top_n": 1,
+            "volatility_policy": {
+              "version": "m1-training-volatility-policy-0.1.0",
+              "training_only": true,
+              "gate_applied": true,
+              "selected_regimes": [
+                "Low",
+                "Normal",
+                "Extreme"
+              ],
+              "evidence_sufficient": true,
+              "minimum_samples_per_regime": 20,
+              "minimum_regimes": 2,
+              "minimum_improvement_percent": 0,
+              "training_baseline_expectancy_percent": -0.16423028375808255,
+              "per_regime": {
+                "Low": {
+                  "sample_count": 1136,
+                  "net_expectancy_percent": -0.13280643397887312,
+                  "sufficiently_sampled": true
+                },
+                "Normal": {
+                  "sample_count": 869,
+                  "net_expectancy_percent": -0.162121902186421,
+                  "sufficiently_sampled": true
+                },
+                "High": {
+                  "sample_count": 474,
+                  "net_expectancy_percent": -0.24644075527426146,
+                  "sufficiently_sampled": true
+                },
+                "Extreme": {
+                  "sample_count": 150,
+                  "net_expectancy_percent": -0.15464303999999998,
+                  "sufficiently_sampled": true
+                }
+              },
+              "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+              "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+            }
+          }
+        },
+        {
+          "window_index": 4,
+          "test_start": 1785632399999,
+          "test_end": 1785884399999,
+          "model_summary": {
+            "version": "m1-oos-selection-policy-0.1.0",
+            "score_field": "raw_score",
+            "score_threshold": 85.581,
+            "cluster_top_n": 1,
+            "volatility_policy": {
+              "version": "m1-training-volatility-policy-0.1.0",
+              "training_only": true,
+              "gate_applied": true,
+              "selected_regimes": [
+                "Low",
+                "Normal"
+              ],
+              "evidence_sufficient": true,
+              "minimum_samples_per_regime": 20,
+              "minimum_regimes": 2,
+              "minimum_improvement_percent": 0,
+              "training_baseline_expectancy_percent": -0.17269239450921414,
+              "per_regime": {
+                "Low": {
+                  "sample_count": 991,
+                  "net_expectancy_percent": -0.13333452976791127,
+                  "sufficiently_sampled": true
+                },
+                "Normal": {
+                  "sample_count": 839,
+                  "net_expectancy_percent": -0.15134340762812884,
+                  "sufficiently_sampled": true
+                },
+                "High": {
+                  "sample_count": 594,
+                  "net_expectancy_percent": -0.23846262962962983,
+                  "sufficiently_sampled": true
+                },
+                "Extreme": {
+                  "sample_count": 235,
+                  "net_expectancy_percent": -0.24864100851063828,
+                  "sufficiently_sampled": true
+                }
+              },
+              "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+              "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+            }
+          }
+        },
+        {
+          "window_index": 5,
+          "test_start": 1785873599999,
+          "test_end": 1786132799999,
+          "model_summary": {
+            "version": "m1-oos-selection-policy-0.1.0",
+            "score_field": "raw_score",
+            "score_threshold": 85.97925000000001,
+            "cluster_top_n": 1,
+            "volatility_policy": {
+              "version": "m1-training-volatility-policy-0.1.0",
+              "training_only": true,
+              "gate_applied": true,
+              "selected_regimes": [
+                "Low",
+                "Normal"
+              ],
+              "evidence_sufficient": true,
+              "minimum_samples_per_regime": 20,
+              "minimum_regimes": 2,
+              "minimum_improvement_percent": 0,
+              "training_baseline_expectancy_percent": -0.15715041169724797,
+              "per_regime": {
+                "Low": {
+                  "sample_count": 999,
+                  "net_expectancy_percent": -0.12018896896896895,
+                  "sufficiently_sampled": true
+                },
+                "Normal": {
+                  "sample_count": 787,
+                  "net_expectancy_percent": -0.13465336594663285,
+                  "sufficiently_sampled": true
+                },
+                "High": {
+                  "sample_count": 563,
+                  "net_expectancy_percent": -0.22093678685612805,
+                  "sufficiently_sampled": true
+                },
+                "Extreme": {
+                  "sample_count": 267,
+                  "net_expectancy_percent": -0.22725500749063668,
+                  "sufficiently_sampled": true
+                }
+              },
+              "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+              "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+            }
+          }
+        },
+        {
+          "window_index": 6,
+          "test_start": 1786147199999,
+          "test_end": 1786399199999,
+          "model_summary": {
+            "version": "m1-oos-selection-policy-0.1.0",
+            "score_field": "raw_score",
+            "score_threshold": 86.3812,
+            "cluster_top_n": 1,
+            "volatility_policy": {
+              "version": "m1-training-volatility-policy-0.1.0",
+              "training_only": true,
+              "gate_applied": true,
+              "selected_regimes": [
+                "Low",
+                "Normal"
+              ],
+              "evidence_sufficient": true,
+              "minimum_samples_per_regime": 20,
+              "minimum_regimes": 2,
+              "minimum_improvement_percent": 0,
+              "training_baseline_expectancy_percent": -0.15368748546621383,
+              "per_regime": {
+                "Low": {
+                  "sample_count": 893,
+                  "net_expectancy_percent": -0.11221092385218374,
+                  "sufficiently_sampled": true
+                },
+                "Normal": {
+                  "sample_count": 900,
+                  "net_expectancy_percent": -0.1382045344444446,
+                  "sufficiently_sampled": true
+                },
+                "High": {
+                  "sample_count": 561,
+                  "net_expectancy_percent": -0.20795297504456367,
+                  "sufficiently_sampled": true
+                },
+                "Extreme": {
+                  "sample_count": 295,
+                  "net_expectancy_percent": -0.2232816745762713,
+                  "sufficiently_sampled": true
+                }
+              },
+              "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+              "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+            }
+          }
+        },
+        {
+          "window_index": 7,
+          "test_start": 1786406399999,
+          "test_end": 1786665599999,
+          "model_summary": {
+            "version": "m1-oos-selection-policy-0.1.0",
+            "score_field": "raw_score",
+            "score_threshold": 86.5738,
+            "cluster_top_n": 1,
+            "volatility_policy": {
+              "version": "m1-training-volatility-policy-0.1.0",
+              "training_only": true,
+              "gate_applied": true,
+              "selected_regimes": [
+                "Low",
+                "Normal"
+              ],
+              "evidence_sufficient": true,
+              "minimum_samples_per_regime": 20,
+              "minimum_regimes": 2,
+              "minimum_improvement_percent": 0,
+              "training_baseline_expectancy_percent": -0.15609882022044858,
+              "per_regime": {
+                "Low": {
+                  "sample_count": 868,
+                  "net_expectancy_percent": -0.108339737327189,
+                  "sufficiently_sampled": true
+                },
+                "Normal": {
+                  "sample_count": 901,
+                  "net_expectancy_percent": -0.14678555493895684,
+                  "sufficiently_sampled": true
+                },
+                "High": {
+                  "sample_count": 560,
+                  "net_expectancy_percent": -0.20844080357142877,
+                  "sufficiently_sampled": true
+                },
+                "Extreme": {
+                  "sample_count": 302,
+                  "net_expectancy_percent": -0.22409426821192066,
+                  "sufficiently_sampled": true
+                }
+              },
+              "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+              "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+            }
+          }
+        },
+        {
+          "window_index": 8,
+          "test_start": 1786661999999,
+          "test_end": 1786917599999,
+          "model_summary": {
+            "version": "m1-oos-selection-policy-0.1.0",
+            "score_field": "raw_score",
+            "score_threshold": 86.64455,
+            "cluster_top_n": 1,
+            "volatility_policy": {
+              "version": "m1-training-volatility-policy-0.1.0",
+              "training_only": true,
+              "gate_applied": true,
+              "selected_regimes": [
+                "Low",
+                "Normal"
+              ],
+              "evidence_sufficient": true,
+              "minimum_samples_per_regime": 20,
+              "minimum_regimes": 2,
+              "minimum_improvement_percent": 0,
+              "training_baseline_expectancy_percent": -0.17211024866920158,
+              "per_regime": {
+                "Low": {
+                  "sample_count": 902,
+                  "net_expectancy_percent": -0.15272022949002223,
+                  "sufficiently_sampled": true
+                },
+                "Normal": {
+                  "sample_count": 912,
+                  "net_expectancy_percent": -0.15004313157894736,
+                  "sufficiently_sampled": true
+                },
+                "High": {
+                  "sample_count": 546,
+                  "net_expectancy_percent": -0.20599884249084263,
+                  "sufficiently_sampled": true
+                },
+                "Extreme": {
+                  "sample_count": 270,
+                  "net_expectancy_percent": -0.24289482592592615,
+                  "sufficiently_sampled": true
+                }
+              },
+              "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+              "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+            }
+          }
+        },
+        {
+          "window_index": 9,
+          "test_start": 1786928399999,
+          "test_end": 1787072399999,
+          "model_summary": {
+            "version": "m1-oos-selection-policy-0.1.0",
+            "score_field": "raw_score",
+            "score_threshold": 87.2251,
+            "cluster_top_n": 1,
+            "volatility_policy": {
+              "version": "m1-training-volatility-policy-0.1.0",
+              "training_only": true,
+              "gate_applied": true,
+              "selected_regimes": [
+                "Low",
+                "Normal"
+              ],
+              "evidence_sufficient": true,
+              "minimum_samples_per_regime": 20,
+              "minimum_regimes": 2,
+              "minimum_improvement_percent": 0,
+              "training_baseline_expectancy_percent": -0.16342230804248822,
+              "per_regime": {
+                "Low": {
+                  "sample_count": 996,
+                  "net_expectancy_percent": -0.145426799196787,
+                  "sufficiently_sampled": true
+                },
+                "Normal": {
+                  "sample_count": 977,
+                  "net_expectancy_percent": -0.15462508802456493,
+                  "sufficiently_sampled": true
+                },
+                "High": {
+                  "sample_count": 470,
+                  "net_expectancy_percent": -0.18609698723404272,
+                  "sufficiently_sampled": true
+                },
+                "Extreme": {
+                  "sample_count": 193,
+                  "net_expectancy_percent": -0.2456052694300519,
+                  "sufficiently_sampled": true
+                }
+              },
+              "selection_basis": "training_net_1h_expectancy_vs_training_baseline",
+              "reason": "SELECTED_TRAINING_REGIMES_ONLY"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
