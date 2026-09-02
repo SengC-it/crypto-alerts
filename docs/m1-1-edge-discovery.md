@@ -190,4 +190,3 @@ Coverage complete: **true**; symbols: 18/18.
 - The 180d target is intentionally frozen before the old M1 holdout boundary; symbols remain the configured 18-symbol universe and are never blacklisted by result.
 - All score, horizon, volatility, event and Top-N policies are fit per training window. The final holdout is reserved for a later validation phase and is not opened here.
 - `edge_score`, `learned_score` and calibration bins are ordering diagnostics, not win probabilities.
-

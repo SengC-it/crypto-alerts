@@ -173,5 +173,5 @@ export function buildM11Markdown(result = {}) {
     '- `edge_score`, `learned_score` and calibration bins are ordering diagnostics, not win probabilities.',
     '',
   );
-  return `${lines.join('\n')}\n`;
+  return lines.join('\n');
 }
