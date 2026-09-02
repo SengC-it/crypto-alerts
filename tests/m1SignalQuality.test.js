@@ -436,6 +436,7 @@ describe('M1 shadow experiment boundary', () => {
     });
     assert.equal(result.V1_UNCHANGED, true);
     assert.equal(result.V2_SHADOW_ONLY, true);
+    assert.equal(result.V2_PRODUCTION_ENABLED, false);
     assert.equal(result.AUTO_TRADING, false);
     assert.ok(result.candidates.length >= 1);
     assert.ok(result.candidates.every(candidate => candidate.status === 'SHADOW'));
@@ -468,6 +469,7 @@ describe('M1 shadow experiment boundary', () => {
     assert.equal(result.mode, 'SHADOW_ONLY');
     assert.equal(result.historical_coverage.complete, true);
     assert.equal(result.flags.AUTO_TRADING, false);
+    assert.equal(result.flags.V2_PRODUCTION_ENABLED, false);
     assert.equal(result.promotion.recommendation, 'INSUFFICIENT_EVIDENCE');
     assert.ok(result.candidates.every(candidate => candidate.status === 'SHADOW'));
     const compact = runM1Experiment({

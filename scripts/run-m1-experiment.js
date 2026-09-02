@@ -44,35 +44,28 @@ function makeFixture(symbol, count = 900, phase = 0) {
 
 function compactResult(result) {
   if (process.argv.includes('--full')) return result;
-  const oosSelectionAudit = (result.walk_forward?.oos_samples || []).map(sample => ({
-    market_event_id: sample.market_event_id,
-    symbol: sample.symbol,
-    direction: sample.direction,
-    setup_family: sample.setup_family,
-    cluster_rank: sample.cluster_rank,
-    ranking_bucket: sample.ranking_bucket,
-    raw_score: sample.raw_score,
-    edge_score: sample.edge_score,
-    timestamp: sample.timestamp,
-    outcome: sample.outcome,
-    raw_score_eligible: sample.raw_score_eligible ?? null,
-    score_eligible: sample.score_eligible ?? null,
-    volatility_eligible: sample.volatility_eligible ?? null,
-    oos_cluster_rank: sample.oos_cluster_rank ?? null,
-    selection_status: sample.selection_status ?? null,
-    selected: sample.selected === true,
-  }));
+  const oosSamples = result.walk_forward?.oos_samples || [];
+  const selectionStatusCounts = Object.fromEntries(
+    [...new Set(oosSamples.map(sample => sample.selection_status || 'UNKNOWN'))]
+      .sort()
+      .map(status => [status, oosSamples.filter(sample => (sample.selection_status || 'UNKNOWN') === status).length]),
+  );
   const compactWalkForward = result.walk_forward
     ? {
-      ...result.walk_forward,
+      ...Object.fromEntries(Object.entries(result.walk_forward).filter(([key]) => ![
+        'ordered_indices',
+        'development_indices',
+        'wfo_development_indices',
+        'final_holdout_indices',
+        'oos_samples',
+      ].includes(key))),
       windows: (result.walk_forward.windows || []).map(({ train, test, ...window }) => window),
-      oos_samples_count: result.walk_forward.oos_samples?.length || 0,
-      oos_samples: undefined,
+      oos_samples_count: oosSamples.length,
+      oos_selection_audit_counts: selectionStatusCounts,
     }
     : result.walk_forward;
   return {
     ...result,
-    oos_selection_audit: oosSelectionAudit,
     candidates: undefined,
     candidate_count: result.candidate_count ?? (result.candidates?.length || 0),
     v1_records: undefined,
@@ -149,11 +142,16 @@ const result = runM1Experiment({
 });
 
 const outputPath = argument('out');
+const auditOutputPath = argument('audit-out');
 if (outputPath) {
   fs.mkdirSync(path.dirname(path.resolve(outputPath)), { recursive: true });
   fs.writeFileSync(outputPath, JSON.stringify(compactResult(result), null, 2));
   const markdownPath = outputPath.replace(/\.json$/i, '.md');
   fs.writeFileSync(markdownPath, buildM1Markdown(result));
+}
+if (auditOutputPath) {
+  fs.mkdirSync(path.dirname(path.resolve(auditOutputPath)), { recursive: true });
+  fs.writeFileSync(auditOutputPath, JSON.stringify(result.walk_forward?.oos_samples || [], null, 2));
 }
 
 console.log(JSON.stringify({

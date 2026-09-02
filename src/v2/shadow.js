@@ -25,6 +25,7 @@ export const V2_MODE = SHADOW_STATUS;
 const V2_FLAGS = Object.freeze({
   V1_UNCHANGED: true,
   V2_SHADOW_ONLY: true,
+  V2_PRODUCTION_ENABLED: false,
   AUTO_TRADING: false,
 });
 

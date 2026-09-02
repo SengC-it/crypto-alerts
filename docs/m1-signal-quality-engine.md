@@ -19,7 +19,8 @@ authorize promotion, deployment, or automatic trading.
 
 ## Safety and benchmark contract
 
-- `V1_UNCHANGED=true`, `V2_SHADOW_ONLY=true`, `AUTO_TRADING=false`.
+- `V1_UNCHANGED=true`, `V2_SHADOW_ONLY=true`, `V2_PRODUCTION_ENABLED=false`,
+  `AUTO_TRADING=false`.
 - Every V2 candidate remains externally `SHADOW`; selection status is research
   metadata only.
 - Indicators use the M0 canonical closed-candle window. No future candle is
@@ -129,7 +130,7 @@ when both levels are touched in the same candle and ordering is unknowable.
 - Promotion recommendation: `REJECT`. Fixed promotion thresholds were not
   reduced; V2 was not merged, deployed, or wired to automatic trading.
 
-The machine-readable artifact is [reports/m1-final.json](/D:/Codex/crypto-alerts/reports/m1-final.json).
+The machine-readable artifact is [reports/m1-final.json](../reports/m1-final.json).
 It contains the exact benchmark, coverage, WFO boundaries, holdout hash,
 per-window policies and metrics, selected-lane metrics, calibration, V1
 comparator, and promotion result without raw candle payloads.

@@ -485,6 +485,7 @@ export function runM1Experiment({
     flags: {
       V1_UNCHANGED: true,
       V2_SHADOW_ONLY: true,
+      V2_PRODUCTION_ENABLED: false,
       AUTO_TRADING: false,
     },
     benchmark,
