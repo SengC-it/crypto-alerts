@@ -140,12 +140,34 @@ function latestMetricsPerHour(rows = []) {
   return [...byHour.values()].sort((left, right) => left.source_timestamp - right.source_timestamp);
 }
 
-async function fetchArchive(url, fetchImpl) {
-  const response = await fetchImpl(url);
-  if (response.status === 404) return { url, missing: true, rows: [] };
-  if (!response.ok) throw new Error(`Binance derivatives archive request failed: ${response.status} ${url}`);
-  const bytes = await response.arrayBuffer();
-  return { url, missing: false, bytes };
+async function fetchArchive(url, fetchImpl, {
+  requestTimeoutMs = 30000,
+  maxRetries = 2,
+} = {}) {
+  let lastError = null;
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
+    try {
+      const response = await fetchImpl(url, { signal: controller.signal });
+      if (response.status === 404) return { url, missing: true, rows: [] };
+      if (!response.ok) {
+        const retryable = response.status === 408 || response.status === 429 || response.status >= 500;
+        if (!retryable || attempt === maxRetries) {
+          throw new Error(`Binance derivatives archive request failed: ${response.status} ${url}`);
+        }
+        throw new Error(`retryable_http_${response.status}`);
+      }
+      const bytes = await response.arrayBuffer();
+      return { url, missing: false, bytes };
+    } catch (error) {
+      lastError = error;
+      if (attempt === maxRetries) throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  throw lastError || new Error(`Binance derivatives archive request failed: ${url}`);
 }
 
 async function mapWithConcurrency(items, concurrency, worker) {
@@ -171,13 +193,18 @@ async function loadMonthlyFamily({
   parser,
   concurrency,
   fetchImpl,
+  requestTimeoutMs,
+  maxRetries,
 }) {
   const months = monthList(startTime, endTime);
   const pages = await mapWithConcurrency(months, concurrency, async month => {
     const path = timeframe
       ? `monthly/${family}/${symbol}/${timeframe}/${symbol}-${timeframe}-${month}.zip`
       : `monthly/${family}/${symbol}/${symbol}-${family}-${month}.zip`;
-    const result = await fetchArchive(`${BINANCE_DERIVATIVES_ARCHIVE_BASE}/${path}`, fetchImpl);
+    const result = await fetchArchive(`${BINANCE_DERIVATIVES_ARCHIVE_BASE}/${path}`, fetchImpl, {
+      requestTimeoutMs,
+      maxRetries,
+    });
     if (result.missing) return { month, missing: true, rows: [] };
     const csv = readArchiveEntry(result.bytes);
     return { month, missing: false, rows: parser(csv, symbol) };
@@ -201,11 +228,16 @@ async function loadMetricsFamily({
   endTime,
   concurrency,
   fetchImpl,
+  requestTimeoutMs,
+  maxRetries,
 }) {
   const dates = dateList(startTime, endTime);
   const pages = await mapWithConcurrency(dates, concurrency, async date => {
     const path = `daily/metrics/${symbol}/${symbol}-metrics-${date}.zip`;
-    const result = await fetchArchive(`${BINANCE_DERIVATIVES_ARCHIVE_BASE}/${path}`, fetchImpl);
+    const result = await fetchArchive(`${BINANCE_DERIVATIVES_ARCHIVE_BASE}/${path}`, fetchImpl, {
+      requestTimeoutMs,
+      maxRetries,
+    });
     if (result.missing) return { date, missing: true, rows: [] };
     const csv = readArchiveEntry(result.bytes);
     return { date, missing: false, rows: parseMetricsRows(csv, symbol) };
@@ -251,6 +283,9 @@ export async function loadPublicDerivativeHistory({
   endTime,
   concurrency = 8,
   symbolConcurrency = 2,
+  requestTimeoutMs = 30000,
+  maxRetries = 2,
+  onSymbolComplete = null,
   fetchImpl = globalThis.fetch,
 } = {}) {
   if (typeof fetchImpl !== 'function') throw new Error('A fetch implementation is required');
@@ -265,7 +300,12 @@ export async function loadPublicDerivativeHistory({
       startTime: start,
       endTime: end,
       concurrency,
+      requestTimeoutMs,
+      maxRetries,
       fetchImpl,
+    }).then(result => {
+      if (typeof onSymbolComplete === 'function') onSymbolComplete(result);
+      return result;
     })
   ));
   return {

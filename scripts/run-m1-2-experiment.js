@@ -244,6 +244,8 @@ if (!Number.isFinite(parsedAsOf) || parsedAsOf >= frozenBoundary) {
 const source = 'public_binance_futures_archive';
 const concurrency = Math.max(1, Number(argument('concurrency', '8')) || 8);
 const symbolConcurrency = Math.max(1, Number(argument('symbol-concurrency', '2')) || 2);
+const requestTimeoutMs = Math.max(1000, Number(argument('request-timeout-ms', '30000')) || 30000);
+const maxRetries = Math.max(0, Number(argument('max-retries', '2')) || 2);
 const commitSha = argument('commit-sha') || getCommitSha();
 const outputPath = path.resolve(argument('out', 'reports/m1-2-final.json'));
 const markdownPath = path.resolve(argument('report-out', 'docs/m1-2-independent-information-gain.md'));
@@ -268,6 +270,14 @@ const derivativeHistory = await loadPublicDerivativeHistory({
   endTime: window.requestedEnd,
   concurrency,
   symbolConcurrency,
+  requestTimeoutMs,
+  maxRetries,
+  onSymbolComplete: result => console.log(JSON.stringify({
+    derivatives_symbol_complete: result.symbol,
+    funding_rows: result.funding.rows.length,
+    premium_rows: result.premium.rows.length,
+    open_interest_hour_rows: result.openInterest.rows.length,
+  })),
 });
 const derivativeDatasets = {
   fundingBySymbol: derivativeHistory.fundingBySymbol,
