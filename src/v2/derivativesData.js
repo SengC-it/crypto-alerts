@@ -212,8 +212,9 @@ async function loadMonthlyFamily({
   const start = timestampValue(startTime);
   const end = timestampValue(endTime);
   return {
-    rows: latestMetricsPerHour(pages.flatMap(page => page.rows)
-      .filter(row => row.source_timestamp >= start && row.source_timestamp <= end)),
+    rows: pages.flatMap(page => page.rows)
+      .filter(row => row.source_timestamp >= start && row.source_timestamp <= end)
+      .sort((left, right) => left.source_timestamp - right.source_timestamp),
     files: {
       expected: months.length,
       loaded: pages.filter(page => !page.missing).length,
@@ -245,9 +246,8 @@ async function loadMetricsFamily({
   const start = timestampValue(startTime);
   const end = timestampValue(endTime);
   return {
-    rows: pages.flatMap(page => page.rows)
-      .filter(row => row.source_timestamp >= start && row.source_timestamp <= end)
-      .sort((left, right) => left.source_timestamp - right.source_timestamp),
+    rows: latestMetricsPerHour(pages.flatMap(page => page.rows)
+      .filter(row => row.source_timestamp >= start && row.source_timestamp <= end)),
     files: {
       expected: dates.length,
       loaded: pages.filter(page => !page.missing).length,
