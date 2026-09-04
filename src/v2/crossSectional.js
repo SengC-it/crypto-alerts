@@ -909,7 +909,7 @@ export function buildDirectionalSamples(input = {}, options = {}) {
         signal_value: score.signal_value,
         signed_signal_value: score.signed_signal_value,
         score_semantics: score.score_semantics,
-        feature_snapshot: { ...row },
+        feature_snapshot: row,
         relative_momentum_8h: row.relative_momentum_8h,
         residual_momentum_8h: row.residual_momentum_8h,
         residual_reversal_4h: row.residual_reversal_4h,
@@ -1318,13 +1318,17 @@ function supportMap(records = []) {
   return new Map(records.map(record => [supportKey(record), record]));
 }
 
-function selectedEventOutcome(records, eventIdValue, primaryHorizonHours) {
-  const selected = selectedRecords(records).filter(record => (
-    (record.independent_market_event_id || record.market_event_id) === eventIdValue
-  ));
-  if (!selected.length) return 0;
-  const outcomes = selected.map(record => netOutcome(record, primaryHorizonHours)).filter(value => value !== null);
-  return outcomes.length ? average(outcomes) : 0;
+function selectedEventOutcomeMap(records, primaryHorizonHours) {
+  const values = new Map();
+  for (const record of selectedRecords(records)) {
+    const id = record.independent_market_event_id || record.market_event_id;
+    if (!id) continue;
+    const outcome = netOutcome(record, primaryHorizonHours);
+    if (outcome === null) continue;
+    if (!values.has(id)) values.set(id, []);
+    values.get(id).push(outcome);
+  }
+  return new Map([...values.entries()].map(([id, outcomes]) => [id, average(outcomes)]));
 }
 
 function seededRandom(seed) {
@@ -1385,16 +1389,20 @@ export function compareM13Results(baselineResult, candidateResult, {
     baselineSupport.get(key).independent_market_event_id
       || baselineSupport.get(key).market_event_id
   )).filter(Boolean));
+  const baselineOutcomes = selectedEventOutcomeMap(baselineResult?.oos_records || [], primaryHorizonHours);
+  const candidateOutcomes = selectedEventOutcomeMap(candidateResult?.oos_records || [], primaryHorizonHours);
+  const baselineSelectedEvents = new Set(baselineOutcomes.keys());
+  const candidateSelectedEvents = new Set(candidateOutcomes.keys());
   const pairs = [...commonEvents].sort().map(independentEventIdValue => {
-    const baselineOutcome = selectedEventOutcome(baselineResult?.oos_records || [], independentEventIdValue, primaryHorizonHours);
-    const candidateOutcome = selectedEventOutcome(candidateResult?.oos_records || [], independentEventIdValue, primaryHorizonHours);
+    const baselineOutcome = baselineOutcomes.get(independentEventIdValue) ?? 0;
+    const candidateOutcome = candidateOutcomes.get(independentEventIdValue) ?? 0;
     return {
       independent_market_event_id: independentEventIdValue,
       baseline_net_expectancy: baselineOutcome,
       candidate_net_expectancy: candidateOutcome,
       delta_net_expectancy: candidateOutcome - baselineOutcome,
-      baseline_abstention_outcome_zero: baselineOutcome === 0 && !selectedRecords(baselineResult?.oos_records || []).some(record => (record.independent_market_event_id || record.market_event_id) === independentEventIdValue),
-      candidate_abstention_outcome_zero: candidateOutcome === 0 && !selectedRecords(candidateResult?.oos_records || []).some(record => (record.independent_market_event_id || record.market_event_id) === independentEventIdValue),
+      baseline_abstention_outcome_zero: baselineOutcome === 0 && !baselineSelectedEvents.has(independentEventIdValue),
+      candidate_abstention_outcome_zero: candidateOutcome === 0 && !candidateSelectedEvents.has(independentEventIdValue),
     };
   });
   const baselineValues = pairs.map(pair => pair.baseline_net_expectancy);

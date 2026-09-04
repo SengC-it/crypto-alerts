@@ -433,6 +433,10 @@ const oldHoldoutRecordsPresent = generated.v2_research_records.some(record => {
   return timestamp !== null && timestamp >= PREVIOUS_FINAL_HOLDOUT_BOUNDARY;
 });
 if (oldHoldoutRecordsPresent) throw new Error('M1.3 input unexpectedly contains previous final holdout rows');
+generated.normalizedBySymbol = null;
+generated.rankedV2 = null;
+generated.v2Records = null;
+generated.v1Records = null;
 
 const snapshotStart = window.startOpen - M13_BETA_WINDOW_HOURS * HOUR;
 const snapshotResult = buildCrossSectionSnapshots({
@@ -643,6 +647,7 @@ for (const candidate of M13_PREDECLARED_CANDIDATES.slice(1)) {
     continue;
   }
   const samples = repriceSamples(baseCrossSectionalSamples, candidate);
+  console.log(JSON.stringify({ candidate_started: candidate.candidate_id, sample_count: samples.length }));
   const result = runM13Candidate(samples, {
     candidateId: candidate.candidate_id,
     candidate,
@@ -671,6 +676,8 @@ for (const candidate of M13_PREDECLARED_CANDIDATES.slice(1)) {
     diagnosticBestSummary = summary;
     diagnosticBestResult = result;
   }
+  samples.length = 0;
+  if (globalThis.gc) globalThis.gc();
 }
 
 if (candidateSummaries.length !== M13_CANDIDATE_BUDGET) {
