@@ -512,7 +512,6 @@ const reportResult = {
   data_admission: admission,
   admitted_families: admission.admitted_families,
   rejected_families: admission.rejected_families,
-  common_support_comparison: true,
   COMMON_SUPPORT_COMPARISON: true,
   frozen_candle_baseline: M12_BASELINE_CANDIDATE,
   candidate_search_budget: `${M12_PREDECLARED_CANDIDATES.length}/${M12_CANDIDATE_BUDGET} predeclared candidates`,
