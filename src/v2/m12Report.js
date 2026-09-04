@@ -25,10 +25,11 @@ function metricTable(title, values) {
 function comparisonLines(comparison) {
   if (!comparison) return ['- No augmented comparison was evaluated.'];
   return [
-    `- Common support clusters: ${comparison.common_support_clusters ?? 0}; paired cluster count: ${comparison.paired_cluster_count ?? 0}.`,
+    `- Underlying OOS events: ${comparison.underlying_oos_events ?? 0}; PIT-valid common events: ${comparison.pit_valid_common_events ?? 0}.`,
+    `- Baseline action events: ${comparison.baseline_action_events ?? 0}; augmented action events: ${comparison.augmented_action_events ?? 0}; paired independent market events: ${comparison.paired_common_events ?? comparison.common_support_clusters ?? 0}.`,
     `- Common-support contract: ${comparison.common_support_comparison?.same_oos_support === true}; same OOS windows: ${comparison.common_support_comparison?.same_oos_windows === true}.`,
     `- Point delta net expectancy: ${display(comparison.point_estimate?.delta_net_expectancy, '%')}; delta net PF: ${display(comparison.point_estimate?.delta_net_pf)}.`,
-    `- Bootstrap: ${comparison.bootstrap?.repetitions ?? 0} repetitions; delta expectancy 95% CI ${json(comparison.bootstrap?.delta_expectancy_95_ci)}; P(delta expectancy > 0)=${display(comparison.bootstrap?.p_delta_expectancy_gt_zero)}.`,
+    `- Bootstrap unit: ${comparison.bootstrap?.unit || 'market_event_id'}; ${comparison.bootstrap?.repetitions ?? 0} repetitions; delta expectancy 95% CI ${json(comparison.bootstrap?.delta_expectancy_95_ci)}; P(delta expectancy > 0)=${display(comparison.bootstrap?.p_delta_expectancy_gt_zero)}.`,
     `- Bootstrap delta PF 95% CI: ${json(comparison.bootstrap?.delta_net_pf_95_ci)}; seed: ${display(comparison.bootstrap?.seed)}.`,
   ];
 }
@@ -45,7 +46,7 @@ export function buildM12Markdown(result = {}) {
     `- Base main SHA: \`${result.base_main_sha || 'N/A'}\`; M1.1 closeout PR: #${result.m1_1_closeout?.pr_number || 'N/A'}.`,
     `- Experiment: \`${result.experiment_id || 'N/A'}\``,
     `- Model/version: \`${result.model_version || 'N/A'}\` / \`${result.feature_version || 'N/A'}\``,
-    `- Source commit SHA: \`${result.commit_sha || 'N/A'}\``,
+    `- Experiment source SHA: \`${result.experiment_source_sha || result.commit_sha || 'N/A'}\``,
     `- Config hash: \`${result.config_hash || 'N/A'}\``,
     `- Data source: ${result.data_source || 'N/A'}`,
     `- Cost: ${display(result.cost_assumptions?.round_trip_percent, '%')} round trip; diagnostics are signal-level gross/net values.`,
@@ -87,11 +88,11 @@ export function buildM12Markdown(result = {}) {
     `- Candidate budget: ${result.candidate_search_budget || 'N/A'}`,
     `- Diagnostic largest observed delta (not a selection rule): \`${result.diagnostic_max_delta_candidate_id || 'NONE'}\``,
     '',
-    '| Candidate | Families | Status | Selected OOS | Clusters | Net PF | Net expectancy | Gain gate | Absolute gate |',
-    '|---|---|---|---:|---:|---:|---:|---|---|',
+    '| Candidate | Families | Status | Selected OOS | Clusters | Net PF | Net expectancy | Gain gate | Absolute gate | No-op |',
+    '|---|---|---|---:|---:|---:|---:|---|---|---|',
   );
   for (const candidate of result.candidates || []) {
-    lines.push(`| ${candidate.candidate_id} | ${(candidate.derivative_families || []).join(', ') || 'candle-only'} | ${candidate.status || '-'} | ${candidate.selected_oos_signals ?? 0} | ${candidate.independent_oos_clusters ?? 0} | ${display(candidate.net_profit_factor)} | ${display(candidate.net_expectancy_percent, '%')} | ${candidate.independent_information_gain === true} | ${candidate.absolute_promotion?.pass === true} |`);
+    lines.push(`| ${candidate.candidate_id} | ${(candidate.derivative_families || []).join(', ') || 'candle-only'} | ${candidate.status || '-'} | ${candidate.selected_oos_signals ?? 0} | ${candidate.independent_oos_clusters ?? 0} | ${display(candidate.net_profit_factor)} | ${display(candidate.net_expectancy_percent, '%')} | ${candidate.independent_information_gain === true} | ${candidate.absolute_promotion?.pass === true} | ${candidate.integration_no_op === true} |`);
   }
   lines.push(
     '',
@@ -100,6 +101,22 @@ export function buildM12Markdown(result = {}) {
     `- Baseline net PF: ${display(baseline.net_profit_factor)}; net expectancy: ${display(baseline.net_expectancy_percent, '%')}; calibration: ${baseline.calibration || 'N/A'}.`,
     `- Diagnostic augmented candidate: \`${diagnostic.candidate_id || 'NONE'}\`; information gain: ${diagnostic.independent_information_gain === true}.`,
     ...comparisonLines(comparison),
+    '',
+    '## Derivative integration-effect audit',
+    '',
+    '| Candidate | WFO window | Base eligible | Augmented eligible | Promoted | Demoted | Ranking changed | Selected records changed | Selected events changed | Derivative variance | Integration no-op |',
+    '|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|',
+  );
+  for (const candidate of result.candidates || []) {
+    const audit = candidate.derivative_effect_audit;
+    if (!audit) continue;
+    for (const item of [...(audit.windows || []), { window_index: 'TOTAL', ...(audit.total || {}) }]) {
+      lines.push(`| ${candidate.candidate_id} | ${item.window_index} | ${item.base_eligible_count ?? 0} | ${item.augmented_eligible_count ?? 0} | ${item.eligibility_promoted_count ?? 0} | ${item.eligibility_demoted_count ?? 0} | ${item.ranking_changed_count ?? 0} | ${item.selected_record_changed_count ?? 0} | ${item.selected_market_event_changed_count ?? 0} | ${display(item.derivative_score_variance)} | ${item.integration_no_op === true} |`);
+    }
+  }
+  lines.push(
+    '',
+    '- `INTEGRATION_NO_OP=true` means admitted feature variation had no observed decision effect; it is not treated as evidence that the family lacks predictive information.',
     '',
     '## Information-family ablation',
     '',

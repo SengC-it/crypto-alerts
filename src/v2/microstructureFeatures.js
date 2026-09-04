@@ -1,7 +1,7 @@
 // Point-in-time public derivatives features for bounded M1.2 research.
 // This module is deliberately separate from the live/production signal path.
 
-export const M12_FEATURE_VERSION = 'm1.2-pit-derivatives-0.1.0';
+export const M12_FEATURE_VERSION = 'm1.2-pit-derivatives-0.1.1';
 
 export const M12_DERIVATIVE_FAMILIES = Object.freeze([
   'Funding',

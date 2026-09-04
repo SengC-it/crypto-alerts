@@ -12,6 +12,8 @@ reports/*
 !reports/m1-1-final.json
 !reports/m1-2-final.json
 !reports/m1-2-data-admission.json
+!reports/m1-2-final-0.1.1.json
+!reports/m1-2-data-admission-0.1.1.json
 %SystemDrive%/
 
 .vercel

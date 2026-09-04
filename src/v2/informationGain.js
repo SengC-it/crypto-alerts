@@ -22,7 +22,7 @@ import {
   fitDerivativePolicies,
 } from './microstructureFeatures.js';
 
-export const M12_MODEL_VERSION = 'm1.2-v2-independent-information-gain-0.1.0';
+export const M12_MODEL_VERSION = 'm1.2-v2-independent-information-gain-0.1.1';
 export const M12_CANDIDATE_BUDGET = 16;
 export const M12_BOOTSTRAP_REPETITIONS = 2000;
 export const M12_BOOTSTRAP_SEED = 20260904;
@@ -132,36 +132,63 @@ function direction(record) {
   return String(record?.direction ?? record?.signal ?? '').toUpperCase() || 'UNKNOWN';
 }
 
-function selectedClusterKey(record) {
-  if (!record?.market_event_id) return null;
-  return `${record.window_index ?? 'NA'}|${record.market_event_id}|${direction(record)}`;
+function eventId(record) {
+  return record?.market_event_id === null || record?.market_event_id === undefined
+    || record.market_event_id === ''
+    ? null
+    : String(record.market_event_id);
 }
 
-function clusterOutcomes(records = []) {
-  const clusters = new Map();
+function comparisonFamilies(augmentedResult) {
+  return [...new Set(
+    augmentedResult?.candidate?.derivative_families
+      || augmentedResult?.derivative_families
+      || [],
+  )].filter(family => M12_DERIVATIVE_FAMILIES.includes(family));
+}
+
+function familyPointInTimeValid(record, family) {
+  const feature = record?.derivatives?.[family];
+  return feature?.point_in_time_valid === true
+    && finite(feature.representative_value) !== null;
+}
+
+function eventRecords(records = []) {
+  const grouped = new Map();
   for (const record of records) {
-    const key = selectedClusterKey(record);
-    const net = primaryNet(record);
-    if (!key || net === null) continue;
-    if (!clusters.has(key)) clusters.set(key, []);
-    clusters.get(key).push({
-      record,
-      net,
-      gross: primaryGross(record),
-    });
+    const id = eventId(record);
+    if (!id) continue;
+    if (!grouped.has(id)) grouped.set(id, []);
+    grouped.get(id).push(record);
   }
-  return new Map([...clusters.entries()].map(([key, members]) => {
-    const sorted = [...members].sort((left, right) => (
-      (left.record.oos_cluster_rank ?? 0) - (right.record.oos_cluster_rank ?? 0)
-      || String(left.record.symbol || '').localeCompare(String(right.record.symbol || ''))
-    ));
-    return [key, {
-      cluster_id: key,
-      net: average(members.map(member => member.net)),
-      gross: average(members.map(member => member.gross).filter(value => value !== null)),
-      representative: sorted[0].record,
-    }];
-  }));
+  return grouped;
+}
+
+function validEvent(records, families) {
+  return families.every(family => records.length > 0
+    && records.every(record => familyPointInTimeValid(record, family)));
+}
+
+function aggregateEventOutcomes(records = [], eventIds = [], getter) {
+  const selected = new Map();
+  const supported = new Set(eventIds);
+  for (const record of records) {
+    const id = eventId(record);
+    if (!record?.selected || !id || !supported.has(id)) continue;
+    const value = getter(record);
+    if (value === null) continue;
+    if (!selected.has(id)) selected.set(id, []);
+    selected.get(id).push(value);
+  }
+  return new Map(eventIds.map(id => [id, average(selected.get(id) || []) ?? 0]));
+}
+
+function selectedEventIds(records = [], eventIds = []) {
+  const supported = new Set(eventIds);
+  return new Set(records
+    .filter(record => record?.selected && supported.has(eventId(record)))
+    .map(eventId)
+    .filter(Boolean));
 }
 
 function commonRecordSupport(left = [], right = []) {
@@ -220,6 +247,8 @@ function bootstrapMetrics(pairs, repetitions, seed) {
   return {
     repetitions,
     seed,
+    unit: 'market_event_id',
+    unit_count: pairs.length,
     delta_expectancy_95_ci: [round(quantile(meanDeltas, 0.025)), round(quantile(meanDeltas, 0.975))],
     delta_net_pf_95_ci: [round(quantile(pfDeltas, 0.025), 4), round(quantile(pfDeltas, 0.975), 4)],
     p_delta_expectancy_gt_zero: round(meanDeltas.filter(value => value > 0).length / repetitions, 6),
@@ -227,23 +256,50 @@ function bootstrapMetrics(pairs, repetitions, seed) {
   };
 }
 
-/** Cluster-level paired comparison; clusters, not individual symbol rows, are resampled. */
+/** Event-level paired comparison; one market event is one resampling unit. */
 export function compareM12Candidates(baselineResult, augmentedResult, {
   repetitions = M12_BOOTSTRAP_REPETITIONS,
   seed = M12_BOOTSTRAP_SEED,
 } = {}) {
-  const baselineClusters = clusterOutcomes(baselineResult?.selected_records || []);
-  const augmentedClusters = clusterOutcomes(augmentedResult?.selected_records || []);
-  const commonIds = [...baselineClusters.keys()]
-    .filter(clusterId => augmentedClusters.has(clusterId))
+  const families = comparisonFamilies(augmentedResult);
+  const baselineEvents = eventRecords(baselineResult?.oos_records || []);
+  const augmentedEvents = eventRecords(augmentedResult?.oos_records || []);
+  const underlyingIds = [...baselineEvents.keys()]
+    .filter(id => augmentedEvents.has(id))
     .sort();
-  const pairs = commonIds.map(clusterId => ({
-    cluster_id: clusterId,
-    baseline_net: baselineClusters.get(clusterId).net,
-    augmented_net: augmentedClusters.get(clusterId).net,
-    baseline_gross: baselineClusters.get(clusterId).gross,
-    augmented_gross: augmentedClusters.get(clusterId).gross,
-    delta_net: augmentedClusters.get(clusterId).net - baselineClusters.get(clusterId).net,
+  const pitValidIds = underlyingIds.filter(id => (
+    validEvent(baselineEvents.get(id), families)
+      && validEvent(augmentedEvents.get(id), families)
+  ));
+  const baselineNet = aggregateEventOutcomes(
+    baselineResult?.selected_records || [],
+    pitValidIds,
+    primaryNet,
+  );
+  const augmentedNet = aggregateEventOutcomes(
+    augmentedResult?.selected_records || [],
+    pitValidIds,
+    primaryNet,
+  );
+  const baselineGross = aggregateEventOutcomes(
+    baselineResult?.selected_records || [],
+    pitValidIds,
+    primaryGross,
+  );
+  const augmentedGross = aggregateEventOutcomes(
+    augmentedResult?.selected_records || [],
+    pitValidIds,
+    primaryGross,
+  );
+  const pairs = pitValidIds.map(marketEventId => ({
+    market_event_id: marketEventId,
+    baseline_event_outcome: baselineNet.get(marketEventId),
+    augmented_event_outcome: augmentedNet.get(marketEventId),
+    baseline_net: baselineNet.get(marketEventId),
+    augmented_net: augmentedNet.get(marketEventId),
+    baseline_gross: baselineGross.get(marketEventId),
+    augmented_gross: augmentedGross.get(marketEventId),
+    delta_net: augmentedNet.get(marketEventId) - baselineNet.get(marketEventId),
   }));
   const baselineValues = pairs.map(pair => pair.baseline_net);
   const augmentedValues = pairs.map(pair => pair.augmented_net);
@@ -302,6 +358,8 @@ export function compareM12Candidates(baselineResult, augmentedResult, {
       repetitions: 0,
       requested_repetitions: repetitions,
       seed,
+      unit: 'market_event_id',
+      unit_count: 0,
       delta_expectancy_95_ci: [null, null],
       delta_net_pf_95_ci: [null, null],
       p_delta_expectancy_gt_zero: null,
@@ -309,11 +367,24 @@ export function compareM12Candidates(baselineResult, augmentedResult, {
     };
   return {
     common_support_clusters: pairs.length,
-    baseline_selected_clusters: baselineClusters.size,
-    augmented_selected_clusters: augmentedClusters.size,
-    paired_cluster_ids: commonIds,
+    underlying_oos_events: underlyingIds.length,
+    pit_valid_common_events: pitValidIds.length,
+    baseline_action_events: selectedEventIds(baselineResult?.selected_records || [], pitValidIds).size,
+    augmented_action_events: selectedEventIds(augmentedResult?.selected_records || [], pitValidIds).size,
+    paired_common_events: pairs.length,
+    baseline_selected_clusters: selectedEventIds(baselineResult?.selected_records || [], pitValidIds).size,
+    augmented_selected_clusters: selectedEventIds(augmentedResult?.selected_records || [], pitValidIds).size,
+    paired_cluster_ids: pitValidIds,
+    paired_event_ids: pitValidIds,
+    paired_event_outcomes: pairs.map(pair => ({
+      market_event_id: pair.market_event_id,
+      baseline_event_outcome: pair.baseline_event_outcome,
+      augmented_event_outcome: pair.augmented_event_outcome,
+    })),
     common_support_comparison: {
-      unit: 'window|market_event_id|direction',
+      unit: 'market_event_id',
+      underlying_oos_events: underlyingIds.length,
+      pit_valid_common_events: pitValidIds.length,
       same_oos_windows: sameOosWindows,
       exact_oos_record_support: exactOosRecordSupport,
       same_symbols: sameSymbols,
@@ -331,6 +402,137 @@ export function compareM12Candidates(baselineResult, augmentedResult, {
     },
     point_estimate: point,
     bootstrap,
+  };
+}
+
+function variance(values = []) {
+  const finiteValues = values.map(finite).filter(value => value !== null);
+  if (!finiteValues.length) return 0;
+  const mean = average(finiteValues);
+  return average(finiteValues.map(value => (value - mean) ** 2)) || 0;
+}
+
+function oosRecordKey(record) {
+  return `${record?.window_index ?? 'NA'}|${record?.record_index ?? record?.timestamp ?? 'NA'}`;
+}
+
+function scoreDelta(record) {
+  const combined = finite(record?.combined_score ?? record?.learned_score ?? record?.empirical_score);
+  const base = finite(record?.base_score ?? record?.base_learned_score);
+  return combined === null || base === null ? null : combined - base;
+}
+
+function actionEventsForRecords(records = []) {
+  const events = new Map();
+  for (const record of records) {
+    const id = eventId(record);
+    if (!id) continue;
+    if (!events.has(id)) events.set(id, false);
+    if (record.selected === true) events.set(id, true);
+  }
+  return events;
+}
+
+function derivativeEffectForRecords(baselineRecords, augmentedRecords, families) {
+  const baselineByKey = new Map(baselineRecords.map(record => [oosRecordKey(record), record]));
+  const augmentedByKey = new Map(augmentedRecords.map(record => [oosRecordKey(record), record]));
+  const keys = [...new Set([...baselineByKey.keys(), ...augmentedByKey.keys()])].sort();
+  let baseEligibleCount = 0;
+  let augmentedEligibleCount = 0;
+  let eligibilityPromotedCount = 0;
+  let eligibilityDemotedCount = 0;
+  let rankingChangedCount = 0;
+  let selectedRecordChangedCount = 0;
+  const derivativeScoreValues = [];
+  const familyScoreValues = Object.fromEntries(families.map(family => [family, []]));
+  const familyFeatureValues = Object.fromEntries(families.map(family => [family, []]));
+  for (const key of keys) {
+    const baseline = baselineByKey.get(key);
+    const augmented = augmentedByKey.get(key);
+    const baseEligible = baseline?.base_eligible ?? baseline?.score_eligible ?? false;
+    const augmentedEligible = augmented?.augmented_eligible ?? augmented?.score_eligible ?? false;
+    baseEligibleCount += baseEligible ? 1 : 0;
+    augmentedEligibleCount += augmentedEligible ? 1 : 0;
+    if (!baseEligible && augmentedEligible) eligibilityPromotedCount += 1;
+    if (baseEligible && !augmentedEligible) eligibilityDemotedCount += 1;
+    const baselineRank = baseline?.oos_cluster_rank ?? null;
+    const augmentedRank = augmented?.oos_cluster_rank ?? null;
+    if ((baselineRank !== null || augmentedRank !== null) && baselineRank !== augmentedRank) {
+      rankingChangedCount += 1;
+    }
+    if ((baseline?.selected === true) !== (augmented?.selected === true)) {
+      selectedRecordChangedCount += 1;
+    }
+    const delta = scoreDelta(augmented);
+    if (delta !== null) derivativeScoreValues.push(delta);
+    for (const family of families) {
+      const score = finite(augmented?.derivative_scores?.[family]);
+      const feature = finite(augmented?.derivatives?.[family]?.representative_value);
+      if (score !== null) familyScoreValues[family].push(score);
+      if (feature !== null) familyFeatureValues[family].push(feature);
+    }
+  }
+  const baselineEvents = actionEventsForRecords(baselineRecords);
+  const augmentedEvents = actionEventsForRecords(augmentedRecords);
+  const eventIds = [...new Set([...baselineEvents.keys(), ...augmentedEvents.keys()])];
+  const selectedMarketEventChangedCount = eventIds.filter(id => (
+    (baselineEvents.get(id) || false) !== (augmentedEvents.get(id) || false)
+  )).length;
+  const familyScoreVariance = Object.fromEntries(families.map(family => [
+    family,
+    variance(familyScoreValues[family]),
+  ]));
+  const familyFeatureVariance = Object.fromEntries(families.map(family => [
+    family,
+    variance(familyFeatureValues[family]),
+  ]));
+  const decisionEffectCount = eligibilityPromotedCount
+    + eligibilityDemotedCount
+    + rankingChangedCount
+    + selectedRecordChangedCount
+    + selectedMarketEventChangedCount;
+  const integrationNoOpFamilies = families.filter(family => (
+    familyFeatureVariance[family] > 0 && decisionEffectCount === 0
+  ));
+  return {
+    base_eligible_count: baseEligibleCount,
+    augmented_eligible_count: augmentedEligibleCount,
+    eligibility_promoted_count: eligibilityPromotedCount,
+    eligibility_demoted_count: eligibilityDemotedCount,
+    ranking_changed_count: rankingChangedCount,
+    selected_record_changed_count: selectedRecordChangedCount,
+    selected_market_event_changed_count: selectedMarketEventChangedCount,
+    derivative_score_variance: variance(derivativeScoreValues),
+    family_score_variance: familyScoreVariance,
+    family_feature_variance: familyFeatureVariance,
+    integration_no_op_families: integrationNoOpFamilies,
+    integration_no_op: integrationNoOpFamilies.length > 0,
+  };
+}
+
+/** Audit how a derivative candidate changes decisions relative to frozen C0. */
+export function buildM12DerivativeEffectAudit(baselineResult, augmentedResult, families = comparisonFamilies(augmentedResult)) {
+  const baselineRecords = baselineResult?.oos_records || [];
+  const augmentedRecords = augmentedResult?.oos_records || [];
+  const windows = [...new Set([
+    ...baselineRecords.map(record => record.window_index),
+    ...augmentedRecords.map(record => record.window_index),
+  ])].filter(index => index !== null && index !== undefined).sort((left, right) => left - right);
+  const perWindow = windows.map(windowIndex => ({
+    window_index: windowIndex,
+    ...derivativeEffectForRecords(
+      baselineRecords.filter(record => record.window_index === windowIndex),
+      augmentedRecords.filter(record => record.window_index === windowIndex),
+      families,
+    ),
+  }));
+  const total = derivativeEffectForRecords(baselineRecords, augmentedRecords, families);
+  return {
+    unit: 'underlying OOS record; decision changes are compared before outcome aggregation',
+    families,
+    windows: perWindow,
+    total,
+    integration_no_op: total.integration_no_op,
   };
 }
 
@@ -425,7 +627,9 @@ export function evaluateInformationGainGate({
   const ciLower = comparison?.bootstrap?.delta_expectancy_95_ci?.[0] ?? null;
   const pPositive = comparison?.bootstrap?.p_delta_expectancy_gt_zero ?? null;
   const observed = {
-    common_support_independent_clusters: comparison?.common_support_clusters || 0,
+    common_support_independent_clusters: comparison?.paired_common_events
+      ?? comparison?.common_support_clusters
+      ?? 0,
     delta_net_expectancy: comparison?.point_estimate?.delta_net_expectancy ?? null,
     delta_net_profit_factor: comparison?.point_estimate?.delta_net_pf ?? null,
     delta_hit_rate: comparison?.point_estimate?.delta_hit_rate ?? null,
@@ -517,14 +721,22 @@ export function fitM12Policy(trainSamples = [], candidate = {}) {
     ...M12_BASELINE_CANDIDATE,
     ...(candidate.base_candidate || {}),
   });
-  const primaryTrain = applyHorizonPolicy(
-    applyEventPolicy(trainSamples, basePolicy.event_policy.selected_window_hours),
-    basePolicy.horizon_policy,
+  const primaryTrain = applyHorizonPolicy(trainSamples, basePolicy.horizon_policy);
+  const eventTrain = applyEventPolicy(
+    primaryTrain,
+    basePolicy.event_policy.selected_window_hours,
   );
   const derivativePolicy = fitDerivativePolicies(
-    primaryTrain,
+    eventTrain,
     candidate.derivative_families || [],
     { minimumSamples: candidate.minimum_derivative_samples ?? 30 },
+  );
+  const derivativeFamilies = derivativePolicy.families;
+  const trainingEligibility = fitM12EligibilityThreshold(
+    eventTrain,
+    basePolicy,
+    derivativePolicy,
+    derivativeFamilies,
   );
   return {
     version: M12_MODEL_VERSION,
@@ -533,20 +745,101 @@ export function fitM12Policy(trainSamples = [], candidate = {}) {
     frozen_candle_baseline: M12_BASELINE_CANDIDATE.candidate_id,
     base_policy: basePolicy,
     derivative_policy: derivativePolicy,
-    derivative_families: derivativePolicy.families,
+    derivative_families: derivativeFamilies,
     score_threshold: basePolicy.score_threshold,
+    augmented_score_threshold: trainingEligibility.augmented_score_threshold,
+    training_eligibility: trainingEligibility,
     cluster_top_n: basePolicy.cluster_top_n,
     summary: {
       base_score_method: basePolicy.score_policy.score_method,
       base_event_policy: basePolicy.event_policy,
       base_horizon_policy: basePolicy.horizon_policy,
       base_volatility_policy: basePolicy.volatility_policy,
-      derivative_families: derivativePolicy.families,
+      derivative_families: derivativeFamilies,
       derivative_policy: derivativePolicy,
       score_threshold: basePolicy.score_threshold,
+      augmented_score_threshold: trainingEligibility.augmented_score_threshold,
+      training_eligibility: trainingEligibility,
       ranking_score_not_probability: true,
       training_only: true,
     },
+  };
+}
+
+function baseM12Eligibility(sample, basePolicy) {
+  const baseScore = scoreWithPolicy(sample, basePolicy.score_policy);
+  const threshold = finite(basePolicy.score_threshold);
+  const scoreEligible = threshold === null || baseScore >= threshold;
+  const volatilityPolicy = basePolicy.volatility_policy || {};
+  const gatedRegimes = new Set(volatilityPolicy.selected_regimes || []);
+  const volatilityEligible = !volatilityPolicy.gate_applied
+    || gatedRegimes.has(sample?.volatility_regime);
+  return {
+    baseScore,
+    baseScoreEligible: scoreEligible,
+    volatilityEligible,
+    baseEligible: scoreEligible && volatilityEligible,
+  };
+}
+
+function combinedM12Score(sample, basePolicy, derivativePolicy) {
+  const baseScore = scoreWithPolicy(sample, basePolicy.score_policy);
+  const derivative = applyDerivativePolicies(sample, derivativePolicy);
+  const derivativeScores = Object.values(derivative.scores);
+  const combinedScore = derivativeScores.length
+    ? (baseScore + derivativeScores.reduce((sum, value) => sum + value, 0)) / (derivativeScores.length + 1)
+    : baseScore;
+  return {
+    baseScore,
+    derivative,
+    derivativeScores,
+    combinedScore,
+  };
+}
+
+/** Fit augmented eligibility by preserving C0's training eligibility rate. */
+export function fitM12EligibilityThreshold(
+  trainSamples = [],
+  basePolicy = {},
+  derivativePolicy = {},
+  derivativeFamilies = derivativePolicy.families || [],
+) {
+  const baseEvaluations = trainSamples.map(sample => baseM12Eligibility(sample, basePolicy));
+  const baseEligibleCount = baseEvaluations.filter(item => item.baseEligible).length;
+  const baseTrainingSampleCount = trainSamples.length;
+  const baseEligibilityRate = baseTrainingSampleCount
+    ? baseEligibleCount / baseTrainingSampleCount
+    : 0;
+  const combinedScores = trainSamples.map(sample => {
+    const scored = combinedM12Score(sample, basePolicy, derivativePolicy);
+    return scored.derivative.all_valid && derivativeFamilies.length
+      ? scored.combinedScore
+      : derivativeFamilies.length ? null : scored.combinedScore;
+  }).filter(value => value !== null && Number.isFinite(value));
+  const targetCount = Math.min(
+    combinedScores.length,
+    Math.max(0, Math.round(combinedScores.length * baseEligibilityRate)),
+  );
+  const descending = [...combinedScores].sort((left, right) => right - left);
+  const augmentedScoreThreshold = !derivativeFamilies.length
+    ? finite(basePolicy.score_threshold)
+    : targetCount > 0
+      ? descending[targetCount - 1]
+      : 101;
+  return {
+    training_only: true,
+    selection_basis: 'frozen_c0_training_eligibility_rate_preserved_on_augmented_combined_scores',
+    base_training_sample_count: baseTrainingSampleCount,
+    base_training_eligible_count: baseEligibleCount,
+    base_training_eligibility_rate: round(baseEligibilityRate, 12),
+    augmented_training_valid_score_count: combinedScores.length,
+    target_augmented_training_eligible_count: targetCount,
+    target_augmented_training_eligibility_rate: combinedScores.length
+      ? round(targetCount / combinedScores.length, 12)
+      : 0,
+    augmented_score_threshold: augmentedScoreThreshold,
+    derivative_families: derivativeFamilies,
+    threshold_not_selected_by_outcome: true,
   };
 }
 
@@ -558,33 +851,48 @@ export function predictM12Selections(testSamples = [], model = {}) {
   );
   const horizonSamples = applyHorizonPolicy(eventSamples, basePolicy.horizon_policy || {});
   const derivativeFamilies = model.derivative_policy?.families || [];
-  const threshold = finite(basePolicy.score_threshold);
+  const baseThreshold = finite(basePolicy.score_threshold);
+  const threshold = derivativeFamilies.length
+    ? finite(model.augmented_score_threshold)
+    : baseThreshold;
   const volatilityPolicy = basePolicy.volatility_policy || {};
   const gatedRegimes = new Set(volatilityPolicy.selected_regimes || []);
   const predictions = horizonSamples.map((sample, index) => {
-    const baseScore = scoreWithPolicy(sample, basePolicy.score_policy);
-    const derivative = applyDerivativePolicies(sample, model.derivative_policy || {});
-    const derivativeScores = Object.values(derivative.scores);
-    const combinedScore = derivativeScores.length
-      ? (baseScore + derivativeScores.reduce((sum, value) => sum + value, 0)) / (derivativeScores.length + 1)
-      : baseScore;
-    const scoreThresholdEligible = threshold === null || baseScore >= threshold;
+    const scored = combinedM12Score(sample, basePolicy, model.derivative_policy || {});
+    const { baseScore, derivative, derivativeScores, combinedScore } = scored;
+    const baseScoreEligible = baseThreshold === null || baseScore >= baseThreshold;
+    const scoreThresholdEligible = threshold === null || combinedScore >= threshold;
     const volatilityEligible = !volatilityPolicy.gate_applied
       || gatedRegimes.has(sample.volatility_regime);
+    const baseEligible = baseScoreEligible && volatilityEligible;
     const derivativeEligible = derivative.all_valid;
-    const eligible = scoreThresholdEligible && volatilityEligible && derivativeEligible;
+    const augmentedEligible = scoreThresholdEligible && volatilityEligible && derivativeEligible;
+    const eligible = derivativeFamilies.length ? augmentedEligible : baseEligible;
     return {
       sample: {
         ...sample,
         learned_score: round(combinedScore, 8),
         empirical_score: round(combinedScore, 8),
         base_learned_score: round(baseScore, 8),
+        base_score: round(baseScore, 8),
+        combined_score: round(combinedScore, 8),
+        derivative_score_delta: round(combinedScore - baseScore, 8),
         derivative_scores: derivative.scores,
         derivative_normalized_features: derivative.normalized,
         derivative_invalid_families: derivative.invalid_families,
+        base_score_eligible: baseScoreEligible,
+        base_eligible: baseEligible,
+        augmented_score_threshold: threshold,
+        augmented_score_eligible: scoreThresholdEligible,
+        augmented_eligible: augmentedEligible,
       },
       sample_index: index,
-      raw_score_eligible: threshold === null || baseScore >= threshold,
+      raw_score_eligible: baseThreshold === null || finite(sample.raw_score) === null
+        || finite(sample.raw_score) >= baseThreshold,
+      base_score_eligible: baseScoreEligible,
+      base_eligible: baseEligible,
+      augmented_score_eligible: scoreThresholdEligible,
+      augmented_eligible: augmentedEligible,
       score_threshold_eligible: scoreThresholdEligible,
       score_eligible: eligible,
       volatility_eligible: volatilityEligible,
@@ -648,6 +956,9 @@ export function summarizeM12Candidate(result, {
   const comparison = baselineResult && result !== baselineResult
     ? compareM12Candidates(baselineResult, result)
     : null;
+  const derivativeEffectAudit = comparison
+    ? buildM12DerivativeEffectAudit(baselineResult, result, families)
+    : null;
   const informationGain = comparison
     ? evaluateInformationGainGate({
       baselineResult,
@@ -677,6 +988,8 @@ export function summarizeM12Candidate(result, {
     positive_window_ratio: result.stability?.positive_window_ratio ?? 0,
     calibration: result.metrics?.score_calibration?.status || 'CALIBRATION_FAIL',
     concentration: result.cluster_concentration,
+    derivative_effect_audit: derivativeEffectAudit,
+    integration_no_op: derivativeEffectAudit?.integration_no_op === true,
     absolute_promotion: result.absolute_promotion,
     comparison,
     information_gain: informationGain,

@@ -171,10 +171,16 @@ function compactComparison(comparison) {
   if (!comparison) return null;
   return {
     common_support_clusters: comparison.common_support_clusters,
+    underlying_oos_events: comparison.underlying_oos_events,
+    pit_valid_common_events: comparison.pit_valid_common_events,
+    baseline_action_events: comparison.baseline_action_events,
+    augmented_action_events: comparison.augmented_action_events,
+    paired_common_events: comparison.paired_common_events,
     baseline_selected_clusters: comparison.baseline_selected_clusters,
     augmented_selected_clusters: comparison.augmented_selected_clusters,
     paired_cluster_count: comparison.paired_cluster_ids?.length || 0,
     paired_cluster_ids_hash: hashConfig(comparison.paired_cluster_ids || []),
+    paired_event_outcomes_hash: hashConfig(comparison.paired_event_outcomes || []),
     common_support_comparison: comparison.common_support_comparison,
     point_estimate: comparison.point_estimate,
     bootstrap: comparison.bootstrap,
@@ -272,10 +278,10 @@ const concurrency = Math.max(1, Number(argument('concurrency', '8')) || 8);
 const symbolConcurrency = Math.max(1, Number(argument('symbol-concurrency', '2')) || 2);
 const requestTimeoutMs = Math.max(1000, Number(argument('request-timeout-ms', '30000')) || 30000);
 const maxRetries = Math.max(0, Number(argument('max-retries', '2')) || 2);
-const commitSha = argument('commit-sha') || getCommitSha();
-const outputPath = path.resolve(argument('out', 'reports/m1-2-final.json'));
-const markdownPath = path.resolve(argument('report-out', 'docs/m1-2-independent-information-gain.md'));
-const admissionPath = path.resolve(argument('admission-out', 'reports/m1-2-data-admission.json'));
+const commitSha = argument('experiment-source-sha') || argument('commit-sha') || getCommitSha();
+const outputPath = path.resolve(argument('out', 'reports/m1-2-final-0.1.1.json'));
+const markdownPath = path.resolve(argument('report-out', 'docs/m1-2-independent-information-gain-0.1.1.md'));
+const admissionPath = path.resolve(argument('admission-out', 'reports/m1-2-data-admission-0.1.1.json'));
 const auditPath = hasFlag('no-audit') ? null : path.resolve(argument('audit-out', 'reports/m1-2-audit.json'));
 const experimentId = argument('experiment', `m1.2-${source}-${new Date(parsedAsOf).toISOString().slice(0, 10)}-${M12_MODEL_VERSION}`);
 
@@ -374,6 +380,7 @@ const lineage = {
   signal_config_hash: hashConfig(CONFIG),
   model_version: M12_MODEL_VERSION,
   feature_version: M12_FEATURE_VERSION,
+  experiment_source_sha: commitSha,
   generation_history_candles: GENERATION_HISTORY_CANDLES,
   derivative_source: {
     source,
@@ -489,6 +496,7 @@ const reportResult = {
   experiment_id: experimentId,
   model_version: M12_MODEL_VERSION,
   feature_version: M12_FEATURE_VERSION,
+  experiment_source_sha: commitSha,
   commit_sha: commitSha,
   config_hash: reportConfigHash,
   data_source: source,
