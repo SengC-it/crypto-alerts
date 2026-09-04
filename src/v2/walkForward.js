@@ -424,6 +424,7 @@ export function runPurgedWalkForward(samples = [], options = {}) {
   const windowResults = [];
   const oosSamples = [];
   const finalHoldoutSet = new Set(plan.final_holdout_indices);
+  const sampleIndexByReference = new Map(samples.map((sample, index) => [sample, index]));
   let windowsAvoidHoldout = true;
 
   for (const window of plan.windows) {
@@ -446,7 +447,7 @@ export function runPurgedWalkForward(samples = [], options = {}) {
     });
     predictions.forEach(prediction => {
       const sample = prediction.sample;
-      const sampleIndex = samples.indexOf(sample);
+      const sampleIndex = sampleIndexByReference.get(sample) ?? samples.indexOf(sample);
       oosSamples.push({
         ...prediction,
         window_index: window.index,
