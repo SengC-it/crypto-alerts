@@ -100,6 +100,31 @@ function exactConfiguredSymbols(value) {
   return symbols;
 }
 
+async function fetchPublicArchive(url) {
+  let lastError = null;
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      if (response.status === 404) return response;
+      if (!response.ok) {
+        const retryable = response.status === 408 || response.status === 429 || response.status >= 500;
+        if (!retryable || attempt === maxRetries) return response;
+        throw new Error(`retryable_http_${response.status}`);
+      }
+      return response;
+    } catch (error) {
+      lastError = error;
+      if (attempt === maxRetries) throw error;
+      await new Promise(resolve => setTimeout(resolve, Math.min(2000, 250 * 2 ** attempt)));
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  throw lastError || new Error(`Public archive request failed: ${url}`);
+}
+
 async function loadResearchHistory(symbols, days, asOf, concurrency, symbolConcurrency) {
   const window = requestedWindow(days, { asOf, timeframe: '1h' });
   const archiveStart = window.startOpen - getIndicatorLookback(CONFIG) * HOUR;
@@ -114,6 +139,7 @@ async function loadResearchHistory(symbols, days, asOf, concurrency, symbolConcu
         startTime: archiveStart,
         endTime: window.requestedEnd,
         concurrency,
+        fetchImpl: fetchPublicArchive,
       });
       const history = await loadBacktestHistory(symbol, days, {
         config: CONFIG,
@@ -272,6 +298,7 @@ const derivativeHistory = await loadPublicDerivativeHistory({
   symbolConcurrency,
   requestTimeoutMs,
   maxRetries,
+  fetchImpl: fetchPublicArchive,
   onSymbolComplete: result => console.log(JSON.stringify({
     derivatives_symbol_complete: result.symbol,
     funding_rows: result.funding.rows.length,
