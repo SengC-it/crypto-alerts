@@ -825,6 +825,9 @@ export function runM11Candidate(samples = [], {
   candidate = {},
   dataSource = 'public_binance_futures_archive',
   wfoOptions = {},
+  fitPolicy = fitM11Policy,
+  predictPolicy = predictM11Selections,
+  modelVersion = M11_MODEL_VERSION,
 } = {}) {
   // The plan always uses the widest event definition for its split. A model
   // may train-select 1h later, but it can never make the holdout less isolated.
@@ -833,8 +836,8 @@ export function runM11Candidate(samples = [], {
   options.includeFinalHoldoutOutcomeInHash = false;
   const walkForward = runPurgedWalkForward(planSamples, {
     ...options,
-    fit: trainSamples => fitM11Policy(trainSamples, candidate),
-    predict: (testSamples, model) => predictM11Selections(testSamples, model),
+    fit: trainSamples => fitPolicy(trainSamples, candidate),
+    predict: (testSamples, model) => predictPolicy(testSamples, model),
   });
   const rawOos = walkForward.oos_samples.map(compactOosPrediction);
   const oosRecords = deduplicateOos(rawOos);
@@ -850,6 +853,7 @@ export function runM11Candidate(samples = [], {
   const configHash = hashConfig({ candidateId, candidate });
   return {
     candidate_id: candidateId,
+    model_version: modelVersion,
     candidate: {
       ...candidate,
       config_hash: configHash,
@@ -1172,4 +1176,11 @@ export function candidateSummary(result) {
   };
 }
 
-export { primaryNet, primaryGross, sampleTimestamp, netOutcome, grossOutcome };
+export {
+  primaryNet,
+  primaryGross,
+  sampleTimestamp,
+  netOutcome,
+  grossOutcome,
+  rankSelections as rankM11Selections,
+};

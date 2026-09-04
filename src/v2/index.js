@@ -12,3 +12,6 @@ export * from './scoring.js';
 export * from './setups.js';
 export * from './shadow.js';
 export * from './walkForward.js';
+export * from './microstructureFeatures.js';
+export * from './derivativesData.js';
+export * from './informationGain.js';
