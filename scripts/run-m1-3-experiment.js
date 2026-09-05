@@ -43,6 +43,7 @@ import {
   M13_PROMOTION_THRESHOLDS,
   M13_ROUND_TRIP_COST_PERCENT,
   M13_SAFETY_FLAGS,
+  assertM13ComparatorParity,
   attachCrossSectionalDerivativeRanks,
   buildCrossSectionSnapshots,
   buildCrossSectionalFeatures,
@@ -62,10 +63,14 @@ import {
   summarizeM13Records,
 } from '../src/v2/crossSectional.js';
 import { buildM13Markdown } from '../src/v2/m13Report.js';
+import { buildCanonicalWfoPlan } from '../src/v2/walkForward.js';
 
 const HOUR = 60 * 60 * 1000;
 const PREVIOUS_FINAL_HOLDOUT_BOUNDARY = 1783861199999;
 const PREVIOUS_FINAL_HOLDOUT_HASH = '294e6cecb24eeb4ac5041d0bba74e0e0e04301092c13e0c454d862dcaafd40bb';
+// Frozen from the completed M1.3 run. This is metadata only; no holdout
+// outcomes are read when reconstructing the canonical calendar.
+const FROZEN_M13_FINAL_HOLDOUT_START = 1777409999999;
 const BASE_MAIN_SHA = '6dfccf25ff8b0db4365927b4f2709a9c79cd0dde';
 const CLOSEOUT_PR = 4;
 const GENERATION_HISTORY_CANDLES = 256;
@@ -246,24 +251,101 @@ function eventDecorate(record) {
 }
 
 function compactWfo(result) {
+  const walkForward = result?.walk_forward || {};
+  const options = walkForward.options || {};
   return {
-    options: result?.walk_forward?.options || null,
-    window_count: result?.walk_forward?.window_count || 0,
-    windows: (result?.walk_forward?.windows || []).map(window => ({
+    canonical_wfo: options.canonical_wfo === true,
+    canonical_wfo_version: options.canonical_wfo_version || null,
+    canonical_plan_hash: options.canonical_plan_hash || null,
+    canonical_clock_unit: options.canonical_clock_unit || null,
+    canonical_clock_event_count: options.canonical_clock_event_count || null,
+    options,
+    window_count: walkForward.window_count || 0,
+    windows: (walkForward.windows || []).map(window => ({
       index: window.index,
-      train_start: window.train_start,
-      train_end: window.train_end,
-      test_start: window.test_start,
-      test_end: window.test_end,
+      train_start: window.train_start_timestamp ?? window.train_start ?? null,
+      train_end: window.train_end_timestamp ?? window.train_end ?? null,
+      purge_start: window.purge_start_timestamp ?? window.purge_start ?? null,
+      purge_end: window.purge_end_timestamp ?? window.purge_end ?? null,
+      test_start: window.test_start_timestamp ?? window.test_start ?? null,
+      test_end: window.test_end_timestamp ?? window.test_end ?? null,
+      embargo_start: window.embargo_start_timestamp ?? window.embargo_start ?? null,
+      embargo_end: window.embargo_end_timestamp ?? window.embargo_end ?? null,
+      embargo_boundary: window.embargo_boundary_timestamp ?? null,
+      final_holdout_start: window.final_holdout_start_timestamp
+        ?? window.final_holdout_start
+        ?? null,
       purge_hours: window.purge_hours,
       embargo_hours: window.embargo_hours,
-      purged_count: window.purged_count,
-      embargoed_count: window.embargoed_count,
+      train_event_count: window.train_event_count ?? null,
+      test_event_count: window.test_event_count ?? null,
+      train_sample_count: window.train_sample_count ?? null,
+      test_sample_count: window.test_sample_count ?? null,
+      purged_count: window.purged_count ?? window.purged_event_count ?? null,
+      embargoed_count: window.embargoed_count ?? window.embargoed_event_count ?? null,
     })),
-    final_holdout_count: result?.walk_forward?.final_holdout_count || 0,
-    final_holdout_start: result?.walk_forward?.final_holdout_start || null,
-    final_holdout_hash: result?.walk_forward?.final_holdout_hash || null,
+    final_holdout_count: walkForward.final_holdout_count || 0,
+    final_holdout_start: walkForward.final_holdout_start_timestamp
+      ?? walkForward.final_holdout_start
+      ?? null,
+    final_holdout_event_count: walkForward.final_holdout_event_count || null,
+    final_holdout_hash: walkForward.final_holdout_hash || null,
     final_holdout_untouched: result?.final_holdout_untouched === true,
+  };
+}
+
+function compactComparison(comparison) {
+  if (!comparison) return null;
+  const pairedEventIds = comparison.paired_event_ids || [];
+  const pairedOutcomes = comparison.paired_event_outcomes || [];
+  return {
+    common_support_record_count: comparison.common_support_record_count ?? 0,
+    common_support_event_count: comparison.common_support_event_count ?? 0,
+    paired_independent_market_events: comparison.paired_independent_market_events ?? 0,
+    paired_event_ids_count: pairedEventIds.length,
+    paired_event_ids_hash: hashConfig(pairedEventIds),
+    paired_event_outcomes_count: pairedOutcomes.length,
+    paired_event_outcomes_hash: hashConfig(pairedOutcomes),
+    point_estimate: comparison.point_estimate || null,
+    bootstrap: comparison.bootstrap || null,
+    common_support_comparison: comparison.common_support_comparison || null,
+  };
+}
+
+function compactGate(gate) {
+  if (!gate) return null;
+  return {
+    ...gate,
+    comparison: compactComparison(gate.comparison),
+  };
+}
+
+function compactCandidateSummary(summary) {
+  if (!summary) return null;
+  return {
+    candidate_id: summary.candidate_id,
+    family: summary.family,
+    direction: summary.direction,
+    primary_horizon_hours: summary.primary_horizon_hours,
+    status: summary.status,
+    independent_generator: summary.independent_generator,
+    metrics: summary.metrics,
+    all_oos_metrics: summary.all_oos_metrics,
+    selection: summary.selection,
+    per_window: summary.per_window || [],
+    stability: summary.stability,
+    concentration: summary.concentration,
+    calibration: summary.calibration,
+    incremental_gate: compactGate(summary.incremental_gate),
+    absolute_gate: compactGate(summary.absolute_gate),
+    comparison: compactComparison(summary.comparison),
+    comparator_results: Object.fromEntries(Object.entries(summary.comparator_results || {}).map(([key, value]) => [
+      key,
+      compactComparison(value),
+    ])),
+    train_only: summary.train_only,
+    point_in_time_features: summary.point_in_time_features,
+    final_holdout_untouched: summary.final_holdout_untouched,
   };
 }
 
@@ -504,6 +586,21 @@ if (derivativeDatasets) {
   featureRows = attachPointInTimeDerivativeFeatures(featureRows, derivativeDatasets);
   attachCrossSectionalDerivativeRanks(featureRows, { families: REQUIRED_X11_DERIVATIVE_FAMILIES });
 }
+const frozenCanonicalBoundaryPresent = featureRows.some(row => row.timestamp === FROZEN_M13_FINAL_HOLDOUT_START);
+if (!fixture && !frozenCanonicalBoundaryPresent) {
+  throw new Error(`M1.3 canonical WFO final holdout boundary is missing: ${FROZEN_M13_FINAL_HOLDOUT_START}`);
+}
+const canonicalWfoPlan = buildCanonicalWfoPlan(featureRows, {
+  finalHoldoutStartTimestamp: frozenCanonicalBoundaryPresent ? FROZEN_M13_FINAL_HOLDOUT_START : null,
+  trainRatio: 0.35,
+  testRatio: 0.06,
+  holdoutRatio: 0.20,
+  purgeHours: 48,
+  embargoHours: 24,
+  labelHorizonHours: 48,
+  minimumWindows: 6,
+  includeFinalHoldoutOutcomeInHash: false,
+});
 const baseCrossSectionalSamples = buildDirectionalSamples({
   featureRows,
   candlesBySymbol: researchCandlesBySymbol,
@@ -517,6 +614,7 @@ const commonWfoOptions = {
   embargoHours: 24,
   labelHorizonHours: 48,
   minimumWindows: 6,
+  canonicalPlan: canonicalWfoPlan,
 };
 const baselineM11ResultRaw = runM11Candidate(m11Samples, {
   candidateId: M12_BASELINE_CANDIDATE.candidate_id,
@@ -575,7 +673,8 @@ const lineage = {
   snapshot_event_definition: 'exact closed 1h timestamp',
   cost_round_trip_percent: M13_ROUND_TRIP_COST_PERCENT,
   cost_sensitivity_percent: M13_COST_SENSITIVITY_PERCENT,
-  wfo: commonWfoOptions,
+  wfo: canonicalWfoPlan.options,
+  canonical_wfo_plan_hash: canonicalWfoPlan.canonical_plan_hash,
   previous_final_holdout: {
     boundary_timestamp: PREVIOUS_FINAL_HOLDOUT_BOUNDARY,
     boundary_hash: PREVIOUS_FINAL_HOLDOUT_HASH,
@@ -693,6 +792,11 @@ const v1Comparison = compareM13Results(v1ComparatorResult, bestResult, {
 const m12Comparison = m12ComparatorSummary
   ? compareM13Results(m12ComparatorSummary, bestResult, { primaryHorizonHours: bestSummary?.primary_horizon_hours || 8 })
   : null;
+assertM13ComparatorParity(v1Comparison, 'V1 comparator');
+for (const summary of candidateSummaries.filter(item => item.status === 'EVALUATED' && item.candidate_id !== baselineCandidate.candidate_id)) {
+  assertM13ComparatorParity(summary.comparison, summary.candidate_id);
+}
+if (m12Comparison) assertM13ComparatorParity(m12Comparison, 'M1.2 C7 comparator');
 const decision = decideM13({
   candidateSummaries: diagnosticBestSummary ? candidateSummaries : [],
   bestCandidate: bestSummary,
@@ -771,22 +875,22 @@ const reportResult = {
   } : null,
   candidate_search_budget: `${M13_PREDECLARED_CANDIDATES.length}/${M13_CANDIDATE_BUDGET} predeclared candidates`,
   frozen_candle_baseline: baselineCandidate,
-  candidates: candidateSummaries,
-  best_candidate: bestSummary,
+  candidates: candidateSummaries.map(compactCandidateSummary),
+  best_candidate: compactCandidateSummary(bestSummary),
   best_candidate_id: bestSummary?.candidate_id || null,
-  baseline_summary: candidateSummaries[0],
+  baseline_summary: compactCandidateSummary(candidateSummaries[0]),
   comparators: {
     V1_production: {
       summary: v1ComparatorResult.metrics,
-      comparison: v1Comparison,
+      comparison: compactComparison(v1Comparison),
     },
     M1_1_frozen_candle_baseline: {
       summary: baselineResult.metrics,
-      comparison: bestSummary?.comparison || null,
+      comparison: compactComparison(bestSummary?.comparison),
     },
     M1_2_C7_funding_plus_basis_premium: m12ComparatorSummary ? {
       summary: m12ComparatorSummary.metrics,
-      comparison: m12Comparison,
+      comparison: compactComparison(m12Comparison),
     } : {
       status: 'NOT_EVALUATED_DATA_NOT_ADMITTED',
       summary: null,

@@ -832,10 +832,12 @@ export function runM11Candidate(samples = [], {
   // The plan always uses the widest event definition for its split. A model
   // may train-select 1h later, but it can never make the holdout less isolated.
   const planSamples = applyEventPolicy(samples, 4);
+  const canonicalPlan = wfoOptions.canonicalPlan || null;
   const options = defaultM11WfoOptions(planSamples.length, wfoOptions);
   options.includeFinalHoldoutOutcomeInHash = false;
   const walkForward = runPurgedWalkForward(planSamples, {
     ...options,
+    canonicalPlan,
     fit: trainSamples => fitPolicy(trainSamples, candidate),
     predict: (testSamples, model) => predictPolicy(testSamples, model),
   });

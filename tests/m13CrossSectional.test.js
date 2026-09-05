@@ -1,6 +1,10 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildPurgedWalkForwardPlan } from '../src/v2/walkForward.js';
+import {
+  buildCanonicalWfoPlan,
+  buildPurgedWalkForwardPlan,
+  runPurgedWalkForward,
+} from '../src/v2/walkForward.js';
 import {
   M13_CANDIDATE_BUDGET,
   M13_PREDECLARED_CANDIDATES,
@@ -295,5 +299,54 @@ describe('M1.3 outcome-independent support and gates', () => {
     const gate = evaluateAbsolutePromotionGate({ metrics: { independent_market_events: 2, net_profit_factor: 0, net_expectancy_percent: -1, symbol_breadth: 1, score_calibration: { status: 'CALIBRATION_FAIL' } }, stability: { total_windows: 1, positive_windows: 0, positive_window_ratio: 0 }, concentration: { max_symbol_event_share: 1 } });
     assert.equal(gate.pass, false);
     assert.ok(gate.failures.includes('independent_events'));
+  });
+});
+
+describe('M1.3 canonical WFO comparator parity', () => {
+  it('keeps sparse baseline and dense candidate on identical calendar windows', () => {
+    const dense = Array.from({ length: 1000 }, (_, index) => ({
+      timestamp: START + index * HOUR,
+      independent_market_event_id: `event-${Math.floor(index / 4)}`,
+      market_event_id: `event-${Math.floor(index / 4)}`,
+      symbol: 'BTCUSDT',
+      direction: 'BUY',
+      raw_score: 50,
+      label_end_time: START + (index + 48) * HOUR,
+    }));
+    const sparse = dense.filter((sample, index) => index % 100 === 0);
+    const canonicalPlan = buildCanonicalWfoPlan(dense, {
+      trainRatio: 0.35,
+      testRatio: 0.06,
+      holdoutRatio: 0.20,
+      purgeHours: 48,
+      embargoHours: 24,
+      labelHorizonHours: 48,
+      minimumWindows: 6,
+      includeFinalHoldoutOutcomeInHash: false,
+    });
+    const run = samples => runPurgedWalkForward(samples, {
+      canonicalPlan,
+      minimumWindows: 6,
+      fit: trainSamples => ({ summary: { train_count: trainSamples.length } }),
+      predict: testSamples => testSamples.map(sample => ({ sample, selected: true })),
+    });
+    const sparseResult = run(sparse);
+    const denseResult = run(dense);
+    const project = result => result.windows.map(window => ({
+      index: window.index,
+      train_start: window.train_start_timestamp,
+      train_end: window.train_end_timestamp,
+      purge_start: window.purge_start_timestamp,
+      purge_end: window.purge_end_timestamp,
+      test_start: window.test_start_timestamp,
+      test_end: window.test_end_timestamp,
+      embargo_start: window.embargo_start_timestamp,
+      embargo_end: window.embargo_end_timestamp,
+      final_holdout_start: window.final_holdout_start_timestamp,
+    }));
+    assert.deepEqual(project(sparseResult), project(denseResult));
+    assert.ok(sparseResult.windows.some(window => window.train_sample_count < denseResult.windows.find(item => item.index === window.index).train_sample_count));
+    assert.equal(sparseResult.options.canonical_wfo, true);
+    assert.equal(sparseResult.final_holdout_start, denseResult.final_holdout_start);
   });
 });

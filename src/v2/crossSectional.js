@@ -12,8 +12,8 @@ import { runPurgedWalkForward } from './walkForward.js';
 const HOUR = 60 * 60 * 1000;
 const FOUR_HOURS = 4 * HOUR;
 
-export const M13_MODEL_VERSION = 'm1.3-v2-cross-sectional-alpha-0.1.0';
-export const M13_FEATURE_VERSION = 'm1.3-cross-sectional-0.1.0';
+export const M13_MODEL_VERSION = 'm1.3-v2-cross-sectional-alpha-0.1.1';
+export const M13_FEATURE_VERSION = 'm1.3-cross-sectional-0.1.1';
 export const M13_CANDIDATE_BUDGET = 12;
 export const M13_BOOTSTRAP_REPETITIONS = 2000;
 export const M13_BOOTSTRAP_SEED = 20260904;
@@ -1224,10 +1224,13 @@ export function runM13Candidate(samples = [], {
 } = {}) {
   const definition = candidateDefinition(candidateId || candidate);
   const primaryHorizonHours = definition.primary_horizon_hours || 8;
+  const canonicalPlan = wfoOptions.canonicalPlan || null;
   const defaultHoldout = Math.max(1, Math.floor(samples.length * 0.2));
   const defaultTrain = Math.max(60, Math.floor(samples.length * 0.35));
   const defaultTest = Math.max(24, Math.floor(samples.length * 0.06));
-  const options = {
+  const options = canonicalPlan
+    ? { ...canonicalPlan.options }
+    : {
     trainSize: wfoOptions.trainSize ?? defaultTrain,
     testSize: wfoOptions.testSize ?? defaultTest,
     step: wfoOptions.step ?? (wfoOptions.testSize ?? defaultTest),
@@ -1238,9 +1241,10 @@ export function runM13Candidate(samples = [], {
     minimumTrainSamples: wfoOptions.minimumTrainSamples ?? Math.max(30, Math.floor(defaultTrain * 0.35)),
     minimumWindows: wfoOptions.minimumWindows ?? 6,
     includeFinalHoldoutOutcomeInHash: false,
-  };
+    };
   const walkForward = runPurgedWalkForward(samples, {
     ...options,
+    canonicalPlan,
     scoreWindow: m13ScoreWindow,
     fit: trainSamples => fitM13Policy(trainSamples, definition),
     predict: (testSamples, model) => predictM13Selections(testSamples, model),
@@ -1316,6 +1320,88 @@ function supportKey(record) {
 
 function supportMap(records = []) {
   return new Map(records.map(record => [supportKey(record), record]));
+}
+
+function wfoBoundaryWindows(result = {}) {
+  return result?.walk_forward?.windows || [];
+}
+
+function windowField(window, name, legacyName = name) {
+  const aliases = {
+    train_start_timestamp: 'train_start',
+    train_end_timestamp: 'train_end',
+    purge_start_timestamp: 'purge_start',
+    purge_end_timestamp: 'purge_end',
+    test_start_timestamp: 'test_start',
+    test_end_timestamp: 'test_end',
+    embargo_start_timestamp: 'embargo_start',
+    embargo_end_timestamp: 'embargo_end',
+  };
+  return window?.[name] ?? window?.[legacyName] ?? window?.[aliases[name]] ?? null;
+}
+
+function sameWfoField(leftWindows, rightWindows, fields) {
+  if (leftWindows.length !== rightWindows.length) return false;
+  return leftWindows.every((left, index) => fields.every(field => (
+    windowField(left, field) === windowField(rightWindows[index], field)
+  )));
+}
+
+function wfoComparatorParity(baselineResult, candidateResult) {
+  const baselineWindows = wfoBoundaryWindows(baselineResult);
+  const candidateWindows = wfoBoundaryWindows(candidateResult);
+  const hasWindowBoundaries = baselineWindows.length > 0 || candidateWindows.length > 0;
+  const sameTrainWindows = hasWindowBoundaries
+    ? sameWfoField(baselineWindows, candidateWindows, ['train_start_timestamp', 'train_end_timestamp'])
+    : true;
+  const sameOosWindows = hasWindowBoundaries
+    ? sameWfoField(baselineWindows, candidateWindows, ['test_start_timestamp', 'test_end_timestamp'])
+    : true;
+  const samePurge = hasWindowBoundaries
+    ? sameWfoField(baselineWindows, candidateWindows, [
+      'purge_start_timestamp', 'purge_end_timestamp', 'purge_hours',
+    ])
+    : true;
+  const sameEmbargo = hasWindowBoundaries
+    ? sameWfoField(baselineWindows, candidateWindows, [
+      'embargo_start_timestamp', 'embargo_end_timestamp', 'embargo_boundary_timestamp', 'embargo_hours',
+    ])
+    : true;
+  const baselineHoldout = baselineResult?.walk_forward?.final_holdout_start_timestamp
+    ?? baselineResult?.walk_forward?.final_holdout_start
+    ?? null;
+  const candidateHoldout = candidateResult?.walk_forward?.final_holdout_start_timestamp
+    ?? candidateResult?.walk_forward?.final_holdout_start
+    ?? null;
+  const sameFinalHoldoutBoundary = (baselineHoldout === null && candidateHoldout === null)
+    || baselineHoldout === candidateHoldout;
+  return {
+    same_train_windows: sameTrainWindows,
+    same_oos_windows: sameOosWindows,
+    same_purge: samePurge,
+    same_embargo: sameEmbargo,
+    same_final_holdout_boundary: sameFinalHoldoutBoundary,
+    canonical_plan_hash: baselineResult?.walk_forward?.options?.canonical_plan_hash
+      ?? candidateResult?.walk_forward?.options?.canonical_plan_hash
+      ?? null,
+  };
+}
+
+export function assertM13ComparatorParity(comparison, label = 'M1.3 comparator') {
+  const contract = comparison?.common_support_comparison || {};
+  const required = [
+    'same_train_windows',
+    'same_oos_windows',
+    'same_purge',
+    'same_embargo',
+    'same_final_holdout_boundary',
+    'common_support_outcome_independent',
+  ];
+  const failures = required.filter(field => contract[field] !== true);
+  if (failures.length) {
+    throw new Error(`${label} WFO parity failed: ${failures.join(', ')}`);
+  }
+  return true;
 }
 
 function selectedEventOutcomeMap(records, primaryHorizonHours) {
@@ -1409,6 +1495,7 @@ export function compareM13Results(baselineResult, candidateResult, {
   const candidateValues = pairs.map(pair => pair.candidate_net_expectancy);
   const deltas = pairs.map(pair => pair.delta_net_expectancy);
   const bootstrap = bootstrapEventPairs(pairs, repetitions, seed);
+  const parity = wfoComparatorParity(baselineResult, candidateResult);
   return {
     common_support_record_count: commonKeys.length,
     common_support_event_count: commonEvents.size,
@@ -1426,7 +1513,12 @@ export function compareM13Results(baselineResult, candidateResult, {
     common_support_comparison: {
       unit: 'independent_market_event_id',
       support_key: 'timestamp|snapshot_event_id|symbol|direction',
-      same_oos_windows: JSON.stringify(baselineResult?.walk_forward?.options || {}) === JSON.stringify(candidateResult?.walk_forward?.options || {}),
+      same_train_windows: parity.same_train_windows,
+      same_oos_windows: parity.same_oos_windows,
+      same_purge: parity.same_purge,
+      same_embargo: parity.same_embargo,
+      same_final_holdout_boundary: parity.same_final_holdout_boundary,
+      canonical_plan_hash: parity.canonical_plan_hash,
       common_support_outcome_independent: true,
       abstention_outcome: 0,
       candidate_and_baseline_generated_from_same_snapshots: true,
@@ -1609,6 +1701,7 @@ export function summarizeM13Candidate(result, {
     metrics: result?.metrics || null,
     all_oos_metrics: result?.all_oos_metrics || null,
     selection: result?.selection || null,
+    per_window: result?.per_window || [],
     stability: result?.stability || null,
     concentration: result?.concentration || null,
     calibration: result?.calibration || null,

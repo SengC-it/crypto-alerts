@@ -69,13 +69,18 @@ export function buildM13Markdown(result = {}) {
     '- Best candidate: ' + code(best.candidate_id) + '; direction: ' + (best.direction || 'BUY and SELL') + '; primary horizon: ' + (best.primary_horizon_hours ?? 'N/A') + 'h.',
     '- Metrics: selected ' + (bestMetrics.selected_oos_signals ?? 0) + '; independent events ' + (bestMetrics.independent_market_events ?? 0) + '; net PF ' + display(bestMetrics.net_profit_factor) + '; net expectancy ' + display(bestMetrics.net_expectancy_percent, '%') + '; calibration ' + (bestMetrics.score_calibration?.status || 'N/A') + '.',
     '- Common support events: ' + (comparison.paired_independent_market_events ?? 0) + '; support outcome-independent: ' + (comparison.common_support_comparison?.common_support_outcome_independent === true) + '.',
+    '- Comparator parity: same train windows ' + (comparison.common_support_comparison?.same_train_windows === true)
+      + '; same OOS windows ' + (comparison.common_support_comparison?.same_oos_windows === true)
+      + '; same purge ' + (comparison.common_support_comparison?.same_purge === true)
+      + '; same embargo ' + (comparison.common_support_comparison?.same_embargo === true)
+      + '; same final holdout boundary ' + (comparison.common_support_comparison?.same_final_holdout_boundary === true) + '.',
     '- Point delta net expectancy: ' + display(comparison.point_estimate?.delta_net_expectancy_percent, '%') + '; bootstrap unit: ' + (bootstrap.unit || 'N/A') + '; reps: ' + (bootstrap.repetitions ?? 0) + '; seed: ' + (bootstrap.seed ?? 'N/A') + '.',
     '- Delta expectancy 95% CI: ' + json(bootstrap.delta_expectancy_95_ci) + '; P(delta > 0): ' + display(bootstrap.p_delta_expectancy_gt_zero) + '.',
     '- Abstention outcome convention: ' + (comparison.common_support_comparison?.abstention_outcome ?? 'N/A') + '.',
     '',
     '## WFO, costs and diagnostics',
     '',
-    '- WFO windows: ' + (result.wfo?.window_count ?? 0) + '; purge ' + (result.wfo?.options?.purgeHours ?? 'N/A') + 'h; embargo ' + (result.wfo?.options?.embargoHours ?? 'N/A') + 'h; label horizon ' + (result.wfo?.options?.labelHorizonHours ?? 'N/A') + 'h.',
+    '- WFO windows: ' + (result.wfo?.window_count ?? 0) + '; canonical plan ' + code(result.wfo?.canonical_plan_hash || 'N/A') + '; purge ' + (result.wfo?.options?.purgeHours ?? 'N/A') + 'h; embargo ' + (result.wfo?.options?.embargoHours ?? 'N/A') + 'h; label horizon ' + (result.wfo?.options?.labelHorizonHours ?? 'N/A') + 'h.',
     '- Costs: ' + display(result.cost_assumptions?.round_trip_percent, '%') + ' round trip; sensitivity ' + json(result.cost_sensitivity || []) + '; sensitivity did not affect selection.',
     '- Factor correlations and stress/monthly slices are diagnostic only: ' + json(result.diagnostics || {}) + '.',
     '',
