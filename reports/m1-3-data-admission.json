@@ -1,8 +1,8 @@
 {
-  "experiment_id": "m1.3-public_binance_futures_archive-2026-07-12-m1.3-v2-cross-sectional-alpha-0.1.0",
-  "model_version": "m1.3-v2-cross-sectional-alpha-0.1.0",
-  "feature_version": "m1.3-cross-sectional-0.1.0",
-  "config_hash": "75b3621b5864d04f685334a9e5eeabd5b9e0590ee980e049ff74af21ffe95ea9",
+  "experiment_id": "m1.3-public_binance_futures_archive-2026-07-12-m1.3-v2-cross-sectional-alpha-0.1.1",
+  "model_version": "m1.3-v2-cross-sectional-alpha-0.1.1",
+  "feature_version": "m1.3-cross-sectional-0.1.1",
+  "config_hash": "28879c6498075052b1be899f8c064f61bf40250aca983b4d96186e5519b8dde0",
   "version": "m1.2-pit-derivatives-0.1.1",
   "source": "public_binance_futures_archive",
   "requested_symbols": [
