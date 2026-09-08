@@ -272,11 +272,26 @@ function resultForReview(result, laneId, laneLabel, primaryHorizon = 8) {
     primary_horizon_hours: primaryHorizon,
     frozen_record_primary_horizons: primaryHorizons,
     inferred_primary_horizon_hours: lanePrimaryHorizon,
-    result,
     records,
     selected_records: selectedRecords,
     calibration: result.calibration?.status || result.metrics?.score_calibration?.status || 'UNKNOWN',
     final_holdout_untouched: result.final_holdout_untouched === true,
+  };
+}
+
+function releaseResultPayload(result) {
+  if (!result) return;
+  if (result.walk_forward) result.walk_forward.oos_samples = [];
+  result.oos_records = [];
+  result.selected_records = [];
+  result.per_window = [];
+}
+
+function collectHoldoutMetadata(result) {
+  return {
+    count: result?.walk_forward?.final_holdout_count ?? null,
+    start: result?.walk_forward?.final_holdout_start ?? null,
+    hash: result?.walk_forward?.final_holdout_hash ?? null,
   };
 }
 
@@ -616,6 +631,9 @@ generated.normalizedBySymbol = null;
 generated.rankedV2 = null;
 generated.v2Records = null;
 generated.v1Records = null;
+generated.v2_research_records = null;
+generated.v1_research_records = null;
+generated.generation_diagnostics = null;
 
 const snapshotStart = window.startOpen - M13_BETA_WINDOW_HOURS * HOUR;
 const snapshotResult = buildCrossSectionSnapshots({ candlesBySymbol: researchCandlesBySymbol, symbols, startTime: snapshotStart, endTime: window.requestedEnd, minValidSymbols: M13_MIN_VALID_SYMBOLS });
@@ -656,6 +674,10 @@ if (derivativeDatasets) {
   featureRows = attachPointInTimeDerivativeFeatures(featureRows, derivativeDatasets);
   attachCrossSectionalDerivativeRanks(featureRows, { families: REQUIRED_X11_DERIVATIVE_FAMILIES });
 }
+featureResult.features = null;
+featureResult.feature_rows = null;
+featureResult.snapshots = null;
+featureResult.rejected_snapshots = null;
 const frozenCanonicalBoundaryPresent = featureRows.some(row => row.timestamp === FROZEN_M13_FINAL_HOLDOUT_START);
 if (!fixture && !frozenCanonicalBoundaryPresent) throw new Error(`M1.4 canonical final holdout boundary is missing: ${FROZEN_M13_FINAL_HOLDOUT_START}`);
 const canonicalWfoPlan = buildCanonicalWfoPlan(featureRows, {
@@ -677,11 +699,6 @@ const canonicalReviewPlan = buildCanonicalReviewPlan({
 });
 const commonWfoOptions = { purgeHours: 48, embargoHours: 24, labelHorizonHours: 48, minimumWindows: 6, canonicalPlan: canonicalWfoPlan };
 const m11Result = runM11Candidate(m11Samples, { candidateId: M12_BASELINE_CANDIDATE.candidate_id, candidate: M12_BASELINE_CANDIDATE, dataSource: source, wfoOptions: commonWfoOptions });
-const baseCrossSectionalSamples = buildDirectionalSamples({ featureRows, candlesBySymbol: researchCandlesBySymbol, candidateId: 'X1-relative-momentum', roundTripCostPercent: M13_ROUND_TRIP_COST_PERCENT, horizons: M13_HORIZONS_HOURS });
-const x8Candidate = M13_PREDECLARED_CANDIDATES.find(candidate => candidate.candidate_id === 'X8-btc-eth-lead-lag-continuation');
-const x8Samples = repriceSamples(baseCrossSectionalSamples, x8Candidate);
-const x8Result = runM13Candidate(x8Samples, { candidateId: x8Candidate.candidate_id, candidate: x8Candidate, dataSource: source, wfoOptions: commonWfoOptions });
-
 let m12Result = null;
 if (derivativeDatasets && dataAdmission.admitted_families.includes('Funding') && dataAdmission.admitted_families.includes('Basis/Premium')) {
   const enrichedM11Samples = attachPointInTimeDerivativeFeatures(m11Samples, derivativeDatasets);
@@ -692,6 +709,20 @@ if (derivativeDatasets && dataAdmission.admitted_families.includes('Funding') &&
     wfoOptions: commonWfoOptions,
   });
 }
+
+const baseCrossSectionalSamples = buildDirectionalSamples({ featureRows, candlesBySymbol: researchCandlesBySymbol, candidateId: 'X1-relative-momentum', roundTripCostPercent: M13_ROUND_TRIP_COST_PERCENT, horizons: M13_HORIZONS_HOURS });
+const x8Candidate = M13_PREDECLARED_CANDIDATES.find(candidate => candidate.candidate_id === 'X8-btc-eth-lead-lag-continuation');
+const x8Samples = repriceSamples(baseCrossSectionalSamples, x8Candidate);
+baseCrossSectionalSamples.length = 0;
+for (const item of histories) item.candles = null;
+for (const symbol of Object.keys(candleHistoryBySymbol)) candleHistoryBySymbol[symbol] = null;
+derivativeHistory = null;
+derivativeDatasets = null;
+featureRows.length = 0;
+m11Samples.length = 0;
+const x8Result = runM13Candidate(x8Samples, { candidateId: x8Candidate.candidate_id, candidate: x8Candidate, dataSource: source, wfoOptions: commonWfoOptions });
+
+x8Samples.length = 0;
 
 const x8Records = (x8Result.oos_records || []).map(record => ({
   ...record,
@@ -704,8 +735,12 @@ const lanes = [
   m12Result ? resultForReview(m12Result, 'R2', 'M1.2 frozen final diagnostic lane', 'record_primary') : null,
   resultForReview({ ...x8Result, oos_records: x8Records }, 'R3', 'M1.3 X8 BTC/ETH lead-lag continuation', 4),
 ].filter(Boolean);
+const x8HoldoutMetadata = collectHoldoutMetadata(x8Result);
 const v1Result = buildV1Comparator(m11V1Records, x8Result);
 lanes.unshift(resultForReview(v1Result, 'R0', 'V1 production/frozen baseline', 1));
+releaseResultPayload(m11Result);
+releaseResultPayload(m12Result);
+releaseResultPayload(x8Result);
 for (const lane of lanes) lane.review_plan = canonicalReviewPlan;
 const calendarParity = assertReviewCalendarParity(lanes);
 const reviewedLanes = lanes.map(lane => reportLane(lane, canonicalReviewPlan.windows));
@@ -795,9 +830,9 @@ const feasibilityMatrix = [
 ];
 
 const finalHoldout = {
-  count: x8Result.walk_forward?.final_holdout_count ?? null,
-  start: x8Result.walk_forward?.final_holdout_start ?? canonicalReviewPlan.final_holdout_start,
-  hash: x8Result.walk_forward?.final_holdout_hash ?? null,
+  count: x8HoldoutMetadata.count,
+  start: x8HoldoutMetadata.start ?? canonicalReviewPlan.final_holdout_start,
+  hash: x8HoldoutMetadata.hash,
   boundary_hash: PREVIOUS_FINAL_HOLDOUT_HASH,
   outcomes_accessed_for_selection: false,
   untouched: reviewedLanes.every(lane => lane.final_holdout_untouched === true),
