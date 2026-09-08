@@ -4,17 +4,21 @@ import {
   M14_COSTS_PERCENT,
   M14_DENSITY_POLICIES,
   M14_EVENT_ALERT_BOOTSTRAP_SEED,
+  M14_SAFETY_FLAGS,
   assertReviewCalendarParity,
   bootstrapEventValues,
   buildCanonicalReviewPlan,
   buildDensityViews,
   buildEventAlertObservations,
   buildUniverseSlices,
+  classifyDensityFeasibility,
   classifyDirectionalEdge,
   compactEventAlertEvents,
   reviewConfigHash,
+  resolveFeasibilityDecision,
   spearmanIc,
   summarizeEventAlertUtility,
+  summarizeReviewRecords,
 } from '../src/v2/m14Review.js';
 
 const HOUR = 60 * 60 * 1000;
@@ -115,4 +119,109 @@ test('M1.4 directional diagnostics do not disable either direction', () => {
   assert.deepEqual(Object.keys(buildUniverseSlices(rows, { tier1: ['BTCUSDT'], tier2: ['ETHUSDT'], tier3: ['SOLUSDT'] })).sort(), ['All18', 'Tier1', 'Tier1+Tier2', 'Tier2', 'Tier3'].sort());
   const result = classifyDirectionalEdge(rows, { horizonHours: 8, windows: calendar().windows, calibration: 'CALIBRATION_FAIL', repetitions: 50 });
   assert.ok(['NO_GROSS_DIRECTIONAL_EDGE', 'GROSS_EDGE_BUT_COST_CONSTRAINED', 'NET_DIRECTIONAL_EDGE'].includes(result.classification));
+});
+
+test('M1.4 separates gross and net positive-window stability', () => {
+  const rows = Array.from({ length: 16 }, (_, index) => record(index, {
+    forward_returns: { '8h': index < 8 ? 0.1 : 0.2 },
+  }));
+  const summary = summarizeReviewRecords(rows, { horizonHours: 8, costPercent: 0.14, windows: calendar().windows });
+  assert.equal(summary.gross_positive_windows, 2);
+  assert.equal(summary.gross_positive_window_ratio, 1);
+  assert.equal(summary.net_positive_windows, 1);
+  assert.equal(summary.net_positive_window_ratio, 0.5);
+  assert.equal(summary.positive_windows, summary.net_positive_windows);
+});
+
+test('M1.4 classifies a gross edge constrained by fixed net cost', () => {
+  const rows = Array.from({ length: 16 }, (_, index) => record(index, {
+    forward_returns: { '8h': index < 8 ? 0.1 : 0.12 },
+  }));
+  const result = classifyDirectionalEdge(rows, {
+    horizonHours: 8,
+    windows: calendar().windows,
+    calibration: 'CALIBRATION_FAIL',
+    repetitions: 100,
+  });
+  assert.equal(result.classification, 'GROSS_EDGE_BUT_COST_CONSTRAINED');
+  assert.equal(result.gross_summary.gross_positive_window_ratio, 1);
+  assert.equal(result.net_summary.net_positive_window_ratio, 0);
+  assert.equal(result.gross_bootstrap.ci95[0] > 0, true);
+  assert.equal(result.net_bootstrap.mean < 0, true);
+});
+
+test('M1.4 preserves frozen 4h primary semantics while keeping 8h diagnostic', () => {
+  const rows = Array.from({ length: 8 }, (_, index) => record(index, {
+    forward_returns: { '4h': -0.1, '8h': 0.2 },
+  }));
+  const primary = summarizeReviewRecords(rows, { horizonHours: 4, costPercent: 0.14, windows: calendar().windows });
+  const diagnostic = summarizeReviewRecords(rows, { horizonHours: 8, costPercent: 0.14, windows: calendar().windows });
+  assert.equal(primary.horizon_hours, 4);
+  assert.equal(diagnostic.horizon_hours, 8);
+  assert.equal(primary.net_expectancy_percent < diagnostic.net_expectancy_percent, true);
+});
+
+test('M1.4 density feasibility uses exactly three fixed 8h diagnostic views', () => {
+  const rows = Array.from({ length: 8 }, (_, index) => record(index, {
+    forward_returns: { '8h': 0.2 },
+  }));
+  const views = buildDensityViews(rows);
+  assert.deepEqual(Object.keys(views).sort(), [...M14_DENSITY_POLICIES].sort());
+  const result = classifyDensityFeasibility(views.TOP1_PER_4H_EVENT_TOTAL, {
+    horizonHours: 8,
+    windows: calendar().windows,
+    repetitions: 100,
+  });
+  assert.equal(result.horizon_hours, 8);
+  assert.equal(result.independent_events < 100, true);
+  assert.equal(result.DENSITY_ROBUST_GROSS_EDGE, false);
+  assert.equal(result.gross_bootstrap.unit_count, result.independent_events);
+  assert.equal(result.shadow_candidate, undefined);
+  assert.equal(result.production_approval, undefined);
+});
+
+test('M1.4 density robust-gross gate enforces event, CI and concentration limits', () => {
+  const symbols = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'ADAUSDT', 'AVAXUSDT', 'LINKUSDT'];
+  const rows = Array.from({ length: 120 }, (_, index) => record(index, {
+    symbol: symbols[index % symbols.length],
+    independent_market_event_id: `density-${index}`,
+    review_window_index: index < 60 ? 0 : 1,
+    forward_returns: { '8h': 0.2 },
+  }));
+  const passing = classifyDensityFeasibility(rows, { horizonHours: 8, windows: calendar().windows, repetitions: 100 });
+  assert.equal(passing.DENSITY_ROBUST_GROSS_EDGE, true);
+  assert.equal(passing.independent_events, 120);
+  const tooConcentrated = classifyDensityFeasibility(rows.map(row => ({ ...row, symbol: 'BTCUSDT' })), { horizonHours: 8, windows: calendar().windows, repetitions: 100 });
+  assert.equal(tooConcentrated.unique_event_symbol_concentration, 1);
+  assert.equal(tooConcentrated.DENSITY_ROBUST_GROSS_EDGE, false);
+  const noCi = classifyDensityFeasibility(rows.map(row => ({ ...row, forward_returns: { '8h': row.symbol === 'BTCUSDT' ? 0.2 : -0.2 } })), { horizonHours: 8, windows: calendar().windows, repetitions: 100 });
+  assert.equal(noCi.gross_bootstrap.ci95[0] < 0, true);
+  assert.equal(noCi.DENSITY_ROBUST_GROSS_EDGE, false);
+});
+
+test('M1.4 unique event-symbol concentration counts a symbol once per event', () => {
+  const rows = [
+    record(0, { symbol: 'BTCUSDT', independent_market_event_id: 'same-event', forward_returns: { '8h': 0.2 } }),
+    record(1, { symbol: 'BTCUSDT', independent_market_event_id: 'same-event', forward_returns: { '8h': 0.2 } }),
+    record(2, { symbol: 'ETHUSDT', independent_market_event_id: 'same-event', forward_returns: { '8h': 0.2 } }),
+    record(4, { symbol: 'BTCUSDT', independent_market_event_id: 'other-event', forward_returns: { '8h': 0.2 } }),
+  ];
+  const summary = summarizeReviewRecords(rows, { horizonHours: 8, windows: calendar().windows });
+  assert.equal(summary.independent_events, 2);
+  assert.equal(summary.unique_event_symbol_concentration, 1);
+  assert.equal(summary.max_symbol_event_concentration <= 1, true);
+  assert.equal(summary.max_symbol_record_concentration, 0.75);
+});
+
+test('M1.4 density feasibility can continue research without production or M2 enablement', () => {
+  assert.equal(resolveFeasibilityDecision({ densityRobustGrossEdge: true }), 'DIRECTIONAL_RESEARCH_CONTINUE');
+  assert.equal(resolveFeasibilityDecision({ eventAlertUtilityPass: true }), 'PIVOT_TO_MARKET_EVENT_ALERTS');
+  assert.equal(resolveFeasibilityDecision({}), 'STOP_ALPHA_EXPANSION_KEEP_ALERT_PLATFORM');
+  assert.equal(resolveFeasibilityDecision({ evidenceSufficient: false, densityRobustGrossEdge: true }), 'INSUFFICIENT_FEASIBILITY_EVIDENCE');
+  assert.equal(M14_SAFETY_FLAGS.SIGNAL_ONLY, true);
+  assert.equal(M14_SAFETY_FLAGS.V1_UNCHANGED, true);
+  assert.equal(M14_SAFETY_FLAGS.V2_PRODUCTION_ENABLED, false);
+  assert.equal(M14_SAFETY_FLAGS.AUTO_TRADING, false);
+  assert.equal(M14_SAFETY_FLAGS.PRIVATE_TRADING_API, false);
+  assert.equal(M14_SAFETY_FLAGS.M2_STARTED, false);
 });

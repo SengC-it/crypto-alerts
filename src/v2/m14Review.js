@@ -7,7 +7,7 @@ import { hashConfig } from '../lineage.js';
 const HOUR = 60 * 60 * 1000;
 const FOUR_HOURS = 4 * HOUR;
 
-export const M14_REVIEW_VERSION = 'm1.4-alpha-feasibility-0.1.0';
+export const M14_REVIEW_VERSION = 'm1.4-alpha-feasibility-0.1.1';
 export const M14_HORIZONS_HOURS = Object.freeze([1, 4, 8, 12, 24, 48]);
 export const M14_COSTS_PERCENT = Object.freeze([0, 0.05, 0.10, 0.14, 0.20, 0.30]);
 export const M14_EVENT_ALERT_BOOTSTRAP_REPETITIONS = 2000;
@@ -91,6 +91,11 @@ function netOutcome(record, horizonHours, costPercent = 0.14) {
   return gross === null ? null : gross - costPercent;
 }
 
+function resolvedHorizon(record, horizonHours) {
+  if (horizonHours !== 'record_primary') return horizonHours;
+  return Math.max(1, Math.floor(finite(record?.primary_horizon_hours) ?? 1));
+}
+
 function groupByEvent(records = []) {
   const groups = new Map();
   for (const record of records) {
@@ -155,19 +160,34 @@ export function summarizeReviewRecords(records = [], {
   costPercent = 0.14,
   windows = [],
 } = {}) {
-  const gross = records.map(record => grossOutcome(record, horizonHours)).filter(value => value !== null);
-  const net = records.map(record => netOutcome(record, horizonHours, costPercent)).filter(value => value !== null);
+  const gross = records.map(record => grossOutcome(record, resolvedHorizon(record, horizonHours))).filter(value => value !== null);
+  const net = records.map(record => netOutcome(record, resolvedHorizon(record, horizonHours), costPercent)).filter(value => value !== null);
   const eventGroups = groupByEvent(records);
-  const positiveWindows = positiveWindowSummary(records, windows, record => netOutcome(record, horizonHours, costPercent));
+  const grossPositiveWindows = positiveWindowSummary(records, windows, record => grossOutcome(record, resolvedHorizon(record, horizonHours)));
+  const netPositiveWindows = positiveWindowSummary(records, windows, record => netOutcome(record, resolvedHorizon(record, horizonHours), costPercent));
   const symbols = new Set(records.map(record => record.symbol).filter(Boolean));
   const directions = new Set(records.map(record => record.direction).filter(Boolean));
   const wins = net.filter(value => value > 0).length;
-  const eventConcentration = {};
+  const eventSymbolIncidence = new Map();
+  const recordCounts = new Map();
   for (const [id, eventRecords] of eventGroups) {
-    for (const record of eventRecords) eventConcentration[record.symbol] = (eventConcentration[record.symbol] || 0) + 1;
+    const symbolsInEvent = new Set();
+    for (const record of eventRecords) {
+      const symbol = String(record.symbol || '').toUpperCase();
+      if (!symbol) continue;
+      symbolsInEvent.add(symbol);
+      recordCounts.set(symbol, (recordCounts.get(symbol) || 0) + 1);
+    }
+    for (const symbol of symbolsInEvent) {
+      if (!eventSymbolIncidence.has(symbol)) eventSymbolIncidence.set(symbol, new Set());
+      eventSymbolIncidence.get(symbol).add(id);
+    }
     void id;
   }
-  const maxSymbolCount = Math.max(0, ...Object.values(eventConcentration));
+  const maxEventSymbolCount = Math.max(0, ...[...eventSymbolIncidence.values()].map(events => events.size));
+  const maxRecordCount = Math.max(0, ...recordCounts.values());
+  const uniqueEventSymbolConcentration = eventGroups.size ? maxEventSymbolCount / eventGroups.size : 0;
+  const recordConcentration = records.length ? maxRecordCount / records.length : 0;
   return {
     signal_count: records.length,
     independent_events: eventGroups.size,
@@ -179,13 +199,21 @@ export function summarizeReviewRecords(records = [], {
     net_pf: round(profitFactor(net), 6),
     hit_rate_percent: net.length ? round((wins / net.length) * 100, 6) : null,
     false_positive_rate_percent: net.length ? round(((net.length - wins) / net.length) * 100, 6) : null,
-    avg_mfe_percent: round(average(records.map(record => extractMfe(record, horizonHours)))) ,
-    avg_mae_percent: round(average(records.map(record => extractMae(record, horizonHours)))),
-    positive_windows: positiveWindows.positive_windows,
-    total_windows: positiveWindows.total_windows,
-    positive_window_ratio: round(positiveWindows.positive_window_ratio, 6),
-    window_summaries: positiveWindows.windows,
-    max_symbol_event_concentration: eventGroups.size ? round(maxSymbolCount / eventGroups.size, 8) : 0,
+    avg_mfe_percent: round(average(records.map(record => extractMfe(record, resolvedHorizon(record, horizonHours))))) ,
+    avg_mae_percent: round(average(records.map(record => extractMae(record, resolvedHorizon(record, horizonHours))))),
+    gross_positive_windows: grossPositiveWindows.positive_windows,
+    gross_positive_window_ratio: round(grossPositiveWindows.positive_window_ratio, 6),
+    net_positive_windows: netPositiveWindows.positive_windows,
+    net_positive_window_ratio: round(netPositiveWindows.positive_window_ratio, 6),
+    positive_windows: netPositiveWindows.positive_windows,
+    total_windows: netPositiveWindows.total_windows,
+    positive_window_ratio: round(netPositiveWindows.positive_window_ratio, 6),
+    gross_window_summaries: grossPositiveWindows.windows,
+    net_window_summaries: netPositiveWindows.windows,
+    window_summaries: netPositiveWindows.windows,
+    max_symbol_event_concentration: round(uniqueEventSymbolConcentration, 8),
+    unique_event_symbol_concentration: round(uniqueEventSymbolConcentration, 8),
+    max_symbol_record_concentration: round(recordConcentration, 8),
     horizon_hours: horizonHours,
     cost_percent: costPercent,
   };
@@ -328,20 +356,24 @@ export function classifyDirectionalEdge(records = [], {
   repetitions = 2000,
   seed = M14_EVENT_ALERT_BOOTSTRAP_SEED,
 } = {}) {
-  const summary = summarizeReviewRecords(records, { horizonHours, costPercent, windows });
-  const eventValues = eventMeans(records, record => grossOutcome(record, horizonHours));
-  const bootstrap = bootstrapEventValues(eventValues.map(item => item.value), { repetitions, seed });
-  const robustGross = summary.gross_expectancy_percent > 0
-    && summary.gross_pf > 1
-    && bootstrap.ci95[0] >= 0
-    && summary.positive_window_ratio >= 2 / 3;
-  const netPass = summary.independent_events >= 100
-    && summary.net_pf >= 1.25
-    && summary.net_expectancy_percent >= 0.15
-    && summary.total_windows >= 6
-    && summary.positive_windows >= 4
-    && summary.positive_window_ratio >= 2 / 3
-    && summary.symbol_breadth >= 8
+  const grossSummary = summarizeReviewRecords(records, { horizonHours, costPercent: 0, windows });
+  const netSummary = summarizeReviewRecords(records, { horizonHours, costPercent, windows });
+  const grossEventValues = eventMeans(records, record => grossOutcome(record, resolvedHorizon(record, horizonHours)));
+  const netEventValues = eventMeans(records, record => netOutcome(record, resolvedHorizon(record, horizonHours), costPercent));
+  const grossBootstrap = bootstrapEventValues(grossEventValues.map(item => item.value), { repetitions, seed });
+  const netBootstrap = bootstrapEventValues(netEventValues.map(item => item.value), { repetitions, seed });
+  const robustGross = grossSummary.gross_expectancy_percent > 0
+    && grossSummary.gross_pf > 1
+    && grossBootstrap.ci95[0] >= 0
+    && grossBootstrap.p_gt_zero >= 0.95
+    && grossSummary.gross_positive_window_ratio >= 2 / 3;
+  const netPass = netSummary.independent_events >= 100
+    && netSummary.net_pf >= 1.25
+    && netSummary.net_expectancy_percent >= 0.15
+    && netSummary.total_windows >= 6
+    && netSummary.net_positive_windows >= 4
+    && netSummary.net_positive_window_ratio >= 2 / 3
+    && netSummary.symbol_breadth >= 8
     && calibration === 'PASS';
   return {
     classification: netPass
@@ -351,9 +383,70 @@ export function classifyDirectionalEdge(records = [], {
         : 'NO_GROSS_DIRECTIONAL_EDGE',
     robust_gross_edge: robustGross,
     net_directional_edge: netPass,
-    summary,
-    gross_bootstrap: bootstrap,
+    summary: netSummary,
+    gross_summary: grossSummary,
+    net_summary: netSummary,
+    gross_bootstrap: grossBootstrap,
+    net_bootstrap: netBootstrap,
   };
+}
+
+export function classifyDensityFeasibility(records = [], {
+  horizonHours = 8,
+  windows = [],
+  repetitions = M14_EVENT_ALERT_BOOTSTRAP_REPETITIONS,
+  seed = M14_EVENT_ALERT_BOOTSTRAP_SEED,
+} = {}) {
+  const grossSummary = summarizeReviewRecords(records, { horizonHours, costPercent: 0, windows });
+  const netSummary = summarizeReviewRecords(records, { horizonHours, costPercent: 0.14, windows });
+  const grossEventValues = eventMeans(records, record => grossOutcome(record, resolvedHorizon(record, horizonHours)));
+  const netEventValues = eventMeans(records, record => netOutcome(record, resolvedHorizon(record, horizonHours), 0.14));
+  const grossBootstrap = bootstrapEventValues(grossEventValues.map(item => item.value), { repetitions, seed });
+  const netBootstrap = bootstrapEventValues(netEventValues.map(item => item.value), { repetitions, seed });
+  const failures = [];
+  if (grossSummary.independent_events < 100) failures.push('independent_events');
+  if (!(grossSummary.gross_expectancy_percent > 0)) failures.push('gross_expectancy');
+  if (!(grossSummary.gross_pf > 1)) failures.push('gross_pf');
+  if (!(grossBootstrap.ci95[0] >= 0)) failures.push('gross_bootstrap_ci95_lower');
+  if (!(grossBootstrap.p_gt_zero >= 0.95)) failures.push('gross_bootstrap_p_gt_zero');
+  if (!(grossSummary.gross_positive_window_ratio >= 2 / 3)) failures.push('gross_positive_window_ratio');
+  if (grossSummary.symbol_breadth < 8) failures.push('symbol_breadth');
+  if (grossSummary.unique_event_symbol_concentration > 0.30) failures.push('unique_event_symbol_concentration');
+  const robustGross = failures.length === 0;
+  return {
+    horizon_hours: horizonHours,
+    signal_count: grossSummary.signal_count,
+    independent_events: grossSummary.independent_events,
+    symbol_breadth: grossSummary.symbol_breadth,
+    gross_expectancy_percent: grossSummary.gross_expectancy_percent,
+    net_expectancy_percent: netSummary.net_expectancy_percent,
+    gross_pf: grossSummary.gross_pf,
+    net_pf: netSummary.net_pf,
+    gross_positive_windows: grossSummary.gross_positive_windows,
+    gross_positive_window_ratio: grossSummary.gross_positive_window_ratio,
+    net_positive_windows: netSummary.net_positive_windows,
+    net_positive_window_ratio: netSummary.net_positive_window_ratio,
+    unique_event_symbol_concentration: grossSummary.unique_event_symbol_concentration,
+    max_symbol_event_concentration: grossSummary.max_symbol_event_concentration,
+    max_symbol_record_concentration: grossSummary.max_symbol_record_concentration,
+    gross_bootstrap: grossBootstrap,
+    net_bootstrap: netBootstrap,
+    DENSITY_ROBUST_GROSS_EDGE: robustGross,
+    density_robust_gross_edge: robustGross,
+    gate_failures: failures,
+  };
+}
+
+export function resolveFeasibilityDecision({
+  frozenLaneRobustGrossEdge = false,
+  densityRobustGrossEdge = false,
+  eventAlertUtilityPass = false,
+  evidenceSufficient = true,
+} = {}) {
+  if (!evidenceSufficient) return 'INSUFFICIENT_FEASIBILITY_EVIDENCE';
+  if (frozenLaneRobustGrossEdge || densityRobustGrossEdge) return 'DIRECTIONAL_RESEARCH_CONTINUE';
+  if (eventAlertUtilityPass) return 'PIVOT_TO_MARKET_EVENT_ALERTS';
+  return 'STOP_ALPHA_EXPANSION_KEEP_ALERT_PLATFORM';
 }
 
 function closeKey(symbol, time) {
@@ -690,4 +783,3 @@ export function compactEventAlertEvents(events = []) {
     }))),
   };
 }
-

@@ -60,9 +60,11 @@ import {
   buildLossAttribution,
   buildRegimeSlices,
   buildUniverseSlices,
+  classifyDensityFeasibility,
   classifyDirectionalEdge,
   compactEventAlertEvents,
   reviewConfigHash,
+  resolveFeasibilityDecision,
   spearmanIc,
   summarizeEventAlertUtility,
   summarizeReviewRecords,
@@ -256,16 +258,20 @@ function resultForReview(result, laneId, laneLabel, primaryHorizon = 8) {
   if (!result) return null;
   const records = (result.oos_records || []).map(record => ({
     ...record,
-    primary_horizon_hours: primaryHorizon,
+    primary_horizon_hours: finite(record.primary_horizon_hours) ?? (primaryHorizon === 'record_primary' ? null : primaryHorizon),
     independent_market_event_id: record.independent_market_event_id || record.market_event_id,
     market_event_id: record.independent_market_event_id || record.market_event_id,
     review_window_index: record.review_window_index ?? record.window_index ?? null,
   }));
   const selectedRecords = records.filter(record => record.selected === true);
+  const primaryHorizons = [...new Set(records.map(record => finite(record.primary_horizon_hours)).filter(value => value !== null))];
+  const lanePrimaryHorizon = primaryHorizons.length === 1 ? primaryHorizons[0] : primaryHorizon;
   return {
     lane_id: laneId,
     lane_label: laneLabel,
     primary_horizon_hours: primaryHorizon,
+    frozen_record_primary_horizons: primaryHorizons,
+    inferred_primary_horizon_hours: lanePrimaryHorizon,
     result,
     records,
     selected_records: selectedRecords,
@@ -278,7 +284,7 @@ function buildV1Comparator(records, bestResult) {
   const normalized = records.map(record => ({
     ...record,
     selected: true,
-    primary_horizon_hours: 8,
+    primary_horizon_hours: 1,
     independent_market_event_id: record.independent_market_event_id || record.market_event_id,
     market_event_id: record.independent_market_event_id || record.market_event_id,
   }));
@@ -303,8 +309,9 @@ function attachWindowIndexes(records, windows) {
 function reportLane(lane, windows) {
   const records = attachWindowIndexes(lane.records, windows);
   const selected = attachWindowIndexes(lane.selected_records, windows);
+  const primaryHorizon = lane.inferred_primary_horizon_hours ?? lane.primary_horizon_hours;
   const directional = classifyDirectionalEdge(selected, {
-    horizonHours: 8,
+    horizonHours: primaryHorizon,
     windows,
     calibration: lane.calibration,
     repetitions: M14_EVENT_ALERT_BOOTSTRAP_REPETITIONS,
@@ -323,20 +330,46 @@ function reportLane(lane, windows) {
     tier2: CONFIG.MONITOR_TIERS.tier2.symbols,
     tier3: CONFIG.MONITOR_TIERS.tier3.symbols,
   });
+  const densityValues = buildDensityViews(records);
+  const densityViews = Object.fromEntries(Object.entries(densityValues).map(([name, values]) => [
+    name,
+    summarizeReviewRecords(values, { horizonHours: 8, costPercent: 0.14, windows }),
+  ]));
+  const densityFeasibility = Object.fromEntries(Object.entries(densityValues).map(([name, values]) => [
+    name,
+    classifyDensityFeasibility(values, {
+      horizonHours: 8,
+      windows,
+      repetitions: M14_EVENT_ALERT_BOOTSTRAP_REPETITIONS,
+      seed: M14_EVENT_ALERT_BOOTSTRAP_SEED,
+    }),
+  ]));
+  const primaryGrossSummary = directional.gross_summary;
+  const primaryNetSummary = directional.net_summary;
   return {
     ...lane,
     records,
     selected_records: selected,
-    summary: summarizeReviewRecords(selected, { horizonHours: 8, costPercent: 0.14, windows }),
-    all_oos_summary: summarizeReviewRecords(records, { horizonHours: 8, costPercent: 0.14, windows }),
+    primary_horizon_hours: primaryHorizon,
+    summary: primaryNetSummary,
+    all_oos_summary: summarizeReviewRecords(records, { horizonHours: primaryHorizon, costPercent: 0.14, windows }),
+    primary_gross_expectancy: primaryGrossSummary.gross_expectancy_percent,
+    primary_net_expectancy: primaryNetSummary.net_expectancy_percent,
+    primary_gross_pf: primaryGrossSummary.gross_pf,
+    primary_net_pf: primaryNetSummary.net_pf,
+    primary_gross_positive_windows: primaryGrossSummary.gross_positive_windows,
+    primary_net_positive_windows: primaryNetSummary.net_positive_windows,
+    primary_gross_positive_window_ratio: primaryGrossSummary.gross_positive_window_ratio,
+    primary_net_positive_window_ratio: primaryNetSummary.net_positive_window_ratio,
+    gross_bootstrap: directional.gross_bootstrap,
+    net_bootstrap: directional.net_bootstrap,
+    gross_edge_classification: directional.classification,
     cost_matrix: buildCostMatrix(selected, { horizons: M14_HORIZONS_HOURS, costs: M14_COSTS_PERCENT, windows }),
     horizon_surface: Object.fromEntries(M14_HORIZONS_HOURS.map(horizon => [
       `${horizon}h`, summarizeReviewRecords(selected, { horizonHours: horizon, costPercent: 0.14, windows }),
     ])),
-    density_views: Object.fromEntries(Object.entries(buildDensityViews(records)).map(([name, values]) => [
-      name,
-      summarizeReviewRecords(values, { horizonHours: 8, costPercent: 0.14, windows }),
-    ])),
+    density_views: densityViews,
+    density_feasibility: densityFeasibility,
     universe_slices: Object.fromEntries(Object.entries(universe).map(([name, values]) => [
       name,
       summarizeReviewRecords(values, { horizonHours: 8, costPercent: 0.14, windows }),
@@ -345,7 +378,7 @@ function reportLane(lane, windows) {
     regime_slices: regimes,
     ic: spearmanIc(selected, { horizonHours: 8, windows }),
     directional_classification: directional,
-    loss_attribution: buildLossAttribution(summarizeReviewRecords(selected, { horizonHours: 8, costPercent: 0.14, windows }), {
+    loss_attribution: buildLossAttribution(primaryNetSummary, {
       buySummary: directions.BUY,
       sellSummary: directions.SELL,
       calibration: lane.calibration,
@@ -408,7 +441,10 @@ function compactSummary(summary = {}) {
     'signal_count', 'independent_events', 'symbol_breadth', 'direction_breadth',
     'gross_expectancy_percent', 'net_expectancy_percent', 'gross_pf', 'net_pf',
     'hit_rate_percent', 'false_positive_rate_percent', 'avg_mfe_percent', 'avg_mae_percent',
-    'positive_windows', 'total_windows', 'positive_window_ratio', 'max_symbol_event_concentration',
+    'gross_positive_windows', 'gross_positive_window_ratio',
+    'net_positive_windows', 'net_positive_window_ratio',
+    'positive_windows', 'total_windows', 'positive_window_ratio',
+    'max_symbol_event_concentration', 'unique_event_symbol_concentration', 'max_symbol_record_concentration',
     'horizon_hours', 'cost_percent',
   ];
   return Object.fromEntries(fields.filter(field => summary[field] !== undefined).map(field => [field, summary[field]]));
@@ -436,6 +472,17 @@ function compactLane(lane) {
     lane_id: lane.lane_id,
     lane_label: lane.lane_label,
     primary_horizon_hours: lane.primary_horizon_hours,
+    primary_gross_expectancy: lane.primary_gross_expectancy,
+    primary_net_expectancy: lane.primary_net_expectancy,
+    primary_gross_pf: lane.primary_gross_pf,
+    primary_net_pf: lane.primary_net_pf,
+    primary_gross_positive_windows: lane.primary_gross_positive_windows,
+    primary_net_positive_windows: lane.primary_net_positive_windows,
+    primary_gross_positive_window_ratio: lane.primary_gross_positive_window_ratio,
+    primary_net_positive_window_ratio: lane.primary_net_positive_window_ratio,
+    gross_bootstrap: lane.gross_bootstrap,
+    net_bootstrap: lane.net_bootstrap,
+    gross_edge_classification: lane.gross_edge_classification,
     calibration: lane.calibration,
     final_holdout_untouched: lane.final_holdout_untouched,
     summary: compactSummary(lane.summary),
@@ -443,6 +490,7 @@ function compactLane(lane) {
     cost_matrix: compactCostMatrix(lane.cost_matrix),
     horizon_surface: Object.fromEntries(Object.entries(lane.horizon_surface || {}).map(([key, summary]) => [key, compactSummary(summary)])),
     density_views: compactSlices(lane.density_views),
+    density_feasibility: lane.density_feasibility,
     universe_slices: compactSlices(lane.universe_slices),
     direction_slices: compactSlices(lane.direction_slices),
     regime_slices: compactSlices(lane.regime_slices),
@@ -452,6 +500,9 @@ function compactLane(lane) {
       robust_gross_edge: lane.directional_classification.robust_gross_edge,
       net_directional_edge: lane.directional_classification.net_directional_edge,
       gross_bootstrap: lane.directional_classification.gross_bootstrap,
+      net_bootstrap: lane.directional_classification.net_bootstrap,
+      gross_summary: compactSummary(lane.directional_classification.gross_summary),
+      net_summary: compactSummary(lane.directional_classification.net_summary),
     },
     loss_attribution: lane.loss_attribution,
   };
@@ -493,12 +544,17 @@ function buildMarkdown(report) {
     '',
     '## Frozen review lanes',
     '',
-    '| Lane | Role | Signals | Events | Gross expectancy | Net expectancy | Gross PF | Net PF | Classification |',
-    '|---|---|---:|---:|---:|---:|---:|---:|---|',
+    '| Lane | Role | Primary horizon | Signals | Events | Gross expectancy | Net expectancy | Gross PF | Net PF | Classification |',
+    '|---|---|---:|---:|---:|---:|---:|---:|---:|---|',
   ];
   for (const lane of Object.values(report.review_lanes || {})) {
     const summary = lane.summary || {};
-    lines.push(`| ${lane.lane_id} | ${lane.lane_label} | ${summary.signal_count ?? 0} | ${summary.independent_events ?? 0} | ${summary.gross_expectancy_percent ?? 'N/A'}% | ${summary.net_expectancy_percent ?? 'N/A'}% | ${summary.gross_pf ?? 'N/A'} | ${summary.net_pf ?? 'N/A'} | ${lane.directional_classification?.classification || 'N/A'} |`);
+    lines.push(`| ${lane.lane_id} | ${lane.lane_label} | ${lane.primary_horizon_hours} | ${summary.signal_count ?? 0} | ${summary.independent_events ?? 0} | ${lane.primary_gross_expectancy ?? 'N/A'}% | ${lane.primary_net_expectancy ?? 'N/A'}% | ${lane.primary_gross_pf ?? 'N/A'} | ${lane.primary_net_pf ?? 'N/A'} | ${lane.gross_edge_classification || 'N/A'} |`);
+  }
+  lines.push('', '## Density feasibility', '', `- Frozen-lane robust gross edge: **${report.FROZEN_LANE_ROBUST_GROSS_EDGE}**.`, `- Any density robust gross edge: **${report.DENSITY_ROBUST_GROSS_EDGE}**.`, '');
+  lines.push('| Density view | Gross expectancy | Net expectancy | Gross PF | Net PF | Gross positive windows | Net positive windows | Events | Unique concentration | Gross CI95 | P(gross > 0) | Robust gross |', '|---|---:|---:|---:|---:|---:|---:|---:|---:|---|---:|---|');
+  for (const [name, density] of Object.entries(report.density_feasibility || {})) {
+    lines.push(`| ${name} | ${density.gross_expectancy_percent}% | ${density.net_expectancy_percent}% | ${density.gross_pf} | ${density.net_pf} | ${density.gross_positive_windows}/${density.gross_positive_window_ratio} | ${density.net_positive_windows}/${density.net_positive_window_ratio} | ${density.independent_events} | ${density.unique_event_symbol_concentration} | ${JSON.stringify(density.gross_bootstrap?.ci95)} | ${density.gross_bootstrap?.p_gt_zero} | ${density.DENSITY_ROBUST_GROSS_EDGE} |`);
   }
   lines.push('', '## Calendar parity', '', '```json', JSON.stringify(report.calendar_parity, null, 2), '```', '', '## Event alert utility', '', '```json', JSON.stringify(report.event_alert_utility, null, 2), '```', '', '## Feasibility matrix', '', '| Dimension | Result | Evidence | Implication |', '|---|---|---|---|');
   for (const row of report.feasibility_matrix || []) lines.push(`| ${row.dimension} | ${row.result} | ${row.evidence} | ${row.implication} |`);
@@ -643,12 +699,12 @@ const x8Records = (x8Result.oos_records || []).map(record => ({
   primary_horizon_hours: 4,
 }));
 const lanes = [
-  resultForReview(m11Result, 'R1', 'M1.1 frozen final diagnostic lane', 8),
-  m12Result ? resultForReview(m12Result, 'R2', 'M1.2 frozen final diagnostic lane', 8) : null,
+  resultForReview(m11Result, 'R1', 'M1.1 frozen final diagnostic lane', 'record_primary'),
+  m12Result ? resultForReview(m12Result, 'R2', 'M1.2 frozen final diagnostic lane', 'record_primary') : null,
   resultForReview({ ...x8Result, oos_records: x8Records }, 'R3', 'M1.3 X8 BTC/ETH lead-lag continuation', 4),
 ].filter(Boolean);
 const v1Result = buildV1Comparator(m11V1Records, x8Result);
-lanes.unshift(resultForReview(v1Result, 'R0', 'V1 production/frozen baseline', 8));
+lanes.unshift(resultForReview(v1Result, 'R0', 'V1 production/frozen baseline', 1));
 for (const lane of lanes) lane.review_plan = canonicalReviewPlan;
 const calendarParity = assertReviewCalendarParity(lanes);
 const reviewedLanes = lanes.map(lane => reportLane(lane, canonicalReviewPlan.windows));
@@ -701,22 +757,28 @@ for (const [stage, file] of Object.entries({
     : { status: 'MISSING_FROZEN_REPORT', file };
 }
 
-const directionalGrossEdge = reviewedLanes.some(lane => lane.directional_classification.robust_gross_edge === true);
+const frozenLaneRobustGrossEdge = reviewedLanes.some(lane => lane.directional_classification.robust_gross_edge === true);
+const densityFeasibility = primaryLane.density_feasibility;
+const densityRobustGrossEdge = Object.values(densityFeasibility).some(item => item.DENSITY_ROBUST_GROSS_EDGE === true);
+const directionalResearchSignal = frozenLaneRobustGrossEdge || densityRobustGrossEdge;
+const directionalGrossEdge = directionalResearchSignal;
 const directionalNetEdge = reviewedLanes.some(lane => lane.directional_classification.net_directional_edge === true);
-const decision = directionalGrossEdge
-  ? 'DIRECTIONAL_RESEARCH_CONTINUE'
-  : alertUtility8h.gate_pass
-    ? 'PIVOT_TO_MARKET_EVENT_ALERTS'
-    : 'STOP_ALPHA_EXPANSION_KEEP_ALERT_PLATFORM';
+const decision = resolveFeasibilityDecision({
+  frozenLaneRobustGrossEdge,
+  densityRobustGrossEdge,
+  eventAlertUtilityPass: alertUtility8h.gate_pass,
+});
 const primaryClassification = primaryLane.directional_classification.classification;
-const primaryGross = primaryLane.summary.gross_expectancy_percent;
-const primaryNet = primaryLane.summary.net_expectancy_percent;
+const primaryGross = primaryLane.primary_gross_expectancy;
+const primaryNet = primaryLane.primary_net_expectancy;
 const primaryBreakEven = primaryGross > 0 ? primaryGross : 'NO_POSITIVE_GROSS_EDGE';
 const tierDiagnosticsOnly = true;
 const feasibilityMatrix = [
-  { dimension: 'Directional gross edge', result: directionalGrossEdge, evidence: `${reviewedLanes.length} frozen lanes; robust WFO gross gate`, implication: 'Directional research is not continued unless a frozen lane passes robustness' },
+  { dimension: 'Frozen-lane robust gross edge', result: frozenLaneRobustGrossEdge, evidence: `${reviewedLanes.length} frozen lanes at their declared primary horizons`, implication: 'No frozen lane alone justifies continuation unless this passes' },
+  { dimension: 'Density robust gross edge', result: densityRobustGrossEdge, evidence: 'Three predeclared density diagnostics at fixed 8h', implication: 'Feasibility signal only; no density promotion' },
+  { dimension: 'Directional research signal', result: directionalResearchSignal, evidence: 'Frozen-lane OR density robust gross gate', implication: 'At most one separately designed future validation stage' },
   { dimension: 'Directional net edge', result: directionalNetEdge, evidence: 'Fixed 0.14% gate and existing promotion criteria', implication: 'No production promotion' },
-  { dimension: 'Cost sensitivity', result: primaryClassification, evidence: `R3 8h gross=${primaryGross}% net=${primaryNet}%`, implication: 'Diagnostic only; no cost-based retuning' },
+  { dimension: 'Cost sensitivity', result: primaryClassification, evidence: `R3 ${primaryLane.primary_horizon_hours}h primary gross=${primaryGross}% net=${primaryNet}%`, implication: 'Diagnostic only; no cost-based retuning' },
   { dimension: 'Horizon stability', result: classifyHorizonPattern(primaryLane.horizon_surface), evidence: `R3 ${M14_HORIZONS_HOURS.join('/')}h surface`, implication: 'Descriptive only' },
   { dimension: 'Signal density', result: 'DIAGNOSTIC_ONLY', evidence: 'Three predeclared density views', implication: 'No density policy deployment' },
   { dimension: 'BUY quality', result: primaryLane.direction_slices.BUY?.net_expectancy_percent ?? null, evidence: 'R3 BUY OOS slice', implication: 'BUY remains enabled for research/alerts' },
@@ -785,6 +847,14 @@ const report = {
     canonical_wfo_window_count: canonicalWfoPlan.windows.length,
     final_holdout_outcomes_accessed: false,
   },
+  FROZEN_LANE_ROBUST_GROSS_EDGE: frozenLaneRobustGrossEdge,
+  frozen_lane_robust_gross_edge: frozenLaneRobustGrossEdge,
+  density_diagnostic_horizon_hours: 8,
+  density_feasibility: densityFeasibility,
+  DENSITY_ROBUST_GROSS_EDGE: densityRobustGrossEdge,
+  density_robust_gross_edge: densityRobustGrossEdge,
+  DIRECTIONAL_RESEARCH_SIGNAL: directionalResearchSignal,
+  directional_research_signal: directionalResearchSignal,
   event_alert_utility: {
     primary_horizon_hours: 8,
     gate: 'EVENT_ALERT_UTILITY_GATE',
@@ -858,6 +928,9 @@ console.log(JSON.stringify({
   canonical_review_windows: report.canonical_review_plan.windows.length,
   event_alert_utility: report.event_alert_utility.pass,
   event_alert_events: report.event_alert_utility.independent_events,
+  frozen_lane_robust_gross_edge: report.FROZEN_LANE_ROBUST_GROSS_EDGE,
+  density_robust_gross_edge: report.DENSITY_ROBUST_GROSS_EDGE,
+  directional_research_signal: report.DIRECTIONAL_RESEARCH_SIGNAL,
   directional_gross_edge: report.directional_gross_edge,
   decision: report.decision,
   final_holdout_untouched: report.final_holdout_untouched,
