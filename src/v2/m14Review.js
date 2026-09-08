@@ -396,11 +396,13 @@ export function classifyDensityFeasibility(records = [], {
   windows = [],
   repetitions = M14_EVENT_ALERT_BOOTSTRAP_REPETITIONS,
   seed = M14_EVENT_ALERT_BOOTSTRAP_SEED,
+  summary: precomputedSummary = null,
 } = {}) {
-  const grossSummary = summarizeReviewRecords(records, { horizonHours, costPercent: 0, windows });
-  const netSummary = summarizeReviewRecords(records, { horizonHours, costPercent: 0.14, windows });
+  const summary = precomputedSummary || summarizeReviewRecords(records, { horizonHours, costPercent: 0.14, windows });
+  const grossSummary = summary;
+  const netSummary = summary;
   const grossEventValues = eventMeans(records, record => grossOutcome(record, resolvedHorizon(record, horizonHours)));
-  const netEventValues = eventMeans(records, record => netOutcome(record, resolvedHorizon(record, horizonHours), 0.14));
+  const netEventValues = grossEventValues.map(item => ({ ...item, value: item.value - 0.14 }));
   const grossBootstrap = bootstrapEventValues(grossEventValues.map(item => item.value), { repetitions, seed });
   const netBootstrap = bootstrapEventValues(netEventValues.map(item => item.value), { repetitions, seed });
   const failures = [];

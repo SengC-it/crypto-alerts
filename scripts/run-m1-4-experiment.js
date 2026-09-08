@@ -342,6 +342,7 @@ function reportLane(lane, windows) {
       windows,
       repetitions: M14_EVENT_ALERT_BOOTSTRAP_REPETITIONS,
       seed: M14_EVENT_ALERT_BOOTSTRAP_SEED,
+      summary: densityViews[name],
     }),
   ]));
   const primaryGrossSummary = directional.gross_summary;
