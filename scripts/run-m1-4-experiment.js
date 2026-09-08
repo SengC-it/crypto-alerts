@@ -674,6 +674,7 @@ if (derivativeDatasets) {
   featureRows = attachPointInTimeDerivativeFeatures(featureRows, derivativeDatasets);
   attachCrossSectionalDerivativeRanks(featureRows, { families: REQUIRED_X11_DERIVATIVE_FAMILIES });
 }
+const independentMarketEventCount = new Set(featureRows.map(row => row.independent_market_event_id).filter(Boolean)).size;
 featureResult.features = null;
 featureResult.feature_rows = null;
 featureResult.snapshots = null;
@@ -861,7 +862,7 @@ const report = {
   coverage_complete: coverageComplete,
   valid_cross_sectional_snapshots: snapshotResult.snapshot_count,
   rejected_breadth_snapshots: snapshotResult.rejected_snapshot_count,
-  independent_market_events: new Set(featureRows.map(row => row.independent_market_event_id).filter(Boolean)).size,
+  independent_market_events: independentMarketEventCount,
   event_definition: 'fixed UTC 4h bucket from closed 1h candle open time',
   data_admission: {
     admitted_families: dataAdmission.admitted_families,
