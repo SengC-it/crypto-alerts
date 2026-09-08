@@ -15,3 +15,5 @@ export * from './walkForward.js';
 export * from './microstructureFeatures.js';
 export * from './derivativesData.js';
 export * from './informationGain.js';
+export * from './crossSectional.js';
+export * from './m13Report.js';

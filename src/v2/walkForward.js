@@ -6,6 +6,7 @@ import { hashConfig } from '../lineage.js';
 const HOUR = 60 * 60 * 1000;
 const VOLATILITY_REGIMES = ['Low', 'Normal', 'High', 'Extreme'];
 const VOLATILITY_POLICY_VERSION = 'm1-training-volatility-policy-0.1.0';
+const CANONICAL_WFO_VERSION = 'm1.3-time-wfo-0.1.1';
 
 function numericTime(value) {
   const candidate = value?.timestamp ?? value?.signal_timestamp ?? value;
@@ -15,7 +16,7 @@ function numericTime(value) {
 }
 
 function eventId(sample) {
-  const value = sample?.market_event_id ?? sample?.event_id;
+  const value = sample?.independent_market_event_id ?? sample?.market_event_id ?? sample?.event_id;
   return value === null || value === undefined || value === '' ? null : String(value);
 }
 
@@ -412,9 +413,282 @@ export function buildPurgedWalkForwardPlan(samples = [], options = {}) {
   };
 }
 
+function canonicalEventGroups(samples = []) {
+  const groups = new Map();
+  samples.forEach((sample, index) => {
+    const timestamp = numericTime(sample);
+    if (timestamp === null) return;
+    const id = eventId(sample) || `timestamp:${timestamp}`;
+    if (!groups.has(id)) groups.set(id, {
+      event_id: id,
+      start_timestamp: timestamp,
+      end_timestamp: timestamp,
+      snapshot_timestamps: new Set(),
+    });
+    const group = groups.get(id);
+    group.start_timestamp = Math.min(group.start_timestamp, timestamp);
+    group.end_timestamp = Math.max(group.end_timestamp, timestamp);
+    group.snapshot_timestamps.add(timestamp);
+    group.first_sample_index = Math.min(group.first_sample_index ?? index, index);
+  });
+  return [...groups.values()]
+    .map(group => ({
+      ...group,
+      snapshot_timestamps: [...group.snapshot_timestamps].sort((left, right) => left - right),
+    }))
+    .sort((left, right) => left.start_timestamp - right.start_timestamp || left.event_id.localeCompare(right.event_id));
+}
+
+function canonicalWindowProjection(windows = []) {
+  return windows.map(window => ({
+    index: window.index,
+    train_start_timestamp: window.train_start_timestamp ?? window.train_start ?? null,
+    train_end_timestamp: window.train_end_timestamp ?? window.train_end ?? null,
+    purge_start_timestamp: window.purge_start_timestamp ?? window.purge_start ?? null,
+    purge_end_timestamp: window.purge_end_timestamp ?? window.purge_end ?? null,
+    test_start_timestamp: window.test_start_timestamp ?? window.test_start ?? null,
+    test_end_timestamp: window.test_end_timestamp ?? window.test_end ?? null,
+    embargo_start_timestamp: window.embargo_start_timestamp ?? window.embargo_start ?? null,
+    embargo_end_timestamp: window.embargo_end_timestamp ?? window.embargo_end ?? null,
+    embargo_boundary_timestamp: window.embargo_boundary_timestamp ?? null,
+    final_holdout_start_timestamp: window.final_holdout_start_timestamp
+      ?? window.final_holdout_start
+      ?? null,
+    purge_hours: window.purge_hours ?? null,
+    embargo_hours: window.embargo_hours ?? null,
+  }));
+}
+
+/**
+ * Build one time/event-based WFO calendar that can be materialized against
+ * sparse or dense candidate samples without changing any calendar boundary.
+ */
+export function buildCanonicalWfoPlan(samples = [], options = {}) {
+  const {
+    trainRatio = 0.35,
+    testRatio = 0.06,
+    holdoutRatio = 0.20,
+    trainEventCount: requestedTrainEventCount,
+    testEventCount: requestedTestEventCount,
+    stepEventCount: requestedStepEventCount,
+    finalHoldoutStartTimestamp: requestedHoldoutStart,
+    purgeHours = 48,
+    embargoHours = 24,
+    labelHorizonHours = 48,
+    minimumWindows = 6,
+    includeFinalHoldoutOutcomeInHash = false,
+  } = options;
+  const clock = canonicalEventGroups(samples);
+  if (clock.length < 3) throw new Error('Canonical WFO requires at least three independent market events');
+  const holdoutEventCount = Math.max(1, Math.floor(clock.length * holdoutRatio));
+  const requestedBoundary = numericTime(requestedHoldoutStart);
+  let holdoutIndex = requestedBoundary === null
+    ? clock.length - holdoutEventCount
+    : clock.findIndex(event => event.start_timestamp === requestedBoundary);
+  if (holdoutIndex < 1) throw new Error('Canonical WFO final holdout boundary is not present after development history');
+  const finalHoldoutStart = clock[holdoutIndex].start_timestamp;
+  if (requestedBoundary !== null && finalHoldoutStart !== requestedBoundary) {
+    throw new Error(`Canonical WFO final holdout boundary mismatch: requested=${requestedBoundary}, actual=${finalHoldoutStart}`);
+  }
+  const developmentClock = clock.slice(0, holdoutIndex);
+  const holdoutStart = finalHoldoutStart;
+  const holdoutPurgeCutoff = holdoutStart - labelHorizonHours * HOUR;
+  const holdoutEmbargoCutoff = holdoutStart - embargoHours * HOUR;
+  const wfoClock = developmentClock.filter(event => (
+    event.end_timestamp + labelHorizonHours * HOUR <= holdoutStart
+    && event.start_timestamp <= holdoutEmbargoCutoff
+  ));
+  const trainEventCount = Math.max(1, Math.floor(
+    requestedTrainEventCount ?? clock.length * trainRatio,
+  ));
+  const testEventCount = Math.max(1, Math.floor(
+    requestedTestEventCount ?? clock.length * testRatio,
+  ));
+  const stepEventCount = Math.max(1, Math.floor(requestedStepEventCount ?? testEventCount));
+  const windows = [];
+  for (let cursor = 0; cursor + trainEventCount < wfoClock.length; cursor += stepEventCount) {
+    const trainAnchorEnd = cursor + trainEventCount;
+    const rawTestEvent = wfoClock[trainAnchorEnd];
+    if (!rawTestEvent) break;
+    const rawTestStart = rawTestEvent.start_timestamp;
+    const trainEvents = wfoClock.slice(cursor, trainAnchorEnd).filter(event => (
+      event.end_timestamp + labelHorizonHours * HOUR <= rawTestStart
+    ));
+    const embargoBoundary = rawTestStart + embargoHours * HOUR;
+    const testStartIndex = wfoClock.findIndex((event, index) => (
+      index >= trainAnchorEnd && event.start_timestamp >= embargoBoundary
+    ));
+    if (testStartIndex < 0) break;
+    const testEvents = wfoClock.slice(testStartIndex, testStartIndex + testEventCount);
+    if (!testEvents.length) break;
+    const trainStart = trainEvents[0]?.start_timestamp ?? wfoClock[cursor]?.start_timestamp ?? null;
+    const trainEnd = trainEvents.at(-1)?.end_timestamp ?? null;
+    const testStart = testEvents[0].start_timestamp;
+    const testEnd = testEvents.at(-1).end_timestamp;
+    windows.push({
+      index: windows.length,
+      train: trainEvents.map(event => event.event_id),
+      test: testEvents.map(event => event.event_id),
+      train_start: trainStart,
+      train_end: trainEnd,
+      raw_test_start: rawTestStart,
+      test_start: testStart,
+      test_end: testEnd,
+      train_start_timestamp: trainStart,
+      train_end_timestamp: trainEnd,
+      purge_start_timestamp: trainEnd === null ? null : trainEnd + 1,
+      purge_end_timestamp: rawTestStart - 1,
+      test_start_timestamp: testStart,
+      test_end_timestamp: testEnd,
+      embargo_start_timestamp: rawTestStart,
+      embargo_end_timestamp: testStart - 1,
+      embargo_boundary_timestamp: embargoBoundary,
+      final_holdout_start_timestamp: finalHoldoutStart,
+      purge_hours: purgeHours,
+      embargo_hours: embargoHours,
+      label_horizon_hours: labelHorizonHours,
+      train_event_count: trainEvents.length,
+      test_event_count: testEvents.length,
+      purged_event_count: Math.max(0, trainAnchorEnd - trainEvents.length),
+      embargoed_event_count: Math.max(0, testStartIndex - trainAnchorEnd),
+    });
+    if (testStartIndex + testEventCount >= wfoClock.length) break;
+  }
+  if (!windows.length) throw new Error('Canonical WFO produced no chronological windows');
+  const finalHoldoutEvents = clock.slice(holdoutIndex);
+  const boundary = {
+    requested_count: holdoutEventCount,
+    actual_count: finalHoldoutEvents.length,
+    boundary_timestamp: finalHoldoutStart,
+    final_holdout_start_timestamp: finalHoldoutStart,
+    final_holdout_event_id: finalHoldoutEvents[0]?.event_id ?? null,
+    development_max_timestamp: developmentClock.at(-1)?.end_timestamp ?? null,
+    final_holdout_min_timestamp: finalHoldoutEvents[0]?.start_timestamp ?? null,
+    final_holdout_max_timestamp: finalHoldoutEvents.at(-1)?.end_timestamp ?? null,
+    all_boundary_timestamps_single_side: true,
+    purge_hours: purgeHours,
+    embargo_hours: embargoHours,
+    holdout_purge_cutoff_timestamp: holdoutPurgeCutoff,
+    holdout_embargo_cutoff_timestamp: holdoutEmbargoCutoff,
+    wfo_development_max_timestamp: wfoClock.at(-1)?.end_timestamp ?? null,
+  };
+  const finalHoldoutHash = hashConfig(finalHoldoutEvents.map(event => ({
+    event_id: event.event_id,
+    start_timestamp: event.start_timestamp,
+    end_timestamp: event.end_timestamp,
+    ...(includeFinalHoldoutOutcomeInHash ? { outcome: null } : {}),
+  })));
+  const optionsSummary = {
+    canonical_wfo: true,
+    canonical_wfo_version: CANONICAL_WFO_VERSION,
+    canonical_clock_unit: 'independent_market_event_id',
+    canonical_clock_event_count: clock.length,
+    trainRatio,
+    testRatio,
+    holdoutRatio,
+    trainSize: trainEventCount,
+    testSize: testEventCount,
+    step: stepEventCount,
+    finalHoldoutCount: finalHoldoutEvents.length,
+    purgeHours,
+    embargoHours,
+    labelHorizonHours,
+    includeFinalHoldoutOutcomeInHash,
+    minimumWindows,
+  };
+  const canonicalPlanHash = hashConfig({
+    version: CANONICAL_WFO_VERSION,
+    options: optionsSummary,
+    boundary,
+    windows: canonicalWindowProjection(windows),
+  });
+  const optionsWithHash = { ...optionsSummary, canonical_plan_hash: canonicalPlanHash };
+  return {
+    canonical_wfo: true,
+    canonical_wfo_version: CANONICAL_WFO_VERSION,
+    canonical_plan_hash: canonicalPlanHash,
+    canonical_clock_unit: 'independent_market_event_id',
+    canonical_clock_event_count: clock.length,
+    canonical_clock_start_timestamp: clock[0].start_timestamp,
+    canonical_clock_end_timestamp: clock.at(-1).end_timestamp,
+    canonical_clock_snapshot_count: clock.reduce((sum, event) => sum + event.snapshot_timestamps.length, 0),
+    wfo_development_event_count: wfoClock.length,
+    wfo_development_max_timestamp: wfoClock.at(-1)?.end_timestamp ?? null,
+    windows,
+    final_holdout_start: finalHoldoutStart,
+    final_holdout_start_timestamp: finalHoldoutStart,
+    final_holdout_event_id: finalHoldoutEvents[0]?.event_id ?? null,
+    final_holdout_event_count: finalHoldoutEvents.length,
+    final_holdout_hash: finalHoldoutHash,
+    final_holdout_boundary: { ...boundary, final_holdout_hash: finalHoldoutHash },
+    final_holdout_untouched: true,
+    options: optionsWithHash,
+  };
+}
+
+function materializeCanonicalWfoPlan(samples = [], canonicalPlan, options = {}) {
+  const ordered = samples
+    .map((sample, originalIndex) => ({ sample, originalIndex, timestamp: numericTime(sample) }))
+    .filter(item => item.timestamp !== null)
+    .sort((left, right) => left.timestamp - right.timestamp || left.originalIndex - right.originalIndex);
+  const finalHoldoutStart = canonicalPlan.final_holdout_start_timestamp;
+  const labelHorizonHours = canonicalPlan.options?.labelHorizonHours ?? options.labelHorizonHours ?? 48;
+  const finalHoldoutIndices = ordered
+    .filter(item => item.timestamp >= finalHoldoutStart)
+    .map(item => item.originalIndex);
+  const developmentIndices = ordered
+    .filter(item => item.timestamp < finalHoldoutStart)
+    .map(item => item.originalIndex);
+  const wfoDevelopmentMax = canonicalPlan.wfo_development_max_timestamp;
+  const wfoDevelopmentIndices = ordered
+    .filter(item => item.timestamp <= wfoDevelopmentMax
+      && labelEndTime(item.sample, labelHorizonHours) <= finalHoldoutStart)
+    .map(item => item.originalIndex);
+  const windows = canonicalPlan.windows.map(canonicalWindow => {
+    const train = [];
+    const test = [];
+    ordered.forEach(item => {
+      if (item.timestamp >= canonicalWindow.train_start_timestamp
+        && item.timestamp <= canonicalWindow.train_end_timestamp
+        && labelEndTime(item.sample, labelHorizonHours) <= canonicalWindow.raw_test_start) {
+        train.push(item.originalIndex);
+      }
+      if (item.timestamp >= canonicalWindow.test_start_timestamp
+        && item.timestamp <= canonicalWindow.test_end_timestamp) {
+        test.push(item.originalIndex);
+      }
+    });
+    return {
+      ...canonicalWindow,
+      train,
+      test,
+      train_sample_count: train.length,
+      test_sample_count: test.length,
+    };
+  });
+  return {
+    ...canonicalPlan,
+    windows,
+    window_count: windows.length,
+    ordered_indices: ordered.map(item => item.originalIndex),
+    development_indices: developmentIndices,
+    wfo_development_indices: wfoDevelopmentIndices,
+    final_holdout_indices: finalHoldoutIndices,
+    final_holdout_count: finalHoldoutIndices.length,
+    final_holdout_untouched: canonicalPlan.final_holdout_untouched === true,
+    final_holdout_boundary: {
+      ...canonicalPlan.final_holdout_boundary,
+      candidate_final_holdout_count: finalHoldoutIndices.length,
+    },
+    options: { ...canonicalPlan.options },
+  };
+}
+
 /** Execute the plan with optional training and prediction callbacks. */
 export function runPurgedWalkForward(samples = [], options = {}) {
-  const plan = buildPurgedWalkForwardPlan(samples, options);
+  const plan = options.canonicalPlan
+    ? materializeCanonicalWfoPlan(samples, options.canonicalPlan, options)
+    : buildPurgedWalkForwardPlan(samples, options);
   const fit = options.fit || ((trainSamples, fitOptions) => fitClusterSelectionPolicy(trainSamples, {
     ...options,
     ...fitOptions,
@@ -424,6 +698,7 @@ export function runPurgedWalkForward(samples = [], options = {}) {
   const windowResults = [];
   const oosSamples = [];
   const finalHoldoutSet = new Set(plan.final_holdout_indices);
+  const sampleIndexByReference = new Map(samples.map((sample, index) => [sample, index]));
   let windowsAvoidHoldout = true;
 
   for (const window of plan.windows) {
@@ -446,7 +721,7 @@ export function runPurgedWalkForward(samples = [], options = {}) {
     });
     predictions.forEach(prediction => {
       const sample = prediction.sample;
-      const sampleIndex = samples.indexOf(sample);
+      const sampleIndex = sampleIndexByReference.get(sample) ?? samples.indexOf(sample);
       oosSamples.push({
         ...prediction,
         window_index: window.index,
