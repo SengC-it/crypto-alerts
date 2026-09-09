@@ -15,7 +15,8 @@
     "m1.2:experiment": "node scripts/run-m1-2-experiment.js",
     "m1.3:experiment": "node scripts/run-m1-3-experiment.js",
     "m1.4:experiment": "node scripts/run-m1-4-experiment.js",
-    "m1.5:experiment": "node scripts/run-m1-5-experiment.js"
+    "m1.5:experiment": "node scripts/run-m1-5-experiment.js",
+    "m1.6:review": "node scripts/generate-m1-6-review.js"
   },
   "dependencies": {
     "ws": "^8.18.0",
