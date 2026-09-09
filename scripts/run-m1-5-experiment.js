@@ -390,7 +390,7 @@ function markdownReport(report) {
     '| Moving-block P(mean > 0) | ' + c1.moving_block_bootstrap.net.p_gt_zero + ' |',
     '| Calibration | ' + (c1.calibration?.status || 'UNKNOWN') + ' |',
     '| C1 confirmation gate | ' + c1.gate.pass + ' |',
-    '| Absolute promotion gate | ' + report.absolute_promotion.pass + ' |',
+    '| Absolute promotion gate | ' + report.gates.absolute_promotion.pass + ' |',
     '',
     '## Policy gates',
     '',
