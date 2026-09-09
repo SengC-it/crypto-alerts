@@ -235,6 +235,7 @@ function m15Summary(report) {
 }
 
 export function buildAcceptedEvidenceLedger(reports) {
+  if (!hasAcceptedReportSet(reports)) throw new Error('M1.6 evidence ledger must contain exactly six accepted stages');
   return [
     m1Summary(reports.M1),
     m11Summary(reports.M1_1),
@@ -257,6 +258,165 @@ export function assertAcceptedArtifactPaths(paths) {
   return true;
 }
 
+function hasOwnValue(value, key) {
+  return value != null && Object.prototype.hasOwnProperty.call(value, key);
+}
+
+function hasAcceptedReportSet(reports) {
+  const expected = Object.keys(M16_ACCEPTED_REPORTS).sort();
+  return JSON.stringify(Object.keys(reports ?? {}).sort()) === JSON.stringify(expected)
+    && expected.every(stage => reports[stage] && typeof reports[stage] === 'object');
+}
+
+function hasAcceptedArtifactHashes(reportFileHashes) {
+  return Object.values(M16_ACCEPTED_REPORTS).every(relativePath => (
+    typeof reportFileHashes?.[relativePath] === 'string'
+    && reportFileHashes[relativePath].length > 0
+  ));
+}
+
+function hasFinalStageResults(reports) {
+  return Boolean(
+    reports.M1?.promotion?.recommendation
+    && reports.M1_1?.promotion?.recommendation
+    && reports.M1_1?.decision
+    && reports.M1_2?.decision
+    && reports.M1_3?.decision
+    && reports.M1_4?.decision
+    && reports.M1_5?.decision,
+  );
+}
+
+function hasCriticalConfirmationFields(reports) {
+  const eventAlert = reports.M1_4?.event_alert_utility;
+  const gates = reports.M1_5?.gates;
+  return reports.M1_5?.report_version?.endsWith('0.1.1') === true
+    && typeof eventAlert?.pass === 'boolean'
+    && hasOwnValue(eventAlert, 'delta_8h_absolute_return')
+    && hasOwnValue(eventAlert, 'delta_8h_ci95')
+    && hasOwnValue(eventAlert, 'max_symbol_event_concentration')
+    && typeof gates?.c1_confirmation?.pass === 'boolean'
+    && typeof gates?.absolute_promotion?.pass === 'boolean';
+}
+
+function newDomainFeasibilityFromEvidence(reports) {
+  const domain = reports.M1_4?.future_information_domain;
+  if (!domain || domain.fundamentally_different !== true) return false;
+  return [
+    'historical_pit_obtainable',
+    'timestamps_auditable',
+    'coverage_sufficient',
+    'future_leakage_preventable',
+    'sample_size_usable',
+  ].every(field => domain[field] === true);
+}
+
+export function deriveM16DecisionInputs(reports, reportFileHashes = {}) {
+  const acceptedStageCount = Object.keys(reports ?? {}).length;
+  const acceptedReportSet = hasAcceptedReportSet(reports);
+  const invalidatedArtifactExcluded = !M16_INVALIDATED_REPORTS.some(relativePath => (
+    Object.values(M16_ACCEPTED_REPORTS).includes(relativePath)
+    || Object.prototype.hasOwnProperty.call(reportFileHashes, relativePath)
+  ));
+  const artifactHashesAvailable = hasAcceptedArtifactHashes(reportFileHashes);
+  const finalStageResultsPresent = hasFinalStageResults(reports ?? {});
+  const criticalConfirmationFieldsPresent = hasCriticalConfirmationFields(reports ?? {});
+  const evidenceSufficient = acceptedReportSet
+    && acceptedStageCount === 6
+    && invalidatedArtifactExcluded
+    && artifactHashesAvailable
+    && finalStageResultsPresent
+    && criticalConfirmationFieldsPresent;
+
+  const m1Promotion = ['PROMOTE', 'PASS'].includes(reports.M1?.promotion?.recommendation);
+  const m11Promotion = ['PROMOTE', 'PASS'].includes(reports.M1_1?.promotion?.recommendation);
+  const m12Promotion = reports.M1_2?.baseline_summary?.absolute_promotion?.pass === true;
+  const m13Promotion = reports.M1_3?.best_candidate?.incremental_gate?.pass === true
+    || reports.M1_3?.best_candidate?.absolute_gate?.pass === true;
+  const freshCausalConfirmationPass = reports.M1_5?.gates?.c1_confirmation?.pass === true;
+  const freshAbsolutePromotionPass = reports.M1_5?.gates?.absolute_promotion?.pass === true;
+  const acceptedDirectionalPromotionFound = m1Promotion
+    || m11Promotion
+    || m12Promotion
+    || m13Promotion
+    || (freshCausalConfirmationPass && freshAbsolutePromotionPass);
+  const retrospectiveDensityPresent = reports.M1_4?.density_feasibility?.TOP1_PER_4H_EVENT_PER_DIRECTION?.DENSITY_ROBUST_GROSS_EDGE === true;
+  const eventAlert = reports.M1_4?.event_alert_utility;
+  const eventAlertGatePass = eventAlert?.pass === true;
+  const eventAlertConcentration = eventAlert?.max_symbol_event_concentration ?? null;
+  const strongFailureModes = [];
+  if (reports.M1_1?.stability?.unstable_edge === true || reports.M1_3?.best_candidate?.stability?.unstable_edge === true || !freshCausalConfirmationPass) {
+    strongFailureModes.push('NON_STATIONARY_EDGE');
+  }
+  if ([
+    reports.M1?.calibration?.status,
+    reports.M1_1?.calibration?.status,
+    reports.M1_2?.baseline_summary?.calibration,
+    reports.M1_3?.best_candidate?.metrics?.score_calibration?.status,
+    reports.M1_5?.calibration?.status,
+  ].some(status => status === 'CALIBRATION_FAIL')) {
+    strongFailureModes.push('SCORE_CALIBRATION_FAILURE');
+  }
+  if (!freshCausalConfirmationPass) strongFailureModes.push('CAUSAL_TRANSLATION_FAILURE');
+  const moderateFailureModes = ['DATA_DOMAIN_LIMITATION', 'DIRECTIONAL_ASYMMETRY'];
+  const weakFailureModes = ['REGIME_CONCENTRATION'];
+  const fundamentallyNewDomainFeasible = newDomainFeasibilityFromEvidence(reports ?? {});
+  const missingInformationIsPrimaryLimitation = strongFailureModes.length === 0
+    && fundamentallyNewDomainFeasible;
+  const directionalAlphaSupported = acceptedDirectionalPromotionFound;
+  const directionalResearchJustified = directionalAlphaSupported
+    || (missingInformationIsPrimaryLimitation && fundamentallyNewDomainFeasible);
+  const eventAlertProductValueSupported = eventAlertGatePass;
+  const reasons = [];
+  const stageReferences = {};
+  if (!evidenceSufficient) {
+    reasons.push('Accepted evidence is incomplete or missing a critical final confirmation field.');
+    stageReferences.evidence_sufficiency = ['M1', 'M1.1', 'M1.2', 'M1.3', 'M1.4', 'M1.5'];
+  }
+  if (!acceptedDirectionalPromotionFound) {
+    reasons.push('No accepted fresh directional promotion passed the stage gates.');
+    stageReferences.directional_promotion = ['M1', 'M1.1', 'M1.2', 'M1.3', 'M1.5'];
+  }
+  if (retrospectiveDensityPresent && !freshCausalConfirmationPass) {
+    reasons.push('M1.4 retrospective density discovery is not confirmatory because corrected M1.5 C1 failed.');
+    stageReferences.retrospective_density = ['M1.4', 'M1.5'];
+  }
+  if (!missingInformationIsPrimaryLimitation) {
+    reasons.push('Strong model-validity, stability, calibration, or causal-translation failures outweigh the moderate data-domain limitation.');
+    stageReferences.missing_information = ['M1.1', 'M1.3', 'M1.4', 'M1.5'];
+  }
+  if (!eventAlertGatePass) {
+    reasons.push('M1.4 event-alert enrichment fails its concentration-inclusive gate.');
+    stageReferences.event_alert = ['M1.4'];
+  }
+  const decisionEvidence = {
+    evidence_sufficient: evidenceSufficient,
+    accepted_stage_count: acceptedStageCount,
+    invalidated_artifact_excluded: invalidatedArtifactExcluded,
+    accepted_directional_promotion_found: acceptedDirectionalPromotionFound,
+    fresh_causal_confirmation_pass: freshCausalConfirmationPass,
+    fresh_absolute_promotion_pass: freshAbsolutePromotionPass,
+    retrospective_density_only: retrospectiveDensityPresent,
+    m14_retrospective_density_confirmatory: false,
+    event_alert_gate_pass: eventAlertGatePass,
+    event_alert_concentration: eventAlertConcentration,
+    directional_research_justified: directionalResearchJustified,
+    directional_alpha_supported: directionalAlphaSupported,
+    event_alert_product_value_supported: eventAlertProductValueSupported,
+    missing_information_is_primary_limitation: missingInformationIsPrimaryLimitation,
+    fundamentally_new_domain_feasible: fundamentallyNewDomainFeasible,
+    strong_failure_modes: [...new Set(strongFailureModes)],
+    moderate_failure_modes: moderateFailureModes,
+    weak_failure_modes: weakFailureModes,
+    reasons,
+    stage_references: stageReferences,
+  };
+  return {
+    ...decisionEvidence,
+    decision_evidence_hash: hashConfig(decisionEvidence),
+  };
+}
+
 export function breakEvenRoundTripCost(grossExpectancyPercent) {
   return Number.isFinite(grossExpectancyPercent) && grossExpectancyPercent > 0
     ? grossExpectancyPercent
@@ -270,10 +430,20 @@ export function classifyCostFeasibility({ grossExpectancyPercent, netExpectancyP
   return 'EDGE_SURVIVES_REALISTIC_COST';
 }
 
-export function resolveM16Decision({ directionalAlphaSupported = false, eventAlertProductValue = false, evidenceSufficient = true } = {}) {
-  if (!evidenceSufficient) return 'INSUFFICIENT_PROJECT_EVIDENCE';
-  if (directionalAlphaSupported) return 'CONTINUE_DIRECTIONAL_ALPHA_WITH_NEW_INFORMATION_DOMAIN';
-  if (eventAlertProductValue) return 'PIVOT_TO_NON_DIRECTIONAL_MARKET_EVENT_RESEARCH';
+export function resolveM16Decision({
+  directionalResearchJustified = false,
+  eventAlertProductValueSupported = false,
+  evidenceSufficient = false,
+  directional_research_justified,
+  event_alert_product_value_supported,
+  evidence_sufficient,
+} = {}) {
+  const evidence = evidence_sufficient ?? evidenceSufficient;
+  const directional = directional_research_justified ?? directionalResearchJustified;
+  const eventAlert = event_alert_product_value_supported ?? eventAlertProductValueSupported;
+  if (!evidence) return 'INSUFFICIENT_PROJECT_EVIDENCE';
+  if (directional) return 'CONTINUE_DIRECTIONAL_ALPHA_WITH_NEW_INFORMATION_DOMAIN';
+  if (eventAlert) return 'PIVOT_TO_NON_DIRECTIONAL_MARKET_EVENT_RESEARCH';
   return 'STOP_ALPHA_EXPANSION_KEEP_ALERT_PLATFORM';
 }
 
@@ -325,10 +495,23 @@ export function buildM16Report({ reports, reportFileHashes = {}, sourceSha = 'UN
     autoTrading: false,
     m2Started: false,
   });
-  const decision = resolveM16Decision({ directionalAlphaSupported: false, eventAlertProductValue: false, evidenceSufficient: true });
-  const ledger = buildAcceptedEvidenceLedger(reports);
+  const decisionInputs = deriveM16DecisionInputs(reports, reportFileHashes);
+  const decision = resolveM16Decision(decisionInputs);
+  const ledger = decisionInputs.evidence_sufficient ? buildAcceptedEvidenceLedger(reports) : [];
+  const failureTaxonomy = [
+    { code: 'A', category: 'NO_PREDICTIVE_INFORMATION', strength: 'MODERATE', stage_references: ['M1', 'M1.1', 'M1.2', 'M1.3', 'M1.5'], evidence: 'Repeated rejected OOS lanes; not an impossibility claim.' },
+    { code: 'B', category: 'GROSS_EDGE_TOO_WEAK_FOR_COST', strength: 'STRONG', stage_references: ['M1.1', 'M1.2', 'M1.3', 'M1.4', 'M1.5'], evidence: 'Positive gross lanes remain below fixed 0.14% cost or have no positive gross edge.' },
+    { code: 'C', category: 'NON_STATIONARY_EDGE', strength: 'STRONG', stage_references: ['M1.1', 'M1.3', 'M1.4', 'M1.5'], evidence: 'Unstable windows and fresh confirmation decay.' },
+    { code: 'D', category: 'DIRECTIONAL_ASYMMETRY', strength: 'MODERATE', stage_references: ['M1', 'M1.1', 'M1.5'], evidence: 'Observed slices are diagnostic; no predeclared replicated BUY-only rule.' },
+    { code: 'E', category: 'SIGNAL_DENSITY_CORRELATION', strength: 'MODERATE', stage_references: ['M1.4', 'M1.5'], evidence: 'Retrospective density view differs from raw stream and causal view.' },
+    { code: 'F', category: 'SCORE_CALIBRATION_FAILURE', strength: 'STRONG', stage_references: ['M1', 'M1.1', 'M1.2', 'M1.3', 'M1.5'], evidence: 'Accepted primary lanes repeatedly report CALIBRATION_FAIL.' },
+    { code: 'G', category: 'SYMBOL_CONCENTRATION', strength: 'STRONG', stage_references: ['M1.3', 'M1.4', 'M1.5'], evidence: 'Concentration gates fail or diagnostic lanes exceed the 0.30 threshold.' },
+    { code: 'H', category: 'REGIME_CONCENTRATION', strength: 'WEAK', stage_references: ['M1.1', 'M1.2'], evidence: 'Bull/Bear shares are imbalanced but not the primary hard failure.' },
+    { code: 'I', category: 'CAUSAL_TRANSLATION_FAILURE', strength: 'STRONG', stage_references: ['M1.4', 'M1.5'], evidence: 'M1.4 retrospective density result does not survive corrected causal fresh validation.' },
+    { code: 'J', category: 'DATA_DOMAIN_LIMITATION', strength: 'MODERATE', stage_references: ['M1', 'M1.1', 'M1.2', 'M1.3', 'M1.4', 'M1.5'], evidence: 'Only public 1h/derivative aggregates were accepted; missing domains are not asserted to contain alpha.' },
+  ];
   return {
-    report_version: 'm1.6-profitability-feasibility-0.1.0',
+    report_version: 'm1.6-profitability-feasibility-0.1.1',
     generated_at: generatedAt,
     base_main_sha: M16_BASE_MAIN_SHA,
     source_sha: sourceSha,
@@ -336,18 +519,13 @@ export function buildM16Report({ reports, reportFileHashes = {}, sourceSha = 'UN
     invalidated_excluded_artifacts: M16_INVALIDATED_REPORTS,
     accepted_artifact_sha256: reportFileHashes,
     evidence_ledger: ledger,
-    failure_taxonomy: [
-      { code: 'A', category: 'NO_PREDICTIVE_INFORMATION', strength: 'MODERATE', stage_references: ['M1', 'M1.1', 'M1.2', 'M1.3', 'M1.5'], evidence: 'Repeated rejected OOS lanes; not an impossibility claim.' },
-      { code: 'B', category: 'GROSS_EDGE_TOO_WEAK_FOR_COST', strength: 'STRONG', stage_references: ['M1.1', 'M1.2', 'M1.3', 'M1.4', 'M1.5'], evidence: 'Positive gross lanes remain below fixed 0.14% cost or have no positive gross edge.' },
-      { code: 'C', category: 'NON_STATIONARY_EDGE', strength: 'STRONG', stage_references: ['M1.1', 'M1.3', 'M1.4', 'M1.5'], evidence: 'Unstable windows and fresh confirmation decay.' },
-      { code: 'D', category: 'DIRECTIONAL_ASYMMETRY', strength: 'MODERATE', stage_references: ['M1', 'M1.1', 'M1.5'], evidence: 'Observed slices are diagnostic; no predeclared replicated BUY-only rule.' },
-      { code: 'E', category: 'SIGNAL_DENSITY_CORRELATION', strength: 'MODERATE', stage_references: ['M1.4', 'M1.5'], evidence: 'Retrospective density view differs from raw stream and causal view.' },
-      { code: 'F', category: 'SCORE_CALIBRATION_FAILURE', strength: 'STRONG', stage_references: ['M1', 'M1.1', 'M1.2', 'M1.3', 'M1.5'], evidence: 'Accepted primary lanes repeatedly report CALIBRATION_FAIL.' },
-      { code: 'G', category: 'SYMBOL_CONCENTRATION', strength: 'STRONG', stage_references: ['M1.3', 'M1.4', 'M1.5'], evidence: 'Concentration gates fail or diagnostic lanes exceed the 0.30 threshold.' },
-      { code: 'H', category: 'REGIME_CONCENTRATION', strength: 'WEAK', stage_references: ['M1.1', 'M1.2'], evidence: 'Bull/Bear shares are imbalanced but not the primary hard failure.' },
-      { code: 'I', category: 'CAUSAL_TRANSLATION_FAILURE', strength: 'STRONG', stage_references: ['M1.4', 'M1.5'], evidence: 'M1.4 retrospective density result does not survive corrected causal fresh validation.' },
-      { code: 'J', category: 'DATA_DOMAIN_LIMITATION', strength: 'MODERATE', stage_references: ['M1', 'M1.1', 'M1.2', 'M1.3', 'M1.4', 'M1.5'], evidence: 'Only public 1h/derivative aggregates were accepted; missing domains are not asserted to contain alpha.' },
-    ],
+    failure_taxonomy: failureTaxonomy,
+    strong_failure_modes: failureTaxonomy.filter(item => item.strength === 'STRONG').map(item => item.category),
+    moderate_failure_modes: failureTaxonomy.filter(item => item.strength === 'MODERATE').map(item => item.category),
+    weak_failure_modes: failureTaxonomy.filter(item => item.strength === 'WEAK').map(item => item.category),
+    decision_inputs: decisionInputs,
+    M14_RETROSPECTIVE_DENSITY_IS_CONFIRMATORY: false,
+    cost_conclusion: 'No accepted fresh causal directional lane demonstrated robust edge surviving the fixed 0.14% cost. The M1.4 retrospective density diagnostic survived cost in discovery, but was non-deployable discovery evidence and failed independent causal confirmation in M1.5.',
     cost_feasibility: buildCostLanes({
       m1: reports.M1,
       m11: reports.M1_1,
@@ -366,7 +544,8 @@ export function buildM16Report({ reports, reportFileHashes = {}, sourceSha = 'UN
       conclusion: 'Apparent density edge decays under fresh, causal validation; net confirmation fails.'
     },
     directional_feasibility: {
-      classification: 'POST_HOC_ONLY',
+      directional_alpha_supported: decisionInputs.directional_alpha_supported,
+      directional_asymmetry_classification: 'POST_HOC_ONLY',
       buy_only_selection_allowed: false,
       evidence: 'BUY/SELL slices are diagnostic and cannot authorize a BUY-only rule after fresh outcomes.'
     },
@@ -378,7 +557,8 @@ export function buildM16Report({ reports, reportFileHashes = {}, sourceSha = 'UN
     information_domains: M16_INFORMATION_DOMAINS,
     multiplicity: {
       primary_research_stages: 6,
-      candidate_families_or_variants: { M1: 10656, M1_1: '11/20', M1_2: '10/16', M1_3: '12/12', M1_4: '4 lanes plus 3 density views', M1_5: '4 fixed policies' },
+      candidate_model_or_policy_variants: { M1: 'bounded candidate records, not independent models (10656)', M1_1: '11/20', M1_2: '10/16', M1_3: '12/12', M1_4: '4 lanes plus 3 density views', M1_5: '4 fixed policies' },
+      generated_candidate_signal_rows: { M1: 10656 },
       diagnostic_policies: ['M1.2 C7', 'M1.3 X8', 'M1.4 density views', 'M1.5 D1/D2'],
       fresh_confirmations: 1,
       interpretation: 'Researcher degrees of freedom and diagnostic selection mean winners are not independent proof; accumulation is classified conservatively.',
@@ -405,7 +585,7 @@ export function buildM16Report({ reports, reportFileHashes = {}, sourceSha = 'UN
     holdout_outcomes_opened: false,
     new_candidates_generated: false,
     production_route_changes: false,
-    report_hash: hashConfig({ base_main_sha: M16_BASE_MAIN_SHA, decision, ledger, source_sha: sourceSha }),
+    report_hash: hashConfig({ base_main_sha: M16_BASE_MAIN_SHA, decision, decision_inputs: decisionInputs, ledger, source_sha: sourceSha }),
   };
 }
 
@@ -415,6 +595,7 @@ export function buildM16Markdown(report) {
     '',
     `- Base main SHA: \`${report.base_main_sha}\``,
     `- Source SHA: \`${report.source_sha}\``,
+    `- Report version: \`${report.report_version}\``,
     `- Decision: \`${report.decision}\``,
     '- Scope: accepted research evidence only; no alpha search, deployment, V2 enablement, or M2.',
     '',
@@ -432,12 +613,15 @@ export function buildM16Markdown(report) {
     '',
     '## Cost and stability conclusions',
     '',
-    `Fixed research cost remains 0.14%. Break-even cost is the gross mean expectancy; no cost or horizon was changed. ${report.temporal_stability.conclusion}`,
+    `Fixed research cost remains 0.14%. Break-even cost is the gross mean expectancy; no cost or horizon was changed.`,
+    report.cost_conclusion,
+    report.temporal_stability.conclusion,
     `M1.4 → M1.5 expectancy delta: ${report.temporal_stability.discovery_to_fresh_delta.net_expectancy_percent} percentage points; PF delta: ${report.temporal_stability.discovery_to_fresh_delta.net_pf}.`,
     '',
     '## Direction, score, and information domains',
     '',
-    `Directional classification: ${report.directional_feasibility.classification}; BUY-only selection allowed: ${report.directional_feasibility.buy_only_selection_allowed}.`,
+    `Directional alpha supported: ${report.directional_feasibility.directional_alpha_supported}; asymmetry classification: ${report.directional_feasibility.directional_asymmetry_classification}; BUY-only selection allowed: ${report.directional_feasibility.buy_only_selection_allowed}.`,
+    `Decision inputs: evidence sufficient ${report.decision_inputs.evidence_sufficient}; accepted directional promotion ${report.decision_inputs.accepted_directional_promotion_found}; fresh causal confirmation ${report.decision_inputs.fresh_causal_confirmation_pass}; fresh absolute promotion ${report.decision_inputs.fresh_absolute_promotion_pass}; missing information primary limitation ${report.decision_inputs.missing_information_is_primary_limitation}; new domain feasible ${report.decision_inputs.fundamentally_new_domain_feasible}; event-alert gate ${report.decision_inputs.event_alert_gate_pass}.`,
     `Score calibration: ${report.score_calibration.classification}.`,
     `Tested domains: ${report.information_domains.filter(item => item.status === 'TESTED').map(item => item.domain).join(', ')}.`,
     `Untested/unavailable domains: ${report.information_domains.filter(item => item.status !== 'TESTED').map(item => `${item.domain} (${item.status})`).join(', ')}. No missing domain is claimed to contain alpha.`,
@@ -451,6 +635,7 @@ export function buildM16Markdown(report) {
     `**${report.decision}**`,
     '',
     'Close the X8, signal sparsification, basic derivative augmentation, and current cross-sectional directional lines. Keep V1/alert-platform work scoped to product quality, alert UX, observability, data integrity, and performance monitoring.',
+    `M1.4 retrospective density confirmatory: ${report.M14_RETROSPECTIVE_DENSITY_IS_CONFIRMATORY}.`,
     '',
     '```text',
     ...Object.entries(report.safety_flags).map(([key, value]) => `${key}=${value}`),
