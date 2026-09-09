@@ -1,0 +1,648 @@
+{
+  "version": "m1.5-causal-sparsification-0.1.0",
+  "experiment_id": "m1.5-public_binance_futures-2026-07-12_to_2026-09-07-causal-sparsification-0.1.0",
+  "data_source": "public Binance Futures 1h closed-candle archives",
+  "configured_symbols": [
+    "AAVEUSDT",
+    "ADAUSDT",
+    "APTUSDT",
+    "ARBUSDT",
+    "ATOMUSDT",
+    "AVAXUSDT",
+    "BNBUSDT",
+    "BTCUSDT",
+    "DOTUSDT",
+    "ETHUSDT",
+    "IMXUSDT",
+    "LINKUSDT",
+    "LTCUSDT",
+    "NEARUSDT",
+    "SOLUSDT",
+    "STXUSDT",
+    "UNIUSDT",
+    "XRPUSDT"
+  ],
+  "signal_start": "2026-07-12T12:59:59.999Z",
+  "signal_end": "2026-09-07T15:59:59.999Z",
+  "outcome_data_end": "2026-09-07T23:59:59.999Z",
+  "required_candle_open_start": "2026-07-12T12:00:00.000Z",
+  "required_candle_open_end": "2026-09-07T23:00:00.000Z",
+  "warmup_start_open": "2026-06-29T08:00:00.000Z",
+  "warmup_hours": 316,
+  "timeframe": "1h",
+  "exact_coverage_required": true,
+  "per_symbol": [
+    {
+      "symbol": "AAVEUSDT",
+      "timeframe": "1h",
+      "requested_start_open": "2026-07-12T12:00:00.000Z",
+      "requested_end_open": "2026-09-07T23:00:00.000Z",
+      "expected_candles": 1380,
+      "loaded_candles": 1380,
+      "missing_candles": 0,
+      "coverage_percent": 100,
+      "first_loaded_open": "2026-07-12T12:00:00.000Z",
+      "last_loaded_open": "2026-09-07T23:00:00.000Z",
+      "first_loaded_close": "2026-07-12T12:59:59.999Z",
+      "last_loaded_close": "2026-09-07T23:59:59.999Z",
+      "source_timestamps": {
+        "archive_requested_start": "2026-06-29T08:00:00.000Z",
+        "archive_requested_end": "2026-09-07T23:59:59.999Z",
+        "monthly_archive_months": [
+          "2026-06",
+          "2026-07",
+          "2026-08"
+        ],
+        "daily_fallback_dates": [
+          "2026-09-01",
+          "2026-09-02",
+          "2026-09-03",
+          "2026-09-04",
+          "2026-09-05",
+          "2026-09-06",
+          "2026-09-07"
+        ],
+        "missing_archive_dates": []
+      },
+      "missing_sample": []
+    },
+    {
+      "symbol": "ADAUSDT",
+      "timeframe": "1h",
+      "requested_start_open": "2026-07-12T12:00:00.000Z",
+      "requested_end_open": "2026-09-07T23:00:00.000Z",
+      "expected_candles": 1380,
+      "loaded_candles": 1380,
+      "missing_candles": 0,
+      "coverage_percent": 100,
+      "first_loaded_open": "2026-07-12T12:00:00.000Z",
+      "last_loaded_open": "2026-09-07T23:00:00.000Z",
+      "first_loaded_close": "2026-07-12T12:59:59.999Z",
+      "last_loaded_close": "2026-09-07T23:59:59.999Z",
+      "source_timestamps": {
+        "archive_requested_start": "2026-06-29T08:00:00.000Z",
+        "archive_requested_end": "2026-09-07T23:59:59.999Z",
+        "monthly_archive_months": [
+          "2026-06",
+          "2026-07",
+          "2026-08"
+        ],
+        "daily_fallback_dates": [
+          "2026-09-01",
+          "2026-09-02",
+          "2026-09-03",
+          "2026-09-04",
+          "2026-09-05",
+          "2026-09-06",
+          "2026-09-07"
+        ],
+        "missing_archive_dates": []
+      },
+      "missing_sample": []
+    },
+    {
+      "symbol": "APTUSDT",
+      "timeframe": "1h",
+      "requested_start_open": "2026-07-12T12:00:00.000Z",
+      "requested_end_open": "2026-09-07T23:00:00.000Z",
+      "expected_candles": 1380,
+      "loaded_candles": 1380,
+      "missing_candles": 0,
+      "coverage_percent": 100,
+      "first_loaded_open": "2026-07-12T12:00:00.000Z",
+      "last_loaded_open": "2026-09-07T23:00:00.000Z",
+      "first_loaded_close": "2026-07-12T12:59:59.999Z",
+      "last_loaded_close": "2026-09-07T23:59:59.999Z",
+      "source_timestamps": {
+        "archive_requested_start": "2026-06-29T08:00:00.000Z",
+        "archive_requested_end": "2026-09-07T23:59:59.999Z",
+        "monthly_archive_months": [
+          "2026-06",
+          "2026-07",
+          "2026-08"
+        ],
+        "daily_fallback_dates": [
+          "2026-09-01",
+          "2026-09-02",
+          "2026-09-03",
+          "2026-09-04",
+          "2026-09-05",
+          "2026-09-06",
+          "2026-09-07"
+        ],
+        "missing_archive_dates": []
+      },
+      "missing_sample": []
+    },
+    {
+      "symbol": "ARBUSDT",
+      "timeframe": "1h",
+      "requested_start_open": "2026-07-12T12:00:00.000Z",
+      "requested_end_open": "2026-09-07T23:00:00.000Z",
+      "expected_candles": 1380,
+      "loaded_candles": 1380,
+      "missing_candles": 0,
+      "coverage_percent": 100,
+      "first_loaded_open": "2026-07-12T12:00:00.000Z",
+      "last_loaded_open": "2026-09-07T23:00:00.000Z",
+      "first_loaded_close": "2026-07-12T12:59:59.999Z",
+      "last_loaded_close": "2026-09-07T23:59:59.999Z",
+      "source_timestamps": {
+        "archive_requested_start": "2026-06-29T08:00:00.000Z",
+        "archive_requested_end": "2026-09-07T23:59:59.999Z",
+        "monthly_archive_months": [
+          "2026-06",
+          "2026-07",
+          "2026-08"
+        ],
+        "daily_fallback_dates": [
+          "2026-09-01",
+          "2026-09-02",
+          "2026-09-03",
+          "2026-09-04",
+          "2026-09-05",
+          "2026-09-06",
+          "2026-09-07"
+        ],
+        "missing_archive_dates": []
+      },
+      "missing_sample": []
+    },
+    {
+      "symbol": "ATOMUSDT",
+      "timeframe": "1h",
+      "requested_start_open": "2026-07-12T12:00:00.000Z",
+      "requested_end_open": "2026-09-07T23:00:00.000Z",
+      "expected_candles": 1380,
+      "loaded_candles": 1380,
+      "missing_candles": 0,
+      "coverage_percent": 100,
+      "first_loaded_open": "2026-07-12T12:00:00.000Z",
+      "last_loaded_open": "2026-09-07T23:00:00.000Z",
+      "first_loaded_close": "2026-07-12T12:59:59.999Z",
+      "last_loaded_close": "2026-09-07T23:59:59.999Z",
+      "source_timestamps": {
+        "archive_requested_start": "2026-06-29T08:00:00.000Z",
+        "archive_requested_end": "2026-09-07T23:59:59.999Z",
+        "monthly_archive_months": [
+          "2026-06",
+          "2026-07",
+          "2026-08"
+        ],
+        "daily_fallback_dates": [
+          "2026-09-01",
+          "2026-09-02",
+          "2026-09-03",
+          "2026-09-04",
+          "2026-09-05",
+          "2026-09-06",
+          "2026-09-07"
+        ],
+        "missing_archive_dates": []
+      },
+      "missing_sample": []
+    },
+    {
+      "symbol": "AVAXUSDT",
+      "timeframe": "1h",
+      "requested_start_open": "2026-07-12T12:00:00.000Z",
+      "requested_end_open": "2026-09-07T23:00:00.000Z",
+      "expected_candles": 1380,
+      "loaded_candles": 1380,
+      "missing_candles": 0,
+      "coverage_percent": 100,
+      "first_loaded_open": "2026-07-12T12:00:00.000Z",
+      "last_loaded_open": "2026-09-07T23:00:00.000Z",
+      "first_loaded_close": "2026-07-12T12:59:59.999Z",
+      "last_loaded_close": "2026-09-07T23:59:59.999Z",
+      "source_timestamps": {
+        "archive_requested_start": "2026-06-29T08:00:00.000Z",
+        "archive_requested_end": "2026-09-07T23:59:59.999Z",
+        "monthly_archive_months": [
+          "2026-06",
+          "2026-07",
+          "2026-08"
+        ],
+        "daily_fallback_dates": [
+          "2026-09-01",
+          "2026-09-02",
+          "2026-09-03",
+          "2026-09-04",
+          "2026-09-05",
+          "2026-09-06",
+          "2026-09-07"
+        ],
+        "missing_archive_dates": []
+      },
+      "missing_sample": []
+    },
+    {
+      "symbol": "BNBUSDT",
+      "timeframe": "1h",
+      "requested_start_open": "2026-07-12T12:00:00.000Z",
+      "requested_end_open": "2026-09-07T23:00:00.000Z",
+      "expected_candles": 1380,
+      "loaded_candles": 1380,
+      "missing_candles": 0,
+      "coverage_percent": 100,
+      "first_loaded_open": "2026-07-12T12:00:00.000Z",
+      "last_loaded_open": "2026-09-07T23:00:00.000Z",
+      "first_loaded_close": "2026-07-12T12:59:59.999Z",
+      "last_loaded_close": "2026-09-07T23:59:59.999Z",
+      "source_timestamps": {
+        "archive_requested_start": "2026-06-29T08:00:00.000Z",
+        "archive_requested_end": "2026-09-07T23:59:59.999Z",
+        "monthly_archive_months": [
+          "2026-06",
+          "2026-07",
+          "2026-08"
+        ],
+        "daily_fallback_dates": [
+          "2026-09-01",
+          "2026-09-02",
+          "2026-09-03",
+          "2026-09-04",
+          "2026-09-05",
+          "2026-09-06",
+          "2026-09-07"
+        ],
+        "missing_archive_dates": []
+      },
+      "missing_sample": []
+    },
+    {
+      "symbol": "BTCUSDT",
+      "timeframe": "1h",
+      "requested_start_open": "2026-07-12T12:00:00.000Z",
+      "requested_end_open": "2026-09-07T23:00:00.000Z",
+      "expected_candles": 1380,
+      "loaded_candles": 1380,
+      "missing_candles": 0,
+      "coverage_percent": 100,
+      "first_loaded_open": "2026-07-12T12:00:00.000Z",
+      "last_loaded_open": "2026-09-07T23:00:00.000Z",
+      "first_loaded_close": "2026-07-12T12:59:59.999Z",
+      "last_loaded_close": "2026-09-07T23:59:59.999Z",
+      "source_timestamps": {
+        "archive_requested_start": "2026-06-29T08:00:00.000Z",
+        "archive_requested_end": "2026-09-07T23:59:59.999Z",
+        "monthly_archive_months": [
+          "2026-06",
+          "2026-07",
+          "2026-08"
+        ],
+        "daily_fallback_dates": [
+          "2026-09-01",
+          "2026-09-02",
+          "2026-09-03",
+          "2026-09-04",
+          "2026-09-05",
+          "2026-09-06",
+          "2026-09-07"
+        ],
+        "missing_archive_dates": []
+      },
+      "missing_sample": []
+    },
+    {
+      "symbol": "DOTUSDT",
+      "timeframe": "1h",
+      "requested_start_open": "2026-07-12T12:00:00.000Z",
+      "requested_end_open": "2026-09-07T23:00:00.000Z",
+      "expected_candles": 1380,
+      "loaded_candles": 1380,
+      "missing_candles": 0,
+      "coverage_percent": 100,
+      "first_loaded_open": "2026-07-12T12:00:00.000Z",
+      "last_loaded_open": "2026-09-07T23:00:00.000Z",
+      "first_loaded_close": "2026-07-12T12:59:59.999Z",
+      "last_loaded_close": "2026-09-07T23:59:59.999Z",
+      "source_timestamps": {
+        "archive_requested_start": "2026-06-29T08:00:00.000Z",
+        "archive_requested_end": "2026-09-07T23:59:59.999Z",
+        "monthly_archive_months": [
+          "2026-06",
+          "2026-07",
+          "2026-08"
+        ],
+        "daily_fallback_dates": [
+          "2026-09-01",
+          "2026-09-02",
+          "2026-09-03",
+          "2026-09-04",
+          "2026-09-05",
+          "2026-09-06",
+          "2026-09-07"
+        ],
+        "missing_archive_dates": []
+      },
+      "missing_sample": []
+    },
+    {
+      "symbol": "ETHUSDT",
+      "timeframe": "1h",
+      "requested_start_open": "2026-07-12T12:00:00.000Z",
+      "requested_end_open": "2026-09-07T23:00:00.000Z",
+      "expected_candles": 1380,
+      "loaded_candles": 1380,
+      "missing_candles": 0,
+      "coverage_percent": 100,
+      "first_loaded_open": "2026-07-12T12:00:00.000Z",
+      "last_loaded_open": "2026-09-07T23:00:00.000Z",
+      "first_loaded_close": "2026-07-12T12:59:59.999Z",
+      "last_loaded_close": "2026-09-07T23:59:59.999Z",
+      "source_timestamps": {
+        "archive_requested_start": "2026-06-29T08:00:00.000Z",
+        "archive_requested_end": "2026-09-07T23:59:59.999Z",
+        "monthly_archive_months": [
+          "2026-06",
+          "2026-07",
+          "2026-08"
+        ],
+        "daily_fallback_dates": [
+          "2026-09-01",
+          "2026-09-02",
+          "2026-09-03",
+          "2026-09-04",
+          "2026-09-05",
+          "2026-09-06",
+          "2026-09-07"
+        ],
+        "missing_archive_dates": []
+      },
+      "missing_sample": []
+    },
+    {
+      "symbol": "IMXUSDT",
+      "timeframe": "1h",
+      "requested_start_open": "2026-07-12T12:00:00.000Z",
+      "requested_end_open": "2026-09-07T23:00:00.000Z",
+      "expected_candles": 1380,
+      "loaded_candles": 1380,
+      "missing_candles": 0,
+      "coverage_percent": 100,
+      "first_loaded_open": "2026-07-12T12:00:00.000Z",
+      "last_loaded_open": "2026-09-07T23:00:00.000Z",
+      "first_loaded_close": "2026-07-12T12:59:59.999Z",
+      "last_loaded_close": "2026-09-07T23:59:59.999Z",
+      "source_timestamps": {
+        "archive_requested_start": "2026-06-29T08:00:00.000Z",
+        "archive_requested_end": "2026-09-07T23:59:59.999Z",
+        "monthly_archive_months": [
+          "2026-06",
+          "2026-07",
+          "2026-08"
+        ],
+        "daily_fallback_dates": [
+          "2026-09-01",
+          "2026-09-02",
+          "2026-09-03",
+          "2026-09-04",
+          "2026-09-05",
+          "2026-09-06",
+          "2026-09-07"
+        ],
+        "missing_archive_dates": []
+      },
+      "missing_sample": []
+    },
+    {
+      "symbol": "LINKUSDT",
+      "timeframe": "1h",
+      "requested_start_open": "2026-07-12T12:00:00.000Z",
+      "requested_end_open": "2026-09-07T23:00:00.000Z",
+      "expected_candles": 1380,
+      "loaded_candles": 1380,
+      "missing_candles": 0,
+      "coverage_percent": 100,
+      "first_loaded_open": "2026-07-12T12:00:00.000Z",
+      "last_loaded_open": "2026-09-07T23:00:00.000Z",
+      "first_loaded_close": "2026-07-12T12:59:59.999Z",
+      "last_loaded_close": "2026-09-07T23:59:59.999Z",
+      "source_timestamps": {
+        "archive_requested_start": "2026-06-29T08:00:00.000Z",
+        "archive_requested_end": "2026-09-07T23:59:59.999Z",
+        "monthly_archive_months": [
+          "2026-06",
+          "2026-07",
+          "2026-08"
+        ],
+        "daily_fallback_dates": [
+          "2026-09-01",
+          "2026-09-02",
+          "2026-09-03",
+          "2026-09-04",
+          "2026-09-05",
+          "2026-09-06",
+          "2026-09-07"
+        ],
+        "missing_archive_dates": []
+      },
+      "missing_sample": []
+    },
+    {
+      "symbol": "LTCUSDT",
+      "timeframe": "1h",
+      "requested_start_open": "2026-07-12T12:00:00.000Z",
+      "requested_end_open": "2026-09-07T23:00:00.000Z",
+      "expected_candles": 1380,
+      "loaded_candles": 1380,
+      "missing_candles": 0,
+      "coverage_percent": 100,
+      "first_loaded_open": "2026-07-12T12:00:00.000Z",
+      "last_loaded_open": "2026-09-07T23:00:00.000Z",
+      "first_loaded_close": "2026-07-12T12:59:59.999Z",
+      "last_loaded_close": "2026-09-07T23:59:59.999Z",
+      "source_timestamps": {
+        "archive_requested_start": "2026-06-29T08:00:00.000Z",
+        "archive_requested_end": "2026-09-07T23:59:59.999Z",
+        "monthly_archive_months": [
+          "2026-06",
+          "2026-07",
+          "2026-08"
+        ],
+        "daily_fallback_dates": [
+          "2026-09-01",
+          "2026-09-02",
+          "2026-09-03",
+          "2026-09-04",
+          "2026-09-05",
+          "2026-09-06",
+          "2026-09-07"
+        ],
+        "missing_archive_dates": []
+      },
+      "missing_sample": []
+    },
+    {
+      "symbol": "NEARUSDT",
+      "timeframe": "1h",
+      "requested_start_open": "2026-07-12T12:00:00.000Z",
+      "requested_end_open": "2026-09-07T23:00:00.000Z",
+      "expected_candles": 1380,
+      "loaded_candles": 1380,
+      "missing_candles": 0,
+      "coverage_percent": 100,
+      "first_loaded_open": "2026-07-12T12:00:00.000Z",
+      "last_loaded_open": "2026-09-07T23:00:00.000Z",
+      "first_loaded_close": "2026-07-12T12:59:59.999Z",
+      "last_loaded_close": "2026-09-07T23:59:59.999Z",
+      "source_timestamps": {
+        "archive_requested_start": "2026-06-29T08:00:00.000Z",
+        "archive_requested_end": "2026-09-07T23:59:59.999Z",
+        "monthly_archive_months": [
+          "2026-06",
+          "2026-07",
+          "2026-08"
+        ],
+        "daily_fallback_dates": [
+          "2026-09-01",
+          "2026-09-02",
+          "2026-09-03",
+          "2026-09-04",
+          "2026-09-05",
+          "2026-09-06",
+          "2026-09-07"
+        ],
+        "missing_archive_dates": []
+      },
+      "missing_sample": []
+    },
+    {
+      "symbol": "SOLUSDT",
+      "timeframe": "1h",
+      "requested_start_open": "2026-07-12T12:00:00.000Z",
+      "requested_end_open": "2026-09-07T23:00:00.000Z",
+      "expected_candles": 1380,
+      "loaded_candles": 1380,
+      "missing_candles": 0,
+      "coverage_percent": 100,
+      "first_loaded_open": "2026-07-12T12:00:00.000Z",
+      "last_loaded_open": "2026-09-07T23:00:00.000Z",
+      "first_loaded_close": "2026-07-12T12:59:59.999Z",
+      "last_loaded_close": "2026-09-07T23:59:59.999Z",
+      "source_timestamps": {
+        "archive_requested_start": "2026-06-29T08:00:00.000Z",
+        "archive_requested_end": "2026-09-07T23:59:59.999Z",
+        "monthly_archive_months": [
+          "2026-06",
+          "2026-07",
+          "2026-08"
+        ],
+        "daily_fallback_dates": [
+          "2026-09-01",
+          "2026-09-02",
+          "2026-09-03",
+          "2026-09-04",
+          "2026-09-05",
+          "2026-09-06",
+          "2026-09-07"
+        ],
+        "missing_archive_dates": []
+      },
+      "missing_sample": []
+    },
+    {
+      "symbol": "STXUSDT",
+      "timeframe": "1h",
+      "requested_start_open": "2026-07-12T12:00:00.000Z",
+      "requested_end_open": "2026-09-07T23:00:00.000Z",
+      "expected_candles": 1380,
+      "loaded_candles": 1380,
+      "missing_candles": 0,
+      "coverage_percent": 100,
+      "first_loaded_open": "2026-07-12T12:00:00.000Z",
+      "last_loaded_open": "2026-09-07T23:00:00.000Z",
+      "first_loaded_close": "2026-07-12T12:59:59.999Z",
+      "last_loaded_close": "2026-09-07T23:59:59.999Z",
+      "source_timestamps": {
+        "archive_requested_start": "2026-06-29T08:00:00.000Z",
+        "archive_requested_end": "2026-09-07T23:59:59.999Z",
+        "monthly_archive_months": [
+          "2026-06",
+          "2026-07",
+          "2026-08"
+        ],
+        "daily_fallback_dates": [
+          "2026-09-01",
+          "2026-09-02",
+          "2026-09-03",
+          "2026-09-04",
+          "2026-09-05",
+          "2026-09-06",
+          "2026-09-07"
+        ],
+        "missing_archive_dates": []
+      },
+      "missing_sample": []
+    },
+    {
+      "symbol": "UNIUSDT",
+      "timeframe": "1h",
+      "requested_start_open": "2026-07-12T12:00:00.000Z",
+      "requested_end_open": "2026-09-07T23:00:00.000Z",
+      "expected_candles": 1380,
+      "loaded_candles": 1380,
+      "missing_candles": 0,
+      "coverage_percent": 100,
+      "first_loaded_open": "2026-07-12T12:00:00.000Z",
+      "last_loaded_open": "2026-09-07T23:00:00.000Z",
+      "first_loaded_close": "2026-07-12T12:59:59.999Z",
+      "last_loaded_close": "2026-09-07T23:59:59.999Z",
+      "source_timestamps": {
+        "archive_requested_start": "2026-06-29T08:00:00.000Z",
+        "archive_requested_end": "2026-09-07T23:59:59.999Z",
+        "monthly_archive_months": [
+          "2026-06",
+          "2026-07",
+          "2026-08"
+        ],
+        "daily_fallback_dates": [
+          "2026-09-01",
+          "2026-09-02",
+          "2026-09-03",
+          "2026-09-04",
+          "2026-09-05",
+          "2026-09-06",
+          "2026-09-07"
+        ],
+        "missing_archive_dates": []
+      },
+      "missing_sample": []
+    },
+    {
+      "symbol": "XRPUSDT",
+      "timeframe": "1h",
+      "requested_start_open": "2026-07-12T12:00:00.000Z",
+      "requested_end_open": "2026-09-07T23:00:00.000Z",
+      "expected_candles": 1380,
+      "loaded_candles": 1380,
+      "missing_candles": 0,
+      "coverage_percent": 100,
+      "first_loaded_open": "2026-07-12T12:00:00.000Z",
+      "last_loaded_open": "2026-09-07T23:00:00.000Z",
+      "first_loaded_close": "2026-07-12T12:59:59.999Z",
+      "last_loaded_close": "2026-09-07T23:59:59.999Z",
+      "source_timestamps": {
+        "archive_requested_start": "2026-06-29T08:00:00.000Z",
+        "archive_requested_end": "2026-09-07T23:59:59.999Z",
+        "monthly_archive_months": [
+          "2026-06",
+          "2026-07",
+          "2026-08"
+        ],
+        "daily_fallback_dates": [
+          "2026-09-01",
+          "2026-09-02",
+          "2026-09-03",
+          "2026-09-04",
+          "2026-09-05",
+          "2026-09-06",
+          "2026-09-07"
+        ],
+        "missing_archive_dates": []
+      },
+      "missing_sample": []
+    }
+  ]
+}
