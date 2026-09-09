@@ -1,0 +1,730 @@
+{
+  "report_version": "m1.6-profitability-feasibility-0.1.1",
+  "generated_at": "2026-09-09T08:56:23.013Z",
+  "base_main_sha": "6361418a35e3d8f7e5aa1c6e5ce87bfb38830a2a",
+  "source_sha": "4d1516019bbd5afa5d2b64318137a21b023a6863",
+  "accepted_final_artifacts": {
+    "M1": "reports/m1-final.json",
+    "M1_1": "reports/m1-1-final.json",
+    "M1_2": "reports/m1-2-final-0.1.1.json",
+    "M1_3": "reports/m1-3-final.json",
+    "M1_4": "reports/m1-4-alpha-feasibility-0.1.1.json",
+    "M1_5": "reports/m1-5-causal-sparsification-validation-0.1.1.json"
+  },
+  "invalidated_excluded_artifacts": [
+    "reports/m1-5-causal-sparsification-validation-0.1.0.json"
+  ],
+  "accepted_artifact_sha256": {
+    "reports/m1-final.json": "894795fd25aac287bacb7843d60b6c061294214f99351d0a0f812eb6d7f7c425",
+    "reports/m1-1-final.json": "d1bd7f13e828b0e304db7f2ebddaf230cfbb461fd98922c2b32defb9d4163a71",
+    "reports/m1-2-final-0.1.1.json": "220f974c2d2ff43afff8938ca54a05efa61d5ab4c3acf8e737326be9315f6c31",
+    "reports/m1-3-final.json": "bacc3654d383ac136b6449338181f6d202dfc804fb137eade276ab60457121b8",
+    "reports/m1-4-alpha-feasibility-0.1.1.json": "441bb690144c1d494d16361a081cea7fc7266ec017a3a8dd9e8d41eee73ac3a6",
+    "reports/m1-5-causal-sparsification-validation-0.1.1.json": "3d386887bf1762cea7d4066f0d285dcabe05ec45be09178376c8915d6e19c9d9"
+  },
+  "evidence_ledger": [
+    {
+      "stage": "M1",
+      "research_question": "Can the bounded V2 quality model meet predeclared OOS promotion gates?",
+      "dataset": "public_binance_futures_archive",
+      "time_range": {
+        "start": "2026-06-28T20:00:00.000Z",
+        "end": "2026-08-31T23:59:59.999Z"
+      },
+      "symbols": 18,
+      "candidate_count": 10656,
+      "primary_oos_events": 164,
+      "gross_expectancy_percent": -0.062178,
+      "net_expectancy_percent": -0.202178,
+      "gross_pf": null,
+      "net_pf": 0.4533,
+      "positive_windows": "1/10",
+      "bootstrap_ci": "not reported in accepted final artifact",
+      "calibration": "CALIBRATION_FAIL",
+      "promotion_result": "REJECT",
+      "final_decision": "REJECT",
+      "known_methodological_limitations": [
+        "public 1h Binance archive only",
+        "research-only shadow evaluation",
+        "no account-return claim"
+      ],
+      "evidence_hashes": {
+        "source_sha": "c9160c1",
+        "config_hash": "dc6d18ab7391e607462017b9e4ed286ec96440b9ce6b026c30039deb0a35219d"
+      },
+      "accepted_final_only": true,
+      "report_reference": "reports/m1-final.json"
+    },
+    {
+      "stage": "M1.1",
+      "research_question": "Does a bounded edge-discovery family produce a robust, stable OOS directional lane?",
+      "dataset": "public_binance_futures_archive",
+      "time_range": {
+        "start": "2026-02-21T16:00:00.000Z",
+        "end": "2026-08-20T15:59:59.999Z"
+      },
+      "symbols": 18,
+      "candidate_count": 11,
+      "primary_oos_events": 822,
+      "gross_expectancy_percent": 0.047694,
+      "net_expectancy_percent": -0.092306,
+      "gross_pf": 1.0445,
+      "net_pf": 0.9196,
+      "positive_windows": "4/11",
+      "bootstrap_ci": "not reported in accepted final artifact",
+      "calibration": "CALIBRATION_FAIL",
+      "promotion_result": "REJECT",
+      "final_decision": "NO_ROBUST_EDGE_FOUND",
+      "known_methodological_limitations": [
+        "The primary target is 180d; 365d was not requested for this bounded run.",
+        "Only public candle data was admitted. Funding, open interest and spread were not used.",
+        "The old M1 final holdout was frozen by boundary/hash metadata and not used for model selection.",
+        "The new M1.1 final holdout remains reserved for a later validation phase.",
+        "No candidate was selected from an OOS performance ranking; all predeclared candidate summaries are retained."
+      ],
+      "evidence_hashes": {
+        "source_sha": "299f744dfae9ce0fff34a8e028e4d3f7e83aea6d",
+        "config_hash": "0059f97b20669255e0ee496c4faa3d9b590e0fa8ed26c3c7e473782d11a8d762"
+      },
+      "accepted_final_only": true,
+      "report_reference": "reports/m1-1-final.json"
+    },
+    {
+      "stage": "M1.2",
+      "research_question": "Do admitted derivative information families add independent information gain to the frozen baseline?",
+      "dataset": "public_binance_futures_archive",
+      "time_range": {
+        "start": "2026-02-21T16:00:00.000Z",
+        "end": "2026-08-20T15:59:59.999Z"
+      },
+      "symbols": 18,
+      "candidate_count": 10,
+      "primary_oos_events": 822,
+      "gross_expectancy_percent": 0.047694,
+      "net_expectancy_percent": -0.092306,
+      "gross_pf": 1.0445,
+      "net_pf": 0.9196,
+      "positive_windows": "4/11",
+      "bootstrap_ci": "not reported in accepted final artifact",
+      "calibration": "CALIBRATION_FAIL",
+      "promotion_result": "REJECT",
+      "final_decision": "NO_ROBUST_MICROSTRUCTURE_INFORMATION_GAIN",
+      "known_methodological_limitations": [
+        "This bounded run targets 180d and the configured 18-symbol universe; no symbols were blacklisted by result.",
+        "Only public Binance Vision archives were admitted. Liquidations were not admitted and no historical order-book proxy was used.",
+        "Open-interest metrics were reduced to the latest source row per UTC hour for memory-bounded, conservative PIT lookup.",
+        "All candidate normalization, train scalers, signs, thresholds and combination rules are fit inside each WFO training window.",
+        "The old M1 final holdout was filtered before labels were read; the new WFO final holdout was not used for selection.",
+        "Cost sensitivity at 0.10%, 0.14% and 0.20% is diagnostic only and cannot change the decision.",
+        "Information-gain comparisons resample independent market-event clusters with deterministic bootstrap settings."
+      ],
+      "evidence_hashes": {
+        "source_sha": "57668249bd3bee94e3ea6f41cf772b1582391d58",
+        "config_hash": "ce72572182fa767126a6a7c2a8ab4622b458f5785c889da7e8ef6f2bb3c9442b"
+      },
+      "accepted_final_only": true,
+      "report_reference": "reports/m1-2-final-0.1.1.json"
+    },
+    {
+      "stage": "M1.3",
+      "research_question": "Does cross-sectional relative-value information produce robust incremental directional alpha?",
+      "dataset": "public_binance_futures_archive",
+      "time_range": {
+        "start": "2025-07-12T12:00:00.000Z",
+        "end": "2026-07-12T11:59:59.999Z"
+      },
+      "symbols": 18,
+      "candidate_count": 12,
+      "primary_oos_events": 962,
+      "gross_expectancy_percent": 0.0358241,
+      "net_expectancy_percent": -0.1041759,
+      "gross_pf": 1.058091,
+      "net_pf": 0.848706,
+      "positive_windows": "0/8",
+      "bootstrap_ci": {
+        "ci95": [
+          -0.09286337,
+          0.12906225
+        ],
+        "p_delta_gt_zero": 0.6185
+      },
+      "calibration": "CALIBRATION_FAIL",
+      "promotion_result": "REJECT",
+      "final_decision": "NO_ROBUST_CROSS_SECTIONAL_ALPHA",
+      "known_methodological_limitations": [
+        "This run uses closed 1h public Binance Futures candles and the configured 18-symbol universe; every symbol must meet strict 100% candle coverage.",
+        "Cross-sectional snapshots require at least 12 valid symbols at the exact same timestamp; rejected breadth snapshots are not forward-filled.",
+        "Rolling beta is a past-only 168h OLS estimate with a minimum of 120 observations; no global normalization or outcome-derived feature scaling is used.",
+        "M1.2 C7 is a fixed comparator only; previous final holdout outcomes and previous optimization results were not used to select M1.3 policies.",
+        "Liquidations and historical order-book snapshots were not admitted; optional X11 is evaluated only when all required PIT derivative families pass admission.",
+        "Cost sensitivity, factor correlations, monthly slices and dispersion stress slices are diagnostic only and cannot change the decision."
+      ],
+      "evidence_hashes": {
+        "source_sha": "25243cae0635437e4f7625945a496f6a2b7ed064",
+        "config_hash": "28879c6498075052b1be899f8c064f61bf40250aca983b4d96186e5519b8dde0"
+      },
+      "accepted_final_only": true,
+      "report_reference": "reports/m1-3-final.json"
+    },
+    {
+      "stage": "M1.4",
+      "research_question": "Is any accepted directional lane gross-feasible and is the M1.4 density finding independently actionable?",
+      "dataset": "public_binance_futures_archive",
+      "time_range": {
+        "start": "2025-07-12T12:00:00.000Z",
+        "end": "2026-07-12T11:59:59.999Z"
+      },
+      "symbols": 18,
+      "candidate_count": 4,
+      "primary_oos_events": 962,
+      "gross_expectancy_percent": 0.0358241,
+      "net_expectancy_percent": -0.1041759,
+      "gross_pf": 1.058091,
+      "net_pf": 0.848706,
+      "positive_windows": "0/8",
+      "bootstrap_ci": "not reported in accepted final artifact",
+      "calibration": "CALIBRATION_FAIL",
+      "promotion_result": "REJECT",
+      "final_decision": "DIRECTIONAL_RESEARCH_CONTINUE",
+      "known_methodological_limitations": [
+        "M1.1 and M1.2 lanes retain their frozen semantics and are diagnostic representatives; they are not new promotion candidates.",
+        "All comparable lanes use one outcome-independent calendar with 48h purge, 24h embargo and the frozen final-holdout boundary.",
+        "The event-alert comparator uses only same-timestamp valid configured symbols and evaluates future absolute movement after support is fixed; it does not claim trading profitability.",
+        "Cost, horizon, density, tier, direction, regime and IC surfaces are diagnostic only and cannot create, retune or disable a signal lane.",
+        "The review uses closed public Binance Futures 1h candles and the configured 18-symbol universe; it does not establish impossibility outside these tested public-data families.",
+        "The final holdout is retained as boundary/hash/count metadata only; no holdout outcomes enter selection, metrics, event utility or the project decision."
+      ],
+      "evidence_hashes": {
+        "source_sha": "859ea3ba69bf7df89cb6f2fe34ebd9fd0dd1ac8d",
+        "config_hash": "62981b3a26abadd7bba0098777c0cb07e8a71aaa262913b58d2052b49f3693fc",
+        "canonical_review_plan_hash": "6356ff210f4b8069d440e3197556854ff3f801e9eec3d310d5e5f8750891653c"
+      },
+      "accepted_final_only": true,
+      "report_reference": "reports/m1-4-alpha-feasibility-0.1.1.json"
+    },
+    {
+      "stage": "M1.5",
+      "research_question": "Does the corrected point-in-time, causal, fresh validation confirm the M1.4 sparsification finding?",
+      "dataset": "public Binance Futures archives; closed 1h candles only",
+      "time_range": {
+        "start": "2026-07-12T12:59:59.999Z",
+        "end": "2026-09-07T15:59:59.999Z"
+      },
+      "symbols": 18,
+      "candidate_count": 4,
+      "primary_oos_events": 343,
+      "gross_expectancy_percent": -0.07845153,
+      "net_expectancy_percent": -0.21845153,
+      "gross_pf": 0.920176,
+      "net_pf": 0.792083,
+      "positive_windows": "2/8",
+      "bootstrap_ci": {
+        "net_ci95": [
+          -0.43614056,
+          -0.01195955
+        ],
+        "net_p_gt_zero": 0.0176
+      },
+      "calibration": "CALIBRATION_FAIL",
+      "promotion_result": "REJECT",
+      "final_decision": "SPARSIFICATION_NOT_CONFIRMED",
+      "known_methodological_limitations": [
+        "Research-only result; no production route or V2 runtime was changed.",
+        "C1 is the only confirmatory causal policy; C2 is secondary and cannot rescue C1.",
+        "D1 and D2 are retrospective diagnostics and remain non-deployable.",
+        "No alpha expansion, score retuning, threshold search, or symbol/direction/regime filter was performed."
+      ],
+      "evidence_hashes": {
+        "source_sha": "b8b9c2bd5f7b76273f37b1ce0d3c33de8c3b7db3",
+        "config_hash": "abb9ebc7c3fa6fd9ad0aee1482f3c10c50cf7fb693a78c59798c69bef169b275",
+        "validation_plan_hash": "1014d326a1ef42c338122aec1da526ca001889266cc391284fcaf271e79089e1",
+        "validation_event_window_map_hash": "cacec44410b68bcf1911c1ed4f95792c46d9b4ae265362f936979b6e572d30b8"
+      },
+      "accepted_final_only": true,
+      "report_reference": "reports/m1-5-causal-sparsification-validation-0.1.1.json"
+    }
+  ],
+  "failure_taxonomy": [
+    {
+      "code": "A",
+      "category": "NO_PREDICTIVE_INFORMATION",
+      "strength": "MODERATE",
+      "stage_references": [
+        "M1",
+        "M1.1",
+        "M1.2",
+        "M1.3",
+        "M1.5"
+      ],
+      "evidence": "Repeated rejected OOS lanes; not an impossibility claim."
+    },
+    {
+      "code": "B",
+      "category": "GROSS_EDGE_TOO_WEAK_FOR_COST",
+      "strength": "STRONG",
+      "stage_references": [
+        "M1.1",
+        "M1.2",
+        "M1.3",
+        "M1.4",
+        "M1.5"
+      ],
+      "evidence": "Positive gross lanes remain below fixed 0.14% cost or have no positive gross edge."
+    },
+    {
+      "code": "C",
+      "category": "NON_STATIONARY_EDGE",
+      "strength": "STRONG",
+      "stage_references": [
+        "M1.1",
+        "M1.3",
+        "M1.4",
+        "M1.5"
+      ],
+      "evidence": "Unstable windows and fresh confirmation decay."
+    },
+    {
+      "code": "D",
+      "category": "DIRECTIONAL_ASYMMETRY",
+      "strength": "MODERATE",
+      "stage_references": [
+        "M1",
+        "M1.1",
+        "M1.5"
+      ],
+      "evidence": "Observed slices are diagnostic; no predeclared replicated BUY-only rule."
+    },
+    {
+      "code": "E",
+      "category": "SIGNAL_DENSITY_CORRELATION",
+      "strength": "MODERATE",
+      "stage_references": [
+        "M1.4",
+        "M1.5"
+      ],
+      "evidence": "Retrospective density view differs from raw stream and causal view."
+    },
+    {
+      "code": "F",
+      "category": "SCORE_CALIBRATION_FAILURE",
+      "strength": "STRONG",
+      "stage_references": [
+        "M1",
+        "M1.1",
+        "M1.2",
+        "M1.3",
+        "M1.5"
+      ],
+      "evidence": "Accepted primary lanes repeatedly report CALIBRATION_FAIL."
+    },
+    {
+      "code": "G",
+      "category": "SYMBOL_CONCENTRATION",
+      "strength": "STRONG",
+      "stage_references": [
+        "M1.3",
+        "M1.4",
+        "M1.5"
+      ],
+      "evidence": "Concentration gates fail or diagnostic lanes exceed the 0.30 threshold."
+    },
+    {
+      "code": "H",
+      "category": "REGIME_CONCENTRATION",
+      "strength": "WEAK",
+      "stage_references": [
+        "M1.1",
+        "M1.2"
+      ],
+      "evidence": "Bull/Bear shares are imbalanced but not the primary hard failure."
+    },
+    {
+      "code": "I",
+      "category": "CAUSAL_TRANSLATION_FAILURE",
+      "strength": "STRONG",
+      "stage_references": [
+        "M1.4",
+        "M1.5"
+      ],
+      "evidence": "M1.4 retrospective density result does not survive corrected causal fresh validation."
+    },
+    {
+      "code": "J",
+      "category": "DATA_DOMAIN_LIMITATION",
+      "strength": "MODERATE",
+      "stage_references": [
+        "M1",
+        "M1.1",
+        "M1.2",
+        "M1.3",
+        "M1.4",
+        "M1.5"
+      ],
+      "evidence": "Only public 1h/derivative aggregates were accepted; missing domains are not asserted to contain alpha."
+    }
+  ],
+  "strong_failure_modes": [
+    "GROSS_EDGE_TOO_WEAK_FOR_COST",
+    "NON_STATIONARY_EDGE",
+    "SCORE_CALIBRATION_FAILURE",
+    "SYMBOL_CONCENTRATION",
+    "CAUSAL_TRANSLATION_FAILURE"
+  ],
+  "moderate_failure_modes": [
+    "NO_PREDICTIVE_INFORMATION",
+    "DIRECTIONAL_ASYMMETRY",
+    "SIGNAL_DENSITY_CORRELATION",
+    "DATA_DOMAIN_LIMITATION"
+  ],
+  "weak_failure_modes": [
+    "REGIME_CONCENTRATION"
+  ],
+  "decision_inputs": {
+    "evidence_sufficient": true,
+    "accepted_stage_count": 6,
+    "invalidated_artifact_excluded": true,
+    "accepted_directional_promotion_found": false,
+    "fresh_causal_confirmation_pass": false,
+    "fresh_absolute_promotion_pass": false,
+    "retrospective_density_only": true,
+    "m14_retrospective_density_confirmatory": false,
+    "event_alert_gate_pass": false,
+    "event_alert_concentration": 0.50727651,
+    "directional_research_justified": false,
+    "directional_alpha_supported": false,
+    "event_alert_product_value_supported": false,
+    "missing_information_is_primary_limitation": false,
+    "fundamentally_new_domain_feasible": false,
+    "strong_failure_modes": [
+      "NON_STATIONARY_EDGE",
+      "SCORE_CALIBRATION_FAILURE",
+      "CAUSAL_TRANSLATION_FAILURE"
+    ],
+    "moderate_failure_modes": [
+      "DATA_DOMAIN_LIMITATION",
+      "DIRECTIONAL_ASYMMETRY"
+    ],
+    "weak_failure_modes": [
+      "REGIME_CONCENTRATION"
+    ],
+    "reasons": [
+      "No accepted fresh directional promotion passed the stage gates.",
+      "M1.4 retrospective density discovery is not confirmatory because corrected M1.5 C1 failed.",
+      "Strong model-validity, stability, calibration, or causal-translation failures outweigh the moderate data-domain limitation.",
+      "M1.4 event-alert enrichment fails its concentration-inclusive gate."
+    ],
+    "stage_references": {
+      "directional_promotion": [
+        "M1",
+        "M1.1",
+        "M1.2",
+        "M1.3",
+        "M1.5"
+      ],
+      "retrospective_density": [
+        "M1.4",
+        "M1.5"
+      ],
+      "missing_information": [
+        "M1.1",
+        "M1.3",
+        "M1.4",
+        "M1.5"
+      ],
+      "event_alert": [
+        "M1.4"
+      ]
+    },
+    "decision_evidence_hash": "82689189d6fe48623c9af9ff6c028982708572ee92c8109a231ca12d120844bc"
+  },
+  "M14_RETROSPECTIVE_DENSITY_IS_CONFIRMATORY": false,
+  "cost_conclusion": "No accepted fresh causal directional lane demonstrated robust edge surviving the fixed 0.14% cost. The M1.4 retrospective density diagnostic survived cost in discovery, but was non-deployable discovery evidence and failed independent causal confirmation in M1.5.",
+  "cost_feasibility": [
+    {
+      "lane": "M1 V2 primary",
+      "gross_expectancy_percent": -0.062178,
+      "net_expectancy_percent": -0.202178,
+      "cost_drag_percent": 0.14,
+      "gross_pf": null,
+      "net_pf": 0.4533,
+      "break_even_round_trip_cost_percent": "NO_POSITIVE_GROSS_EDGE",
+      "classification": "NO_MEANINGFUL_GROSS_EDGE"
+    },
+    {
+      "lane": "M1.1 primary",
+      "gross_expectancy_percent": 0.047694,
+      "net_expectancy_percent": -0.092306,
+      "cost_drag_percent": 0.14,
+      "gross_pf": 1.0445,
+      "net_pf": 0.9196,
+      "break_even_round_trip_cost_percent": 0.047694,
+      "classification": "EDGE_EXISTS_ONLY_BEFORE_COST"
+    },
+    {
+      "lane": "M1.2 C0 frozen baseline",
+      "gross_expectancy_percent": 0.047694,
+      "net_expectancy_percent": -0.092306,
+      "cost_drag_percent": 0.14,
+      "gross_pf": 1.0445,
+      "net_pf": 0.9196,
+      "break_even_round_trip_cost_percent": 0.047694,
+      "classification": "EDGE_EXISTS_ONLY_BEFORE_COST"
+    },
+    {
+      "lane": "M1.2 C7 diagnostic",
+      "gross_expectancy_percent": 0.044414,
+      "net_expectancy_percent": -0.095586,
+      "cost_drag_percent": 0.14,
+      "gross_pf": 1.0455,
+      "net_pf": 0.9093,
+      "break_even_round_trip_cost_percent": 0.044414,
+      "classification": "EDGE_EXISTS_ONLY_BEFORE_COST"
+    },
+    {
+      "lane": "M1.3 X8 primary",
+      "gross_expectancy_percent": 0.0358241,
+      "net_expectancy_percent": -0.1041759,
+      "cost_drag_percent": 0.14,
+      "gross_pf": 1.058091,
+      "net_pf": 0.848706,
+      "break_even_round_trip_cost_percent": 0.0358241,
+      "classification": "EDGE_EXISTS_ONLY_BEFORE_COST"
+    },
+    {
+      "lane": "M1.4 R3 primary",
+      "gross_expectancy_percent": 0.0358241,
+      "net_expectancy_percent": -0.1041759,
+      "cost_drag_percent": 0.14,
+      "gross_pf": 1.058091,
+      "net_pf": 0.848706,
+      "break_even_round_trip_cost_percent": 0.0358241,
+      "classification": "EDGE_EXISTS_ONLY_BEFORE_COST"
+    },
+    {
+      "lane": "M1.4 density diagnostic",
+      "gross_expectancy_percent": 0.38239275,
+      "net_expectancy_percent": 0.24239275,
+      "cost_drag_percent": 0.14,
+      "gross_pf": 1.473203,
+      "net_pf": 1.27784,
+      "break_even_round_trip_cost_percent": 0.38239275,
+      "classification": "EDGE_SURVIVES_REALISTIC_COST"
+    },
+    {
+      "lane": "M1.5 C1 causal confirmation",
+      "gross_expectancy_percent": -0.07845153,
+      "net_expectancy_percent": -0.21845153,
+      "cost_drag_percent": 0.14,
+      "gross_pf": 0.920176,
+      "net_pf": 0.792083,
+      "break_even_round_trip_cost_percent": "NO_POSITIVE_GROSS_EDGE",
+      "classification": "NO_MEANINGFUL_GROSS_EDGE"
+    }
+  ],
+  "temporal_stability": {
+    "discovery_stage": "M1.4",
+    "confirmation_stage": "M1.5",
+    "discovery": {
+      "gross_expectancy_percent": 0.38239275,
+      "net_expectancy_percent": 0.24239275,
+      "gross_pf": 1.473203,
+      "net_pf": 1.27784,
+      "gross_positive_windows": 8,
+      "net_positive_windows": 8,
+      "unique_event_symbol_concentration": 0.28586279
+    },
+    "fresh_d1": {
+      "gross_expectancy_percent": 0.26627789,
+      "net_expectancy_percent": 0.12627789,
+      "gross_pf": 1.303828,
+      "net_pf": 1.134525,
+      "gross_positive_windows": 7,
+      "net_positive_windows": 6,
+      "unique_event_symbol_concentration": 0.303207
+    },
+    "discovery_to_fresh_delta": {
+      "gross_expectancy_percent": -0.11611486,
+      "net_expectancy_percent": -0.11611486,
+      "gross_pf": -0.169375,
+      "net_pf": -0.143315,
+      "gross_positive_windows": -1,
+      "net_positive_windows": -2,
+      "unique_event_symbol_concentration": 0.01734421
+    },
+    "causality_gap": {
+      "d1_event_count": 343,
+      "c1_event_count": 343,
+      "selected_symbol_direction_overlap_count": 350,
+      "selected_symbol_direction_overlap_ratio": 0.51020408,
+      "gross_expectancy_difference_percent": -0.34472942,
+      "net_expectancy_difference_percent": -0.34472942,
+      "gross_pf_difference": -0.383652,
+      "net_pf_difference": -0.342442,
+      "diagnostic_only": true
+    },
+    "conclusion": "Apparent density edge decays under fresh, causal validation; net confirmation fails."
+  },
+  "directional_feasibility": {
+    "directional_alpha_supported": false,
+    "directional_asymmetry_classification": "POST_HOC_ONLY",
+    "buy_only_selection_allowed": false,
+    "evidence": "BUY/SELL slices are diagnostic and cannot authorize a BUY-only rule after fresh outcomes."
+  },
+  "score_calibration": {
+    "classification": "SCORE_NOT_DECISION_GRADE",
+    "primary_calibration_failures": [
+      "M1",
+      "M1.1",
+      "M1.2",
+      "M1.3",
+      "M1.5"
+    ],
+    "isolated_diagnostic_passes_are_not_independent_proof": true
+  },
+  "information_domains": [
+    {
+      "domain": "1h OHLCV",
+      "status": "TESTED",
+      "feasibility": "AVAILABLE"
+    },
+    {
+      "domain": "technical structure",
+      "status": "TESTED",
+      "feasibility": "AVAILABLE"
+    },
+    {
+      "domain": "market regime",
+      "status": "TESTED",
+      "feasibility": "AVAILABLE"
+    },
+    {
+      "domain": "cross-sectional ranks",
+      "status": "TESTED",
+      "feasibility": "AVAILABLE"
+    },
+    {
+      "domain": "relative/residual momentum",
+      "status": "TESTED",
+      "feasibility": "AVAILABLE"
+    },
+    {
+      "domain": "lead-lag",
+      "status": "TESTED",
+      "feasibility": "AVAILABLE"
+    },
+    {
+      "domain": "funding",
+      "status": "TESTED",
+      "feasibility": "PARTIAL"
+    },
+    {
+      "domain": "open interest",
+      "status": "TESTED",
+      "feasibility": "PARTIAL"
+    },
+    {
+      "domain": "basis/premium",
+      "status": "TESTED",
+      "feasibility": "PARTIAL"
+    },
+    {
+      "domain": "taker flow",
+      "status": "TESTED",
+      "feasibility": "PARTIAL"
+    },
+    {
+      "domain": "true historical order book",
+      "status": "NOT_AVAILABLE",
+      "feasibility": "VENDOR_OR_ARCHIVE_REQUIRED"
+    },
+    {
+      "domain": "trade-level microstructure",
+      "status": "PARTIALLY_AVAILABLE",
+      "feasibility": "TICK_DATA_AND_PIT_AUDIT_REQUIRED"
+    },
+    {
+      "domain": "liquidation flow",
+      "status": "NOT_AVAILABLE",
+      "feasibility": "VENDOR_OR_ARCHIVE_REQUIRED"
+    },
+    {
+      "domain": "sub-hour event structure",
+      "status": "NOT_AVAILABLE",
+      "feasibility": "SUB_HOUR_DATA_AND_PIT_AUDIT_REQUIRED"
+    },
+    {
+      "domain": "external cross-market information",
+      "status": "AVAILABLE_AND_UNTESTED",
+      "feasibility": "PIT_ALIGNED_DATA_REQUIRED"
+    }
+  ],
+  "multiplicity": {
+    "primary_research_stages": 6,
+    "candidate_model_or_policy_variants": {
+      "M1": "bounded candidate records, not independent models (10656)",
+      "M1_1": "11/20",
+      "M1_2": "10/16",
+      "M1_3": "12/12",
+      "M1_4": "4 lanes plus 3 density views",
+      "M1_5": "4 fixed policies"
+    },
+    "generated_candidate_signal_rows": {
+      "M1": 10656
+    },
+    "diagnostic_policies": [
+      "M1.2 C7",
+      "M1.3 X8",
+      "M1.4 density views",
+      "M1.5 D1/D2"
+    ],
+    "fresh_confirmations": 1,
+    "interpretation": "Researcher degrees of freedom and diagnostic selection mean winners are not independent proof; accumulation is classified conservatively."
+  },
+  "event_magnitude_evidence": {
+    "source_stage": "M1.4",
+    "directional_alpha": false,
+    "horizon_hours": 8,
+    "absolute_return_enrichment_percent": 0.25004553,
+    "ci95": [
+      0.21376041,
+      0.28775761
+    ],
+    "event_concentration": 0.50727651,
+    "gate_pass": false,
+    "product_value": "Potentially useful as a separate human-facing market-event alert research question, but the accepted gate is false because of concentration; no deployment or pivot is authorized here."
+  },
+  "decision": "STOP_ALPHA_EXPANSION_KEEP_ALERT_PLATFORM",
+  "decision_count": 1,
+  "future_recommendation": {
+    "closed_directional_lines": [
+      "X8 cross-sectional lead-lag",
+      "signal sparsification",
+      "basic derivative augmentation",
+      "current cross-sectional directional line"
+    ],
+    "focus": [
+      "signal product quality",
+      "alert UX",
+      "observability",
+      "data integrity",
+      "performance monitoring"
+    ],
+    "new_information_domain": null,
+    "implementation_authorized": false
+  },
+  "safety_flags": {
+    "SIGNAL_ONLY": true,
+    "USER_DECIDES_ENTRY": true,
+    "USER_DECIDES_POSITION_SIZE": true,
+    "USER_DECIDES_EXIT": true,
+    "V1_UNCHANGED": true,
+    "V2_PRODUCTION_ENABLED": false,
+    "AUTO_TRADING": false,
+    "PRIVATE_TRADING_API": false,
+    "M2_STARTED": false
+  },
+  "holdout_outcomes_opened": false,
+  "new_candidates_generated": false,
+  "production_route_changes": false,
+  "report_hash": "29f4f8175e7db25aa33f020c64fb7820810629e6f2c95363558906a702074c61"
+}
