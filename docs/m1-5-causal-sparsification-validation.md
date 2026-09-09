@@ -50,8 +50,8 @@
 | --- | --- | --- | --- |
 | RETROSPECTIVE_TOP1_PER_4H_EVENT_PER_DIRECTION | false | false | false |
 | RETROSPECTIVE_TOP1_PER_4H_EVENT_TOTAL | false | false | false |
-| CAUSAL_BUCKET_CLOSE_TOP1_PER_DIRECTION | false | false | false |
-| CAUSAL_BUCKET_CLOSE_TOP1_TOTAL | false | false | true |
+| CAUSAL_BUCKET_CLOSE_TOP1_PER_DIRECTION | false | true | false |
+| CAUSAL_BUCKET_CLOSE_TOP1_TOTAL | false | true | true |
 
 ## Validation windows
 

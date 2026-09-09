@@ -1438,12 +1438,12 @@
           }
         ]
       },
-      "deployable": false,
+      "deployable": true,
       "secondary_only": false,
       "contract": {
         "selection": "last fully closed 1h snapshot at each fixed UTC 4h bucket close; max one BUY and one SELL",
         "retrospective": false,
-        "deployable": false,
+        "deployable": true,
         "causal": true,
         "primary_confirmatory": true
       },
@@ -1687,12 +1687,12 @@
         ]
       },
       "calibration": null,
-      "deployable": false,
+      "deployable": true,
       "secondary_only": true,
       "contract": {
         "selection": "last fully closed 1h snapshot at each fixed UTC 4h bucket close; max one total signal",
         "retrospective": false,
-        "deployable": false,
+        "deployable": true,
         "causal": true,
         "secondary_only": true
       },
