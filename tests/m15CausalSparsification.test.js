@@ -9,6 +9,7 @@ import {
   M15_POLICY_ORDER,
   M15_SAFETY_FLAGS,
   M15_VALIDATION_WINDOW_COUNT,
+  assignPolicyRecordsToValidationWindows,
   buildCausalViews,
   buildCausalityGap,
   buildDiscoveryRetention,
@@ -18,6 +19,7 @@ import {
   evaluateAbsolutePromotion,
   evaluateC1Confirmation,
   evaluateD1Replication,
+  fixedEventBoundsFromId,
   movingBlockBootstrap,
   resolveM15Decision,
   standardEventBootstrap,
@@ -131,6 +133,84 @@ test('validation windows are exactly eight contiguous outcome-independent window
   assert.equal(plan.windows[0].event_close_start_timestamp < plan.windows[1].event_close_start_timestamp, true);
   const poisoned = rows.map(record => ({ ...record, forward_returns: { '8h': -999 } }));
   assert.equal(buildValidationWindows(poisoned).validation_plan_hash, plan.validation_plan_hash);
+});
+
+test('retrospective assignments use fixed event IDs for all eight window boundaries', () => {
+  const planRows = Array.from({ length: 16 }, (_, eventIndex) => eventRows(eventIndex)[0]);
+  const plan = buildValidationWindows(planRows);
+  assert.equal(plan.windows.length, 8);
+  assert.deepEqual(
+    fixedEventBoundsFromId(plan.windows[0].event_id_start),
+    {
+      event_id: plan.windows[0].event_id_start,
+      event_start_timestamp: BASE,
+      event_close_timestamp: BASE + 4 * HOUR - 1,
+    },
+  );
+
+  const earlyRecords = Array.from({ length: 16 }, (_, eventIndex) => row(
+    eventIndex,
+    eventIndex % SYMBOLS.length,
+    BASE + eventIndex * 4 * HOUR + HOUR,
+  ));
+  const retrospective = buildRetrospectiveViews(earlyRecords);
+  for (const policyId of [M15_POLICY_IDS.D1, M15_POLICY_IDS.D2]) {
+    const assignment = assignPolicyRecordsToValidationWindows(retrospective[policyId], plan);
+    assert.equal(assignment.input_independent_events, 16);
+    assert.equal(assignment.assigned_independent_events, 16);
+    assert.equal(assignment.dropped_signal_count, 0);
+    assert.equal(assignment.dropped_in_support_policy_records, 0);
+    assert.equal(assignment.event_assignment_integrity.pass, true);
+    for (const window of plan.windows) {
+      const selected = assignment.records.find(record => (
+        record.independent_market_event_id === window.event_id_start
+      ));
+      assert.equal(selected.review_window_index, window.index);
+    }
+  }
+
+  const sameEvent = [
+    row(0, 0, BASE + HOUR),
+    row(0, 1, BASE + 2 * HOUR, {
+      edge_score: -999,
+      forward_returns: { '8h': -999 },
+    }),
+  ];
+  const sameEventAssignment = assignPolicyRecordsToValidationWindows(sameEvent, plan);
+  assert.deepEqual(sameEventAssignment.records.map(record => record.review_window_index), [0, 0]);
+
+  const mutated = earlyRecords.map(record => ({
+    ...record,
+    timestamp: record.timestamp + 2 * HOUR,
+    edge_score: record.edge_score + 1000,
+    forward_returns: { '8h': -777 },
+  }));
+  const originalAssignment = assignPolicyRecordsToValidationWindows(earlyRecords, plan);
+  const mutatedAssignment = assignPolicyRecordsToValidationWindows(mutated, plan);
+  assert.deepEqual(
+    mutatedAssignment.records.map(record => [record.independent_market_event_id, record.review_window_index]),
+    originalAssignment.records.map(record => [record.independent_market_event_id, record.review_window_index]),
+  );
+  assert.equal(
+    buildValidationWindows(planRows.map(record => ({
+      ...record,
+      timestamp: record.timestamp - 3 * HOUR,
+      forward_returns: { '8h': -123 },
+      edge_score: -321,
+    }))).validation_event_window_map_hash,
+    plan.validation_event_window_map_hash,
+  );
+
+  assert.throws(
+    () => buildValidationWindows([{ ...planRows[0], independent_market_event_id: 'unknown-event' }]),
+    error => error.code === 'INVALID_FIXED_MARKET_EVENT_ID',
+  );
+  assert.throws(
+    () => assignPolicyRecordsToValidationWindows([
+      { ...earlyRecords[0], independent_market_event_id: 'unknown-event' },
+    ], plan),
+    error => error.code === 'INVALID_FIXED_MARKET_EVENT_ID',
+  );
 });
 
 test('standard and moving-block event bootstrap are deterministic and event-level', () => {

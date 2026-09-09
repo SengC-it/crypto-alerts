@@ -263,12 +263,12 @@ function calibrationForC1(records) {
   });
 }
 
-function directionReports(records, windows) {
+function directionReports(records, validationPlan) {
   const result = {};
   for (const direction of ['BUY', 'SELL']) {
     const policy = evaluateM15Policy(
       records.filter(record => String(record.direction).toUpperCase() === direction),
-      windows,
+      validationPlan,
     );
     result[direction] = compactPolicyMetrics(policy);
   }
@@ -303,14 +303,14 @@ function policyContract() {
     [M15_POLICY_IDS.C1]: {
       selection: 'last fully closed 1h snapshot at each fixed UTC 4h bucket close; max one BUY and one SELL',
       retrospective: false,
-      deployable: false,
+      deployable: true,
       causal: true,
       primary_confirmatory: true,
     },
     [M15_POLICY_IDS.C2]: {
       selection: 'last fully closed 1h snapshot at each fixed UTC 4h bucket close; max one total signal',
       retrospective: false,
-      deployable: false,
+      deployable: true,
       causal: true,
       secondary_only: true,
     },
@@ -360,6 +360,8 @@ function markdownReport(report) {
     '- Base main SHA: ' + report.base_main_sha,
     '- M1.4 source SHA: ' + report.m1_4_source_sha,
     '- Experiment source SHA: ' + report.experiment_source_sha,
+    '- Supersedes: ' + report.supersedes_run_version + ' (' + report.supersedes_reason + ')',
+    '- Prior run status: ' + report.prior_run_status,
     '- Config hash: ' + report.config_hash,
     '- Validation data manifest hash: ' + report.validation_data_manifest_hash,
     '- Outcome data manifest hash: ' + report.outcome_data_manifest_hash,
@@ -373,6 +375,7 @@ function markdownReport(report) {
     '- Net round-trip cost: ' + report.round_trip_cost_percent + '%',
     '- Causal bucket-close breadth floor: ' + report.causal_bucket_close_min_valid_symbols,
     '- Contiguous windows: ' + windows.length + ' (plan hash ' + report.validation.validation_plan_hash + ')',
+    '- Event-window map hash: ' + report.validation.validation_event_window_map_hash,
     '- Standard bootstrap: ' + report.bootstrap.repetitions + ' reps, seed ' + report.bootstrap.seed,
     '- Moving block bootstrap: ' + report.bootstrap.block_length_events + ' events / ' + report.bootstrap.block_length_hours + 'h',
     '',
@@ -447,9 +450,9 @@ async function main() {
   maxRetries = positiveInteger(argument('max-retries'), maxRetries);
   const archiveConcurrency = positiveInteger(argument('archive-concurrency'), 6);
   const symbolConcurrency = positiveInteger(argument('symbol-concurrency'), 2);
-  const reportPath = path.resolve(argument('report-out', 'reports/m1-5-causal-sparsification-validation.json'));
-  const manifestPath = path.resolve(argument('manifest-out', 'reports/m1-5-validation-data-manifest.json'));
-  const docsPath = path.resolve(argument('docs-out', 'docs/m1-5-causal-sparsification-validation.md'));
+  const reportPath = path.resolve(argument('report-out', 'reports/m1-5-causal-sparsification-validation-0.1.1.json'));
+  const manifestPath = path.resolve(argument('manifest-out', 'reports/m1-5-validation-data-manifest-0.1.1.json'));
+  const docsPath = path.resolve(argument('docs-out', 'docs/m1-5-causal-sparsification-validation-0.1.1.md'));
   const symbols = exactConfiguredSymbols();
 
   const data = await loadResearchData(symbols, { archiveConcurrency, symbolConcurrency });
@@ -513,8 +516,20 @@ async function main() {
   };
   const evaluated = Object.fromEntries(M15_POLICY_ORDER.map(policyId => [
     policyId,
-    evaluateM15Policy(policyRecords[policyId], windows),
+    evaluateM15Policy(policyRecords[policyId], validationPlan),
   ]));
+  for (const policyId of M15_POLICY_ORDER) {
+    const assignment = evaluated[policyId].assignment;
+    if (assignment.dropped_in_support_policy_records !== 0) {
+      throw new Error(
+        'DROPPED_IN_SUPPORT_POLICY_RECORDS=' + assignment.dropped_in_support_policy_records
+        + ' for ' + policyId,
+      );
+    }
+    if (assignment.event_assignment_integrity?.pass !== true) {
+      throw new Error('M1.5 event assignment integrity failed for ' + policyId);
+    }
+  }
 
   const d1Gate = evaluateD1Replication(evaluated[M15_POLICY_IDS.D1]);
   const d2Gate = evaluateD1Replication(evaluated[M15_POLICY_IDS.D2]);
@@ -576,6 +591,7 @@ async function main() {
     m14SourceSha: M15_M14_SOURCE_SHA,
     symbols,
     validationPlanHash: validationPlan.validation_plan_hash,
+    validationEventWindowMapHash: validationPlan.validation_event_window_map_hash,
     gates: gateContract,
   });
 
@@ -589,11 +605,11 @@ async function main() {
     policyReport[policyId] = {
       ...toPolicyReport(evaluated[policyId], gate, {
         calibration: isC1 ? c1Calibration : null,
-        deployable: false,
+        deployable: isC1 || policyId === M15_POLICY_IDS.C2,
         secondaryOnly: policyId === M15_POLICY_IDS.C2,
       }),
       contract: contract[policyId],
-      directional_slices: directionReports(policyRecords[policyId], windows),
+      directional_slices: directionReports(policyRecords[policyId], validationPlan),
     };
   }
 
@@ -608,6 +624,12 @@ async function main() {
     base_main_sha: M15_BASE_MAIN_SHA,
     m1_4_source_sha: M15_M14_SOURCE_SHA,
     experiment_source_sha: experimentSourceSha,
+    supersedes_run_version: 'm1.5-causal-sparsification-0.1.0',
+    supersedes_reason: 'RETROSPECTIVE_EVENT_WINDOW_ASSIGNMENT_METHOD_ERROR',
+    prior_run_status: 'INVALIDATED_METHOD_ERROR',
+    prior_run_invalidated_reason: 'RETROSPECTIVE_EVENT_WINDOW_ASSIGNMENT_USED_SELECTED_RECORD_TIME',
+    prior_invalidated_performance_runs: 1,
+    corrected_official_performance_run_count: 1,
     candidate_id: 'X8-btc-eth-lead-lag-continuation',
     primary_horizon_hours: M15_PRIMARY_HORIZON_HOURS,
     round_trip_cost_percent: M15_COST_PERCENT,
@@ -624,6 +646,7 @@ async function main() {
       m1_4_official_end: '2026-07-12T11:59:59.999Z',
       no_overlap_with_m1_4: true,
       validation_plan_hash: validationPlan.validation_plan_hash,
+      validation_event_window_map_hash: validationPlan.validation_event_window_map_hash,
       windows,
     },
     coverage: {
@@ -640,6 +663,10 @@ async function main() {
       causal_bucket_close_rejections: rejectionSummary(causal.support.rejected_events),
       min_valid_symbols_at_bucket_close: M15_MIN_BUCKET_CLOSE_BREADTH,
       eight_hour_outcome_missing_count: 0,
+      policy_assignments: Object.fromEntries(M15_POLICY_ORDER.map(policyId => [
+        policyId,
+        evaluated[policyId].assignment,
+      ])),
     },
     feature_provenance: {
       feature_version: featureResult.feature_version,

@@ -13,7 +13,7 @@ import {
 const HOUR = 60 * 60 * 1000;
 const FOUR_HOURS = 4 * HOUR;
 
-export const M15_RESEARCH_VERSION = 'm1.5-causal-sparsification-0.1.0';
+export const M15_RESEARCH_VERSION = 'm1.5-causal-sparsification-0.1.1';
 export const M15_BASE_MAIN_SHA = '748e41815948ca5cd7b9016738a593b760e5d6ad';
 export const M15_M14_SOURCE_SHA = '859ea3ba69bf7df89cb6f2fe34ebd9fd0dd1ac8d';
 export const M15_X8_CANDIDATE = 'X8-btc-eth-lead-lag-continuation';
@@ -27,7 +27,7 @@ export const M15_MIN_BUCKET_CLOSE_BREADTH = 12;
 export const M15_VALIDATION_SIGNAL_START = '2026-07-12T12:59:59.999Z';
 export const M15_VALIDATION_SIGNAL_END = '2026-09-07T15:59:59.999Z';
 export const M15_OUTCOME_DATA_END = '2026-09-07T23:59:59.999Z';
-export const M15_EXPERIMENT_ID = 'm1.5-public_binance_futures-2026-07-12_to_2026-09-07-causal-sparsification-0.1.0';
+export const M15_EXPERIMENT_ID = 'm1.5-public_binance_futures-2026-07-12_to_2026-09-07-causal-sparsification-0.1.1';
 
 export const M15_POLICY_IDS = Object.freeze({
   D1: 'RETROSPECTIVE_TOP1_PER_4H_EVENT_PER_DIRECTION',
@@ -93,8 +93,7 @@ function eventId(record) {
     ?? record?.market_event_id
     ?? record?.event_id;
   if (explicit !== null && explicit !== undefined && explicit !== '') return String(explicit);
-  const time = timestamp(record?.timestamp ?? record?.signal_timestamp ?? record?.close_time);
-  return time === null ? null : 'm15-4h:' + (Math.floor(time / FOUR_HOURS) * FOUR_HOURS);
+  return null;
 }
 
 function recordTime(record) {
@@ -138,17 +137,47 @@ function eventGroups(records = []) {
   return groups;
 }
 
+export function fixedEventBoundsFromId(value) {
+  const event_id = String(value ?? '');
+  const match = event_id.match(/^(?:m13|m15)-4h:(\d+)$/);
+  if (!match) return null;
+  const event_start_timestamp = Number(match[1]);
+  const event_close_timestamp = event_start_timestamp + FOUR_HOURS - 1;
+  if (!Number.isSafeInteger(event_start_timestamp)
+    || !Number.isSafeInteger(event_close_timestamp)
+    || event_start_timestamp % FOUR_HOURS !== 0) {
+    return null;
+  }
+  return {
+    event_id,
+    event_start_timestamp,
+    event_close_timestamp,
+  };
+}
+
+function invalidFixedEventError(value) {
+  const error = new Error('INVALID_FIXED_MARKET_EVENT_ID: ' + String(value ?? ''));
+  error.code = 'INVALID_FIXED_MARKET_EVENT_ID';
+  return error;
+}
+
+function assertFixedEventId(value) {
+  const bounds = fixedEventBoundsFromId(value);
+  if (!bounds) throw invalidFixedEventError(value);
+  return bounds;
+}
+
 function eventSummaries(records = []) {
+  for (const record of records) assertFixedEventId(eventId(record));
   return [...eventGroups(records)].map(([id, rows]) => {
-    const times = rows.map(recordTime).filter(value => value !== null);
-    const close = times.length ? Math.max(...times) : null;
+    const bounds = assertFixedEventId(id);
     return {
       event_id: id,
-      event_close_timestamp: close,
-      event_start_timestamp: close === null ? null : close - FOUR_HOURS + 1,
+      event_close_timestamp: bounds.event_close_timestamp,
+      event_start_timestamp: bounds.event_start_timestamp,
       record_count: rows.length,
     };
-  }).filter(event => event.event_close_timestamp !== null);
+  });
 }
 
 function compareEvents(left, right) {
@@ -165,6 +194,7 @@ function withWindow(record, index) {
  * as retrospective diagnostics and are explicitly non-deployable.
  */
 export function buildRetrospectiveViews(records = []) {
+  for (const record of records) assertFixedEventId(eventId(record));
   const views = buildDensityViews(records);
   return {
     [M15_POLICY_IDS.D1]: [...views.TOP1_PER_4H_EVENT_PER_DIRECTION],
@@ -178,16 +208,7 @@ export function buildRetrospectiveViews(records = []) {
 }
 
 function closeRowsForEvent(id, rows) {
-  const times = rows.map(recordTime).filter(value => value !== null);
-  if (!times.length) return { closeTimestamp: null, rows: [] };
-  const encodedStart = String(id).match(/(?:m13|m15)-4h:(\d+)$/)?.[1];
-  const eventStart = encodedStart
-    ? Number(encodedStart)
-    : Math.floor(Math.min(...times) / FOUR_HOURS) * FOUR_HOURS;
-  const declaredClose = rows
-    .map(record => finite(record.bucket_close_signal_timestamp))
-    .find(value => value !== null);
-  const closeTimestamp = declaredClose ?? (eventStart + FOUR_HOURS - 1);
+  const closeTimestamp = assertFixedEventId(id).event_close_timestamp;
   return {
     closeTimestamp,
     rows: rows
@@ -207,6 +228,7 @@ function closeRowsForEvent(id, rows) {
 export function buildCausalViews(records = [], {
   minValidSymbols = M15_MIN_BUCKET_CLOSE_BREADTH,
 } = {}) {
+  for (const record of records) assertFixedEventId(eventId(record));
   const eligibleCloseRows = [];
   const eligibleEvents = [];
   const rejectedEvents = [];
@@ -266,6 +288,7 @@ export function buildValidationWindows(records = [], {
   const baseSize = Math.floor(events.length / windowCount);
   const remainder = events.length % windowCount;
   const windows = [];
+  const eventWindowMap = [];
   let cursor = 0;
   for (let index = 0; index < windowCount; index += 1) {
     const count = baseSize + (index < remainder ? 1 : 0);
@@ -284,40 +307,125 @@ export function buildValidationWindows(records = [], {
       signal_start_timestamp: first.event_close_timestamp,
       signal_end_timestamp: last.event_close_timestamp,
     });
+    for (const event of slice) {
+      eventWindowMap.push({
+        event_id: event.event_id,
+        event_start_timestamp: event.event_start_timestamp,
+        event_close_timestamp: event.event_close_timestamp,
+        window_index: index,
+      });
+    }
   }
   const plan = {
     version: M15_RESEARCH_VERSION,
     window_count: windowCount,
     eligible_event_count: events.length,
     windows,
+    event_window_map: eventWindowMap,
   };
   return {
     ...plan,
     validation_plan_hash: hashConfig(plan),
+    validation_event_window_map_hash: hashConfig(eventWindowMap),
   };
 }
 
-export function assignValidationWindows(records = [], plan = {}) {
+function eventWindowMapForPlan(records, plan = {}) {
+  if (Array.isArray(plan.event_window_map) && plan.event_window_map.length) {
+    return plan.event_window_map.map(item => ({
+      event_id: String(item.event_id),
+      event_start_timestamp: finite(item.event_start_timestamp),
+      event_close_timestamp: finite(item.event_close_timestamp),
+      window_index: item.window_index,
+    }));
+  }
   const ranges = (plan.windows || []).map(window => ({
     ...window,
     start: finite(window.event_close_start_timestamp),
     end: finite(window.event_close_end_timestamp),
   }));
-  const byEvent = new Map();
-  const chronological = eventSummaries(records).sort(compareEvents);
-  for (const event of chronological) {
+  return eventSummaries(records).sort(compareEvents).map(event => {
     const window = ranges.find(candidate => (
       event.event_close_timestamp >= candidate.start
       && event.event_close_timestamp <= candidate.end
     ));
-    if (window) byEvent.set(event.event_id, window.index);
+    return window ? {
+      event_id: event.event_id,
+      event_start_timestamp: event.event_start_timestamp,
+      event_close_timestamp: event.event_close_timestamp,
+      window_index: window.index,
+    } : null;
+  }).filter(Boolean);
+}
+
+function hashEventIds(ids = []) {
+  return hashConfig([...new Set([...ids].map(String))].sort());
+}
+
+export function assignPolicyRecordsToValidationWindows(records = [], plan = {}) {
+  const eventWindowMap = eventWindowMapForPlan(records, plan);
+  const byEvent = new Map(eventWindowMap.map(item => [item.event_id, item.window_index]));
+  const planEventIds = new Set(byEvent.keys());
+  const assigned = [];
+  const dropped = [];
+  const inputEventIds = new Set();
+  const assignedEventIds = new Set();
+  const droppedEventIds = new Set();
+  const droppedInSupportEventIds = new Set();
+
+  for (const record of records) {
+    const id = eventId(record);
+    assertFixedEventId(id);
+    inputEventIds.add(id);
+    const index = byEvent.get(id);
+    if (index === undefined) {
+      dropped.push(record);
+      droppedEventIds.add(id);
+      continue;
+    }
+    assigned.push(withWindow(record, index));
+    assignedEventIds.add(id);
   }
-  return records
-    .map(record => {
-      const index = byEvent.get(eventId(record));
-      return index === undefined ? null : withWindow(record, index);
-    })
-    .filter(Boolean);
+
+  for (const id of inputEventIds) {
+    if (planEventIds.has(id) && !assignedEventIds.has(id)) droppedInSupportEventIds.add(id);
+  }
+  const validationEventWindowMapHash = plan.validation_event_window_map_hash
+    || hashConfig(eventWindowMap);
+  const inputInSupportEventIds = [...inputEventIds].filter(id => planEventIds.has(id));
+  const droppedInSupportRecords = dropped.filter(record => planEventIds.has(eventId(record))).length;
+  const assignmentIntegrity = {
+    pass: droppedInSupportRecords === 0
+      && droppedInSupportEventIds.size === 0
+      && assigned.every(record => byEvent.get(eventId(record)) === record.review_window_index),
+    all_records_from_same_event_share_window: assigned.every(record => (
+      byEvent.get(eventId(record)) === record.review_window_index
+    )),
+    input_event_ids_in_validation_plan: inputInSupportEventIds.length,
+    dropped_in_support_event_count: droppedInSupportEventIds.size,
+    dropped_in_support_record_count: droppedInSupportRecords,
+    validation_event_window_map_hash: validationEventWindowMapHash,
+  };
+  return {
+    records: assigned,
+    input_signal_count: records.length,
+    assigned_signal_count: assigned.length,
+    dropped_signal_count: dropped.length,
+    input_independent_events: inputEventIds.size,
+    assigned_independent_events: assignedEventIds.size,
+    dropped_independent_events: droppedEventIds.size,
+    dropped_in_support_policy_records: droppedInSupportRecords,
+    dropped_in_support_event_ids: [...droppedInSupportEventIds].sort(),
+    input_event_ids_hash: hashEventIds(inputEventIds),
+    assigned_event_ids_hash: hashEventIds(assignedEventIds),
+    dropped_event_ids_hash: hashEventIds(droppedEventIds),
+    event_assignment_integrity: assignmentIntegrity,
+    validation_event_window_map_hash: validationEventWindowMapHash,
+  };
+}
+
+export function assignValidationWindows(records = [], plan = {}) {
+  return assignPolicyRecordsToValidationWindows(records, plan).records;
 }
 
 function eventValueSeries(records = [], accessor) {
@@ -325,10 +433,9 @@ function eventValueSeries(records = [], accessor) {
   for (const [id, rows] of eventGroups(records)) {
     const values = rows.map(accessor).filter(value => value !== null);
     if (!values.length) continue;
-    const times = rows.map(recordTime).filter(value => value !== null);
     result.push({
       event_id: id,
-      event_close_timestamp: times.length ? Math.max(...times) : 0,
+      event_close_timestamp: assertFixedEventId(id).event_close_timestamp,
       value: values.reduce((sum, value) => sum + value, 0) / values.length,
     });
   }
@@ -472,11 +579,14 @@ export function movingBlockBootstrap(records = [], {
   };
 }
 
-export function evaluateM15Policy(records = [], windows = [], {
+export function evaluateM15Policy(records = [], planOrWindows = [], {
   repetitions = M15_BOOTSTRAP_REPETITIONS,
   seed = M15_BOOTSTRAP_SEED,
 } = {}) {
-  const assigned = assignValidationWindows(records, { windows });
+  const plan = Array.isArray(planOrWindows) ? { windows: planOrWindows } : planOrWindows;
+  const windows = plan.windows || [];
+  const assignment = assignPolicyRecordsToValidationWindows(records, plan);
+  const assigned = assignment.records;
   const summary = summarizeReviewRecords(assigned, {
     horizonHours: M15_PRIMARY_HORIZON_HOURS,
     costPercent: M15_COST_PERCENT,
@@ -496,6 +606,7 @@ export function evaluateM15Policy(records = [], windows = [], {
     gross_window_summaries: grossSummary.gross_window_summaries,
     standard_bootstrap: standardEventBootstrap(assigned, { repetitions, seed }),
     moving_block_bootstrap: movingBlockBootstrap(assigned, { repetitions, seed }),
+    assignment,
     assigned_records: assigned,
   };
 }
@@ -612,6 +723,7 @@ export function buildM15ConfigHash({
   m14SourceSha = M15_M14_SOURCE_SHA,
   symbols = [],
   validationPlanHash = null,
+  validationEventWindowMapHash = null,
   gates = {},
 } = {}) {
   return hashConfig({
@@ -630,6 +742,7 @@ export function buildM15ConfigHash({
     round_trip_cost_percent: M15_COST_PERCENT,
     validation_window_count: M15_VALIDATION_WINDOW_COUNT,
     validation_plan_hash: validationPlanHash,
+    validation_event_window_map_hash: validationEventWindowMapHash,
     bootstrap_repetitions: M15_BOOTSTRAP_REPETITIONS,
     bootstrap_seed: M15_BOOTSTRAP_SEED,
     moving_block_length_events: M15_MOVING_BLOCK_LENGTH,
@@ -663,6 +776,22 @@ export function compactPolicyMetrics(policy = {}) {
     ...Object.fromEntries(fields.map(field => [field, policy[field] ?? null])),
     standard_bootstrap: policy.standard_bootstrap || null,
     moving_block_bootstrap: policy.moving_block_bootstrap || null,
+    assignment: policy.assignment
+      ? {
+        input_signal_count: policy.assignment.input_signal_count,
+        assigned_signal_count: policy.assignment.assigned_signal_count,
+        dropped_signal_count: policy.assignment.dropped_signal_count,
+        input_independent_events: policy.assignment.input_independent_events,
+        assigned_independent_events: policy.assignment.assigned_independent_events,
+        dropped_independent_events: policy.assignment.dropped_independent_events,
+        dropped_in_support_policy_records: policy.assignment.dropped_in_support_policy_records,
+        input_event_ids_hash: policy.assignment.input_event_ids_hash,
+        assigned_event_ids_hash: policy.assignment.assigned_event_ids_hash,
+        dropped_event_ids_hash: policy.assignment.dropped_event_ids_hash,
+        event_assignment_integrity: policy.assignment.event_assignment_integrity,
+        validation_event_window_map_hash: policy.assignment.validation_event_window_map_hash,
+      }
+      : null,
   };
 }
 
@@ -691,6 +820,7 @@ export const M15_INTERNALS = Object.freeze({
   timestamp,
   eventId,
   recordTime,
+  fixedEventBoundsFromId,
   grossOutcome,
   netOutcome,
   selectionKey,
