@@ -51,10 +51,12 @@ function excursion(direction, entryPrice, candle) {
 function futureCandleAt(series, index, entryTime, horizonHours) {
   if (entryTime !== null) {
     const targetTime = entryTime + horizonHours * 60 * 60 * 1000;
-    return series.slice(index + 1).find(candle => {
+    for (let cursor = index + 1; cursor < series.length; cursor += 1) {
+      const candle = series[cursor];
       const time = timeAt(candle);
-      return time !== null && time >= targetTime;
-    }) || null;
+      if (time !== null && time >= targetTime) return candle;
+    }
+    return null;
   }
   return series[index + horizonHours] || null;
 }
@@ -63,10 +65,17 @@ export class SignalEvaluator {
   constructor({ roundTripCostPercent = 0, horizons = DEFAULT_HORIZONS_HOURS } = {}) {
     this.roundTripCostPercent = roundTripCostPercent;
     this.horizons = horizons;
+    this.normalizedSeriesCache = new WeakMap();
   }
 
   evaluate(signal, candles, { signalIndex, entryPrice = signal?.suggestedEntry } = {}) {
-    const series = normalizeCandles(candles);
+    const series = Array.isArray(candles)
+      ? (this.normalizedSeriesCache.get(candles) || (() => {
+        const normalized = normalizeCandles(candles);
+        this.normalizedSeriesCache.set(candles, normalized);
+        return normalized;
+      })())
+      : normalizeCandles(candles);
     const signalTimeValue = signal?.signal_timestamp
       ?? signal?.trigger_time
       ?? signal?.generated_at

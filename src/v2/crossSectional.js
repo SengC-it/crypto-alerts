@@ -759,6 +759,15 @@ function directionalReturn(direction, entry, exit) {
   return round((direction === 'SELL' ? (entry - exit) / entry : (exit - entry) / entry) * 100, 6);
 }
 
+function firstCandleAtOrAfter(candles, startIndex, targetTime) {
+  for (let index = startIndex + 1; index < candles.length; index += 1) {
+    const candle = candles[index];
+    const time = candleCloseTime(candle);
+    if (time !== null && time >= targetTime) return candle;
+  }
+  return null;
+}
+
 function evaluateResearchSeries({
   direction,
   candles = [],
@@ -823,7 +832,7 @@ function evaluateResearchSeries({
   }
   for (const horizon of horizons) {
     const targetTime = entryTime + Number(horizon) * HOUR;
-    const future = candles.slice(index + 1).find(candle => candleCloseTime(candle) >= targetTime);
+    const future = firstCandleAtOrAfter(candles, index, targetTime);
     const gross = directionalReturn(direction, entry, finite(future?.close));
     result.forward_returns[`${horizon}h`] = gross;
     result.net_forward_returns[`${horizon}h`] = gross === null
