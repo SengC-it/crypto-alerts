@@ -1,7 +1,8 @@
 # M1.6 — Project-Level Profitability Feasibility Review
 
 - Base main SHA: `6361418a35e3d8f7e5aa1c6e5ce87bfb38830a2a`
-- Source SHA: `b78f97926a025e3f435c87c162e4fb4312bb2c6c`
+- Source SHA: `4d1516019bbd5afa5d2b64318137a21b023a6863`
+- Report version: `m1.6-profitability-feasibility-0.1.1`
 - Decision: `STOP_ALPHA_EXPANSION_KEEP_ALERT_PLATFORM`
 - Scope: accepted research evidence only; no alpha search, deployment, V2 enablement, or M2.
 
@@ -33,12 +34,15 @@ Only the accepted final artifacts are included. The invalidated M1.5 0.1.0 run i
 
 ## Cost and stability conclusions
 
-Fixed research cost remains 0.14%. Break-even cost is the gross mean expectancy; no cost or horizon was changed. Apparent density edge decays under fresh, causal validation; net confirmation fails.
+Fixed research cost remains 0.14%. Break-even cost is the gross mean expectancy; no cost or horizon was changed.
+No accepted fresh causal directional lane demonstrated robust edge surviving the fixed 0.14% cost. The M1.4 retrospective density diagnostic survived cost in discovery, but was non-deployable discovery evidence and failed independent causal confirmation in M1.5.
+Apparent density edge decays under fresh, causal validation; net confirmation fails.
 M1.4 → M1.5 expectancy delta: -0.11611486 percentage points; PF delta: -0.143315.
 
 ## Direction, score, and information domains
 
-Directional classification: POST_HOC_ONLY; BUY-only selection allowed: false.
+Directional alpha supported: false; asymmetry classification: POST_HOC_ONLY; BUY-only selection allowed: false.
+Decision inputs: evidence sufficient true; accepted directional promotion false; fresh causal confirmation false; fresh absolute promotion false; missing information primary limitation false; new domain feasible false; event-alert gate false.
 Score calibration: SCORE_NOT_DECISION_GRADE.
 Tested domains: 1h OHLCV, technical structure, market regime, cross-sectional ranks, relative/residual momentum, lead-lag, funding, open interest, basis/premium, taker flow.
 Untested/unavailable domains: true historical order book (NOT_AVAILABLE), trade-level microstructure (PARTIALLY_AVAILABLE), liquidation flow (NOT_AVAILABLE), sub-hour event structure (NOT_AVAILABLE), external cross-market information (AVAILABLE_AND_UNTESTED). No missing domain is claimed to contain alpha.
@@ -52,6 +56,7 @@ Untested/unavailable domains: true historical order book (NOT_AVAILABLE), trade-
 **STOP_ALPHA_EXPANSION_KEEP_ALERT_PLATFORM**
 
 Close the X8, signal sparsification, basic derivative augmentation, and current cross-sectional directional lines. Keep V1/alert-platform work scoped to product quality, alert UX, observability, data integrity, and performance monitoring.
+M1.4 retrospective density confirmatory: false.
 
 ```text
 SIGNAL_ONLY=true
