@@ -73,7 +73,7 @@ export async function prepareObservationDelivery(signals, {
       signal.observation_history = OBSERVATION_HISTORY;
       signal.raw_features.observation.candidates = ['OLD', ...signal.observation_candidates];
     }
-    signal.observation_performance = (signal.observation_candidates || ['OLD']).map(candidateId => {
+    signal.observation_performance = ['OLD', ...(signal.observation_candidates || [])].map(candidateId => {
       const summary = summarizeObservationPerformance(history.rows, { candidateId, strategy: signal.strategy, now });
       return { ...summary, candidateId, strategy: signal.strategy,
         closedTrades: summary.closed, openSignals: summary.open,

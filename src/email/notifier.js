@@ -210,9 +210,11 @@ function buildStrategyDetails(signal) {
     ${source}
     <div>触发收盘 ${escapeHtml(fmtTime(observationField(signal, 'observation_trigger_time')))}</div>
     <div>观察报价 ${referencePrice(signal) === null ? '未取得' : fmtPrice(referencePrice(signal))}；报价时间 ${escapeHtml(fmtTime(observationField(signal, 'observation_reference_time')))}</div>
-    <div style="margin-top:8px;font-weight:bold;color:#a7c4ff;">上线观察累计净收益（已结束参考）</div>
+    <div style="margin-top:8px;font-weight:bold;color:#a7c4ff;">原策略整体上线后累计净收益（已结束参考，含A/B命中）</div>
+    ${performanceRow('OLD', '原策略整体 / 本策略')}
+    <div style="margin-top:8px;font-weight:bold;color:#a7c4ff;">A/B分组·上线观察累计净收益（已结束参考）</div>
     ${rows}
-    <div style="color:#999;">A/B样本有重叠，两组累计不可相加。</div>
+    <div style="color:#999;">A/B样本有重叠，两组累计不可相加。原策略整体已包含A/B样本，整体与分组累计也不可相加。</div>
     ${costNote}
     ${historicalRows ? `<div style="margin-top:8px;color:#999;">历史回测固定快照（${escapeHtml(history.start)} 至 ${escapeHtml(history.end)}；初始${escapeHtml(history.capitalUSDT)} USDT、18币分配；与上线观察分别统计）</div>${historicalRows}` : ''}
   </div>`;

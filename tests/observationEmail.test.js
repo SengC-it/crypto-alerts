@@ -33,6 +33,21 @@ describe('Observation email rendering', () => {
     assert.doesNotMatch(buildSubject(signal()), /High priority/);
   });
 
+  it('shows the full original strategy cumulative result separately from its A/B subsets', () => {
+    const original = signal();
+    original.observation_performance.unshift({ candidateId: 'OLD', strategy: 'donchian_breakout',
+      closedTrades: 10, openSignals: 4, pendingSignals: 0, invalidSignals: 1,
+      netPnlUSDT: 25.67, complete: true, asOf: '2026-11-03T01:00:00Z', startedAt: '2026-11-03T00:00:00Z' });
+    for (const html of [buildHtml(original), buildSummaryHtml([original])]) {
+      assert.match(html, /原策略整体上线后累计净收益（已结束参考，含A\/B命中）/);
+      assert.match(html, /原策略整体 \/ 本策略：累计净收益 \+25\.67 USDT/);
+      assert.match(html, /候选A \/ 本策略：累计净收益 -12\.34 USDT/);
+      assert.match(html, /候选B \/ 本策略：暂无已结束样本/);
+      assert.match(html, /已结束 10 · 未结束 4 · 待复盘 0 · 无效 1/);
+      assert.match(html, /原策略整体已包含A\/B样本，整体与分组累计也不可相加/);
+    }
+  });
+
   it('separates live closed-reference performance from the historical capital snapshot', () => {
     const html = buildHtml(signal());
     for (const text of ['原始策略：唐奇安突破（donchian_breakout）', '成交量确认（volume_confirmation）',

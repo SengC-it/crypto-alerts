@@ -24,6 +24,7 @@ describe('Observation alert delivery integration', () => {
     assert.equal(first.newSignals, 1);
     assert.equal(sent.length, 1);
     assert.deepEqual(sent[0].observation_candidates, ['A', 'B']);
+    assert.deepEqual(sent[0].observation_performance.map(item => item.candidateId), ['OLD', 'A', 'B']);
     const row = store.memoryStore.values().next().value.row;
     assert.equal(row.priority_action, 'watch_only');
     assert.equal(row.tracking_status, 'watch_only');
@@ -46,6 +47,24 @@ describe('Observation alert delivery integration', () => {
     assert.equal(output[0].observation_performance[0].candidateId, 'OLD');
     assert.equal(output[0].observation_performance[0].netPnlUSDT, null);
     assert.equal(output[0].observation_performance[0].closedTrades, 0);
+  });
+
+  it('includes the whole original strategy cumulative alongside A/B subset cumulative', async () => {
+    const source = fixture();
+    const historyRow = (candidates, net) => ({ strategy: source.strategy,
+      delivery_status: 'delivered', delivered_at: source.candle_close_time,
+      raw_features: { observation: { version: 'ab-observation-v1', candidates,
+        evaluation: { version: 'observation-reference-v1', status: 'closed', net_pnl_usdt: net } } } });
+    const [prepared] = await prepareObservationDelivery([source], {
+      performance: { rows: [historyRow(['OLD'], 2), historyRow(['OLD', 'A', 'B'], 3)], available: true },
+      priceFetcher: async () => ({ price: '99.2' }),
+    });
+    assert.deepEqual(prepared.observation_performance.map(({ candidateId, netPnlUSDT, closedTrades }) =>
+      ({ candidateId, netPnlUSDT, closedTrades })), [
+      { candidateId: 'OLD', netPnlUSDT: 5, closedTrades: 2 },
+      { candidateId: 'A', netPnlUSDT: 3, closedTrades: 1 },
+      { candidateId: 'B', netPnlUSDT: 3, closedTrades: 1 },
+    ]);
   });
 
   it('keeps A and marks statistics unavailable if quote or performance services fail', async () => {
