@@ -7,6 +7,7 @@ import { SignalEngine } from './signal/engine.js';
 import { signalStore } from './db/signalStore.js';
 import { sendSignalEmail, sendStartupEmail, verifyEmailConfig } from './email/notifier.js';
 import { persistAndNotify } from './delivery.js';
+import { prepareObservationDelivery } from './signal/observationDelivery.js';
 
 const LOG_LEVELS = { error: 0, warn: 1, info: 2, debug: 3 };
 const currentLevel = LOG_LEVELS[CONFIG.LOG_LEVEL] ?? LOG_LEVELS.info;
@@ -52,7 +53,8 @@ async function onCandleClosed(symbol, candle, allCandles) {
   }
 
   // 4. 处理每个信号（去重 + 存储 + 通知）
-  for (const signal of evaluation.signals) {
+  const signals = await prepareObservationDelivery(evaluation.signals, { store: signalStore });
+  for (const signal of signals) {
     log('info', `[${signal.symbol}] ${signal.signal} signal from ${signal.name} (confidence: ${signal.confidence}%)`);
 
     // 去重检查

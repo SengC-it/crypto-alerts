@@ -26,6 +26,9 @@ const DEFAULT_PRIORITY = {
 };
 
 export function getSignalPriority(signal) {
+  if (signal?.observation_only || signal?.raw_features?.observation?.candidates?.some(id => id === 'A' || id === 'B')) {
+    return { level: 'watch', label: '观察候选', description: 'A/B观察信号，盈利能力仍在验证，由用户人工决策。', action: 'watch_only', rank: 1 };
+  }
   const confidence = Number(signal?.confidence || 0);
   return PRIORITY_TIERS.find(tier => confidence >= tier.minConfidence) || DEFAULT_PRIORITY;
 }

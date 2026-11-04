@@ -103,6 +103,121 @@ function formatPair(symbol) {
   }
   return symbol;
 }
+
+const STRATEGY_NAMES = {
+  rsi_reversal: 'RSI反转', macd_cross: 'MACD交叉',
+  bollinger_mean_reversion: '布林均值回归', ema_crossover: 'EMA交叉',
+  multi_indicator_resonance: '多指标共振', donchian_breakout: '唐奇安突破',
+  atr_volatility: 'ATR波动', volume_confirmation: '成交量确认',
+  resonance_SELL: '做空共振', resonance_BUY: '做多共振',
+};
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[char]);
+}
+
+function observationField(signal, key) {
+  const metadata = signal?.raw_features?.observation;
+  const persistedKey = {
+    observation_candidates: 'candidates', observation_reference_price: 'reference_price',
+    observation_reference_time: 'reference_time', observation_trigger_time: 'trigger_time',
+  }[key];
+  return signal?.[key] ?? metadata?.[key] ?? metadata?.[persistedKey];
+}
+
+function isObservation(signal) {
+  const flag = observationField(signal, 'observation_only');
+  return flag === undefined
+    ? Boolean(signal?.raw_features?.observation?.version && observationCandidates(signal).length)
+    : flag === true;
+}
+
+function hasReferenceMetadata(signal) {
+  return isObservation(signal) || Boolean(signal?.raw_features?.observation?.version);
+}
+
+function observationCandidates(signal) {
+  const candidates = observationField(signal, 'observation_candidates');
+  return [...new Set(Array.isArray(candidates) ? candidates.filter(id => ['A', 'B'].includes(id)) : [])];
+}
+
+function strategyLabel(strategy) {
+  return `${STRATEGY_NAMES[strategy] || '未知策略'}（${strategy || '未记录'}）`;
+}
+
+function numeric(value) {
+  return value === null || value === undefined || value === '' || !Number.isFinite(Number(value))
+    ? null : Number(value);
+}
+
+function fmtNet(value) {
+  const net = numeric(value);
+  return net === null ? '待复盘' : `${net >= 0 ? '+' : ''}${net.toFixed(2)} USDT`;
+}
+
+function fmtTime(value) {
+  const timestamp = new Date(value);
+  return value && !Number.isNaN(timestamp.getTime())
+    ? `${timestamp.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })} 北京时间` : '未记录';
+}
+
+function referencePrice(signal) {
+  return numeric(observationField(signal, 'observation_reference_price'));
+}
+
+function buildStrategyDetails(signal) {
+  const contributors = [...new Set([
+    ...(Array.isArray(signal.contributingStrategies) ? signal.contributingStrategies : []),
+    ...(Array.isArray(signal.contributing_evidence) ? signal.contributing_evidence.map(item => item.strategy) : []),
+  ].filter(Boolean))];
+  const source = `<div>原始策略：${escapeHtml(strategyLabel(signal.strategy))}</div>`
+    + (contributors.length ? `<div>参与策略：${contributors.map(id => escapeHtml(strategyLabel(id))).join('、')}</div>` : '');
+  const candidates = observationCandidates(signal);
+  const performance = Array.isArray(signal.observation_performance) ? signal.observation_performance : [];
+  function performanceRow(candidate, label = `候选${candidate} / 本策略`) {
+    const stats = performance.find(item => item.candidateId === candidate && item.strategy === signal.strategy);
+    if (!stats) return `<div>${label}：待复盘，暂无可用统计。</div>`;
+    const closed = numeric(stats.closedTrades ?? stats.closed);
+    const value = stats.complete !== true ? '统计不完整，累计净收益待复盘'
+      : closed === 0 ? '暂无已结束样本'
+        : numeric(stats.netPnlUSDT) === null ? '累计净收益待复盘'
+          : `累计净收益 ${fmtNet(stats.netPnlUSDT)}`;
+    return `<div>${label}：${escapeHtml(value)}</div>
+      <div style="color:#999;">已结束 ${closed ?? '未知'} · 未结束 ${numeric(stats.openSignals ?? stats.open) ?? '未知'} · 待复盘 ${numeric(stats.pendingSignals ?? stats.pending) ?? '未知'} · 无效 ${numeric(stats.invalidSignals ?? stats.invalid) ?? '未知'}</div>
+      <div style="color:#999;">观察起点 ${escapeHtml(fmtTime(stats.startedAt ?? stats.firstObservedAt))}；统计截至 ${escapeHtml(fmtTime(stats.asOf))}</div>`;
+  }
+  const costNote = '<div style="color:#999;">每个信号固定100 USDT参考，以邮件发送确认后下一完整分钟开盘价建立参考，扣除双边0.14%手续费与滑点及历史资金费；未结束不计为零，也不混入已结束累计。不是实际账户收益。</div>';
+  const quoteDetails = `<div>触发收盘 ${escapeHtml(fmtTime(observationField(signal, 'observation_trigger_time')))}</div>
+    <div>参考报价 ${referencePrice(signal) === null ? '未取得' : fmtPrice(referencePrice(signal))}；报价时间 ${escapeHtml(fmtTime(observationField(signal, 'observation_reference_time')))}</div>`;
+  if (!isObservation(signal)) {
+    const old = performance.find(item => item.candidateId === 'OLD' && item.strategy === signal.strategy);
+    return `<div style="font-size:12px;color:#aaa;line-height:1.7;margin-bottom:12px;">${source}${old
+      ? `${quoteDetails}<div style="margin-top:8px;font-weight:bold;">旧规则·本策略上线后累计（已结束参考）</div>${performanceRow('OLD', '旧规则 / 本策略')}${costNote}`
+      : '<div>该策略上线观察统计尚未建立</div>'}</div>`;
+  }
+  const rows = candidates.map(candidate => performanceRow(candidate)).join('');
+  const history = signal.observation_history;
+  const historicalRows = history?.byCandidate ? candidates.map(candidate => {
+    const snapshot = history.byCandidate[candidate];
+    if (!snapshot) return '';
+    const rate = numeric(snapshot.returnPercent);
+    return `<div>候选${candidate}整体：${escapeHtml(fmtNet(snapshot.netPnlUSDT))}${rate === null ? '' : `（${rate.toFixed(2)}%）`}，${numeric(snapshot.trades) ?? '未知'}笔。</div>`;
+  }).join('') : '';
+  return `<div style="background:#15243e;border:1px solid #7aa2ff55;border-radius:8px;padding:12px;margin-bottom:12px;font-size:12px;line-height:1.7;color:#ccc;">
+    <div style="color:#a7c4ff;font-weight:bold;">观察候选 ${candidates.map(escapeHtml).join(' + ')} · 仅信号提醒，开仓、仓位与退出由你决定，不自动交易</div>
+    ${source}
+    <div>触发收盘 ${escapeHtml(fmtTime(observationField(signal, 'observation_trigger_time')))}</div>
+    <div>观察报价 ${referencePrice(signal) === null ? '未取得' : fmtPrice(referencePrice(signal))}；报价时间 ${escapeHtml(fmtTime(observationField(signal, 'observation_reference_time')))}</div>
+    <div style="margin-top:8px;font-weight:bold;color:#a7c4ff;">上线观察累计净收益（已结束参考）</div>
+    ${rows}
+    <div style="color:#999;">A/B样本有重叠，两组累计不可相加。</div>
+    ${costNote}
+    ${historicalRows ? `<div style="margin-top:8px;color:#999;">历史回测固定快照（${escapeHtml(history.start)} 至 ${escapeHtml(history.end)}；初始${escapeHtml(history.capitalUSDT)} USDT、18币分配；与上线观察分别统计）</div>${historicalRows}` : ''}
+  </div>`;
+}
+
 export function formatSignalScore(signal) {
   const score = Number(signal?.score);
   if (Number.isFinite(score)) return score.toFixed(1);
@@ -115,18 +230,21 @@ export function formatSignalScore(signal) {
 /**
  * 生成邮件主题
  */
-function buildSubject(signal) {
+export function buildSubject(signal) {
   const pair = formatPair(signal.symbol);
   const icon = signal.signal === 'BUY' ? '🟢' : '🔴';
   const direction = signal.signal === 'BUY' ? '看涨提醒' : '看跌提醒';
   const priority = signal.priorityLabel ? ` ${signal.priorityLabel}` : '';
+  if (isObservation(signal)) {
+    return `[观察${observationCandidates(signal).join('+')}][${STRATEGY_NAMES[signal.strategy] || '未知策略'}] [${pair}] ${icon} ${direction} - 信号评分${formatSignalScore(signal)}`;
+  }
   return `[${pair}]${priority} ${icon} ${direction} - 信号评分${formatSignalScore(signal)}`;
 }
 
 /**
  * 生成邮件正文 HTML
  */
-function buildHtml(signal) {
+export function buildHtml(signal) {
   const pair = formatPair(signal.symbol);
   const signalColor = signal.signal === 'BUY' ? '#16c784' : '#ea3943';
   const signalLabel = signal.signal === 'BUY' ? '看涨提醒' : '看跌提醒';
@@ -136,6 +254,9 @@ function buildHtml(signal) {
 
   const translatedReason = translateReason(signal.reason || '');
   const signalScore = formatSignalScore(signal);
+  const observation = isObservation(signal);
+  const hasReference = hasReferenceMetadata(signal);
+  const displayedPrice = hasReference ? referencePrice(signal) : signal.suggestedEntry;
 
   const indicatorRows = Object.entries(signal.indicators || {})
     .map(([k, v]) => `<tr><td style="padding:4px 12px;color:#999;">${translateIndicatorKey(k)}</td><td style="padding:4px 12px;font-weight:bold;">${v}</td></tr>`)
@@ -158,8 +279,8 @@ function buildHtml(signal) {
     <div style="padding:20px;">
       <div style="display:flex;justify-content:space-between;margin-bottom:16px;">
         <div>
-          <div style="color:#999;font-size:12px;">当前价格</div>
-          <div style="font-size:24px;font-weight:bold;color:#fff;">${fmtPrice(signal.suggestedEntry)}</div>
+          <div style="color:#999;font-size:12px;">${hasReference ? (observation ? '观察报价（见报价时间）' : '参考报价（见报价时间）') : '当前价格'}</div>
+          <div style="font-size:24px;font-weight:bold;color:#fff;">${fmtPrice(displayedPrice)}</div>
         </div>
         <div style="text-align:right;">
           <div style="color:#999;font-size:12px;">信号评分</div>
@@ -167,14 +288,16 @@ function buildHtml(signal) {
         </div>
       </div>
 
+      ${buildStrategyDetails(signal)}
+
       <!-- Entry/StopLoss/Target -->
       <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
         <tr style="background:#1a1a2e;">
-          <td style="padding:10px 12px;color:#999;">参考入场价</td>
+          <td style="padding:10px 12px;color:#999;">${hasReference ? '触发收盘参考价（非当前报价）' : '参考入场价'}</td>
           <td style="padding:10px 12px;text-align:right;font-weight:bold;color:#fff;">${fmtPrice(signal.suggestedEntry)}</td>
         </tr>
         <tr style="background:#1a1a2e;">
-          <td style="padding:10px 12px;color:#999;">止损位（跌破此价建议离场）</td>
+          <td style="padding:10px 12px;color:#999;">止损参考（${signal.signal === 'SELL' ? '上涨触及' : '下跌触及'}）</td>
           <td style="padding:10px 12px;text-align:right;font-weight:bold;color:#ea3943;">${fmtPrice(signal.stopLoss)}</td>
         </tr>
         <tr style="background:#1a1a2e;">
@@ -266,26 +389,26 @@ export function buildSummarySubject(signals, tierKey = 'all') {
   const tierNames = { tier1: '\u4e3b\u6d41', tier2: '\u70ed\u95e8', tier3: '\u65b0\u9510', all: '\u5168\u90e8' };
   const tierLabel = tierNames[tierKey] || '\u5168\u90e8';
 
+  const observations = annotated.filter(isObservation);
+  if (observations.length) {
+    const count = candidate => observations.filter(signal => observationCandidates(signal).includes(candidate)).length;
+    return `[观察信号汇总] A ${count('A')} / B ${count('B')} · ${observations.length}条观察提醒 - ${tierLabel}币种`;
+  }
+
   return '[\u4fe1\u53f7\u6c47\u603b] \u4ea4\u6613\u5c42 ' + tradingLayerCount + ' / \u89c2\u5bdf\u5c42 ' + watchLayerCount + ' | \u770b\u6da8 ' + buyCount + ' / \u770b\u8dcc ' + sellCount + ' - ' + tierLabel + '\u5e01\u79cd';
 }
 
-export async function sendSummaryEmail(signals, tierKey = 'all') {
-  const tp = ensureTransporter();
-  if (!tp) return false;
-
+export function buildSummaryHtml(signals, tierKey = 'all') {
   // 按置信度降序排列，最强的排最前面
   const sorted = annotateSignalPriorities(signals);
 
   const buySignals = sorted.filter(s => s.signal === 'BUY');
   const sellSignals = sorted.filter(s => s.signal === 'SELL');
-  const highPrioritySignals = sorted.filter(s => s.priority === 'high');
+  const highPrioritySignals = sorted.filter(s => s.priority === 'high' && !isObservation(s));
   const watchSignals = sorted.filter(s => s.priority === 'watch');
 
   const tierNames = { tier1: '主流', tier2: '热门', tier3: '新锐', all: '全部' };
   const tierLabel = tierNames[tierKey] || '全部';
-
-  // 邮件主题
-  const subject = buildSummarySubject(sorted, tierKey);
 
   // 构建每条信号的卡片
   function buildSignalCard(signal) {
@@ -294,7 +417,7 @@ export async function sendSummaryEmail(signals, tierKey = 'all') {
     const reason = translateReason(signal.reason || '');
     const signalScore = formatSignalScore(signal);
     const priorityColor = signal.priority === 'high' ? '#ffd700' : '#7aa2ff';
-    const priorityLabel = signal.priorityLabel || 'Opportunity watch';
+    const priorityLabel = isObservation(signal) ? `观察${observationCandidates(signal).join('+')}` : signal.priorityLabel || 'Opportunity watch';
 
     return `
     <div style="background:#1a1a2e;border-radius:8px;padding:14px;margin-bottom:10px;border-left:3px solid ${color};">
@@ -306,9 +429,10 @@ export async function sendSummaryEmail(signals, tierKey = 'all') {
         </div>
         <span style="color:${color};font-weight:bold;font-size:18px;">${signalScore}</span>
       </div>
+      ${buildStrategyDetails(signal)}
       <div style="color:#ccc;font-size:13px;margin-bottom:6px;">${reason}</div>
       <div style="display:flex;gap:16px;font-size:12px;color:#999;">
-        <span>现价 ${fmtPrice(signal.suggestedEntry)}</span>
+        <span>${hasReferenceMetadata(signal) ? (isObservation(signal) ? '观察报价 ' : '参考报价 ') + fmtPrice(referencePrice(signal)) : '现价 ' + fmtPrice(signal.suggestedEntry)}</span>
         <span style="color:#ea3943;">止损 ${fmtPrice(signal.stopLoss)}</span>
         <span style="color:#16c784;">目标 ${fmtPrice(signal.targetPrice)}</span>
       </div>
@@ -363,6 +487,18 @@ export async function sendSummaryEmail(signals, tierKey = 'all') {
   </div>
 </body>
 </html>`;
+
+  return html;
+}
+
+export async function sendSummaryEmail(signals, tierKey = 'all') {
+  const tp = ensureTransporter();
+  if (!tp) return false;
+  const sorted = annotateSignalPriorities(signals);
+  const buySignals = sorted.filter(signal => signal.signal === 'BUY');
+  const sellSignals = sorted.filter(signal => signal.signal === 'SELL');
+  const subject = buildSummarySubject(sorted, tierKey);
+  const html = buildSummaryHtml(sorted, tierKey);
 
   try {
     await tp.sendMail({

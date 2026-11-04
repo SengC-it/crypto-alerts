@@ -6,5 +6,7 @@ export default function handler(req, res) {
     status: 'ok',
     timestamp: new Date().toISOString(),
     version: '1.0.0',
+    observationRules: 'ab-observation-v1',
+    observationReferenceNotionalUSDT: 100,
   });
 }

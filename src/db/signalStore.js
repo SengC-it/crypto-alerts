@@ -319,6 +319,40 @@ export class SignalStore {
       .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
       .slice(0, limit);
   }
+
+  async getObservationSignals() {
+    await this._ready();
+    if (!this.supabase) throw new Error('Persistent observation history is unavailable');
+    const rows = [];
+    const deadline = Date.now() + 4000;
+    for (let offset = 0; ; offset += 1000) {
+      if (Date.now() >= deadline) throw new Error('Observation history query timed out');
+      const result = await this.supabase.from('crypto_signals').select('*')
+        .eq('raw_features->observation->>version', 'ab-observation-v1')
+        .eq('delivery_status', 'delivered').order('id', { ascending: true })
+        .range(offset, offset + 999).abortSignal(AbortSignal.timeout(Math.max(1, Math.min(2000, deadline - Date.now()))));
+      if (result.error) throw result.error;
+      if (!Array.isArray(result.data)) throw new Error('Invalid observation history');
+      rows.push(...result.data);
+      if (result.data.length < 1000) break;
+    }
+    return rows;
+  }
+
+  async saveObservationEvaluation(row, evaluation) {
+    await this._ready();
+    if (!this.supabase || row.id == null) throw new Error('Persistent observation history is unavailable');
+    const raw_features = { ...row.raw_features, observation: { ...row.raw_features.observation, evaluation } };
+    let query = this.supabase.from('crypto_signals').update({ raw_features }).eq('id', row.id);
+    const previousCursor = row.raw_features.observation.evaluation?.checked_until;
+    query = previousCursor
+      ? query.eq('raw_features->observation->evaluation->>checked_until', previousCursor)
+      : query.is('raw_features->observation->evaluation->>checked_until', null);
+    const result = await query.select('id').abortSignal(AbortSignal.timeout(2000));
+    if (result.error) throw result.error;
+    if (result.data?.length !== 1) throw new Error('Observation update matched no signal');
+    return { ...row, raw_features };
+  }
 }
 
 export const signalStore = new SignalStore();

@@ -9,6 +9,7 @@ import { filterClosedCandles } from '../../src/market/candle.js';
 import { signalStore } from '../../src/db/signalStore.js';
 import { sendSignalEmail } from '../../src/email/notifier.js';
 import { persistAndNotify } from '../../src/delivery.js';
+import { loadObservationPerformance, prepareObservationDelivery } from '../../src/signal/observationDelivery.js';
 
 const signalEngine = new SignalEngine({ config: CONFIG });
 
@@ -49,6 +50,11 @@ async function checkSymbol(symbol, {
   candleFetcher = getCandles,
   now = Date.now(),
   config = CONFIG,
+  store = signalStore,
+  sendEmail = sendSignalEmail,
+  priceFetcher,
+  performance,
+  engine,
 } = {}) {
   const indicatorLookbackCandles = getIndicatorLookback(config);
   // REST can include the forming candle, so request a small margin above N.
@@ -60,7 +66,7 @@ async function checkSymbol(symbol, {
   // REST usually includes the currently forming candle. Remove it before the
   // shared engine so the last closed candle remains eligible for evaluation.
   // The serverless path shares all signal logic with live and backtest.
-  const evaluation = evaluateSymbolCandles(symbol, rawCandles, { now, config });
+  const evaluation = evaluateSymbolCandles(symbol, rawCandles, { now, config, engine });
   if (!evaluation.eligible) {
     return {
       symbol,
@@ -71,17 +77,18 @@ async function checkSymbol(symbol, {
   }
 
   // Persist first, then transition delivery state around the send attempt.
+  const signals = await prepareObservationDelivery(evaluation.signals, { store, now, priceFetcher, performance });
   const results = [];
-  for (const signal of evaluation.signals) {
-    const isDup = await signalStore.isDuplicate(signal);
+  for (const signal of signals) {
+    const isDup = await store.isDuplicate(signal);
     if (isDup) {
       results.push({ ...signal, deduplicated: true });
       continue;
     }
     const delivery = await persistAndNotify({
       signal,
-      signalStore,
-      sendEmail: sendSignalEmail,
+      signalStore: store,
+      sendEmail,
     });
     results.push({
       ...signal,
@@ -122,10 +129,12 @@ export async function checkTierSignals(tierKey = 'all') {
     symbols = tier.symbols;
   }
 
+  // Refresh delivered observation references even when no new alert fires.
+  const performance = await loadObservationPerformance(signalStore);
   // 并行请求所有交易对
   const tasks = symbols.map(async (symbol) => {
     try {
-      const result = await checkSymbol(symbol, { config: CONFIG });
+      const result = await checkSymbol(symbol, { config: CONFIG, performance });
       return { ok: true, result };
     } catch (err) {
       return { ok: false, symbol, error: err.message };

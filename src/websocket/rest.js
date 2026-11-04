@@ -117,6 +117,14 @@ export async function getPrice(symbol) {
   return get('/fapi/v1/ticker/price', { symbol });
 }
 
+// Public history only. A one-day observation update contains at most six
+// settlements, well below the endpoint's 1,000-row limit.
+export async function getFundingHistory(symbol, startTime, endTimeExclusive) {
+  const rows = await get('/fapi/v1/fundingRate', { symbol, startTime, endTime: endTimeExclusive - 1, limit: 1000 });
+  if (!Array.isArray(rows) || rows.length >= 1000) throw new Error('Incomplete funding history');
+  return rows;
+}
+
 /**
  * Get 24hr ticker statistics
  */
